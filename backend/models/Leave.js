@@ -1,0 +1,21 @@
+const mongoose = require('mongoose');
+
+const leaveSchema = new mongoose.Schema({
+  employee: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  leaveType: { type: String, enum: ['casual', 'sick', 'annual', 'unpaid', 'maternity', 'paternity', 'compensatory'], required: true },
+  startDate: { type: Date, required: true },
+  endDate: { type: Date, required: true },
+  totalDays: { type: Number, required: true },
+  reason: { type: String, required: true },
+  status: { type: String, enum: ['pending', 'approved', 'rejected', 'cancelled'], default: 'pending' },
+  reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  reviewedAt: { type: Date },
+  reviewComment: { type: String },
+  isHalfDay: { type: Boolean, default: false },
+  halfDaySession: { type: String, enum: ['morning', 'afternoon'] },
+  attachments: [{ filename: String, url: String }],
+  handoverNote: { type: String }, // task handover during leave
+  emergencyContact: { type: String },
+}, { timestamps: true });
+
+module.exports = mongoose.model('Leave', leaveSchema);
