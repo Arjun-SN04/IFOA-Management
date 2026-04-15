@@ -1,6 +1,7 @@
 const Task = require('../models/Task');
 const Project = require('../models/Project');
 const Notification = require('../models/Notification');
+const User = require('../models/User');
 const { getIO } = require('../socket');
 
 // Helper to generate task key safely (e.g. PROJ-12)
@@ -20,21 +21,66 @@ const pushNotification = async ({ recipient, sender, type, title, message, link 
   return notif;
 };
 
+const createTaskWithRetry = async (payload) => {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const taskKey = await generateTaskKey(payload.project);
+      return await Task.create({ ...payload, taskKey });
+    } catch (err) {
+      if (err.code === 11000 && err.keyPattern?.taskKey && attempt < 2) continue;
+      throw err;
+    }
+  }
+  throw new Error('Unable to generate unique task key');
+};
+
 // @desc  Create task
 // @route POST /api/tasks
 exports.createTask = async (req, res) => {
   try {
-    let task;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const taskKey = await generateTaskKey(req.body.project);
-        task = await Task.create({ ...req.body, reporter: req.user.id, taskKey });
-        break;
-      } catch (err) {
-        if (err.code === 11000 && err.keyPattern?.taskKey && attempt < 2) continue;
-        throw err;
+    const assignToAll = !!req.body.assignToAll || req.body.assignee === '__all__';
+
+    if (assignToAll) {
+      const recipients = await User.find({ role: 'employee', isActive: true }).select('_id');
+      if (!recipients.length) {
+        return res.status(400).json({ success: false, message: 'No active employees available for assign-to-all' });
       }
+
+      const tasks = [];
+      for (const recipient of recipients) {
+        const task = await createTaskWithRetry({
+          ...req.body,
+          assignee: recipient._id,
+          reporter: req.user.id,
+          assignToAll: undefined,
+        });
+        tasks.push(task);
+      }
+
+      await Promise.all(
+        tasks.map((createdTask) =>
+          pushNotification({
+            recipient: createdTask.assignee,
+            sender: req.user.id,
+            type: 'task_assigned',
+            title: 'New Task Assigned',
+            message: `You have been assigned task: ${createdTask.title}`,
+            link: `/tasks?taskId=${createdTask._id}`,
+          })
+        )
+      );
+
+      const populated = await Task.find({ _id: { $in: tasks.map((t) => t._id) } })
+        .populate('assignee', 'name email avatar')
+        .populate('reporter', 'name email')
+        .populate('project', 'name key')
+        .sort({ createdAt: -1 });
+
+      try { getIO().to('admin').emit('task:created', populated[0]); } catch {}
+      return res.status(201).json({ success: true, data: populated[0], task: populated[0], tasks: populated });
     }
+
+    const task = await createTaskWithRetry({ ...req.body, reporter: req.user.id });
 
     // Notify assignee
     if (req.body.assignee && req.body.assignee !== req.user.id.toString()) {
@@ -44,7 +90,7 @@ exports.createTask = async (req, res) => {
         type:      'task_assigned',
         title:     'New Task Assigned',
         message:   `You have been assigned task: ${task.title}`,
-        link:      `/tasks/${task._id}`,
+        link:      `/tasks?taskId=${task._id}`,
       });
     }
 
@@ -134,7 +180,7 @@ exports.updateTask = async (req, res) => {
         type:      'task_assigned',
         title:     'Task Assigned to You',
         message:   `Task "${task.title}" has been assigned to you`,
-        link:      `/tasks/${task._id}`,
+        link:      `/tasks?taskId=${task._id}`,
       });
     }
 
@@ -227,21 +273,72 @@ exports.getMyTasks = async (req, res) => {
 // @route PATCH /api/tasks/:id/assign
 exports.assignTask = async (req, res) => {
   try {
+    const { assignee, assignToAll } = req.body;
+    const baseTask = await Task.findById(req.params.id);
+    if (!baseTask) return res.status(404).json({ success: false, message: 'Task not found' });
+
+    if (assignToAll || assignee === '__all__') {
+      const recipients = await User.find({ role: 'employee', isActive: true }).select('_id');
+      if (!recipients.length) {
+        return res.status(400).json({ success: false, message: 'No active employees available for assign-to-all' });
+      }
+
+      const clones = [];
+      for (const recipient of recipients) {
+        if (String(baseTask.assignee || '') === String(recipient._id)) continue;
+        const clone = await createTaskWithRetry({
+          title: baseTask.title,
+          description: baseTask.description,
+          project: baseTask.project,
+          sprint: baseTask.sprint,
+          type: baseTask.type,
+          status: baseTask.status,
+          priority: baseTask.priority,
+          dueDate: baseTask.dueDate,
+          parent: baseTask.parent,
+          reporter: req.user.id,
+          assignee: recipient._id,
+        });
+        clones.push(clone);
+      }
+
+      await Promise.all(
+        clones.map((clone) =>
+          pushNotification({
+            recipient: clone.assignee,
+            sender: req.user.id,
+            type: 'task_assigned',
+            title: 'Task Assigned to You',
+            message: `Task "${clone.title}" has been assigned to you`,
+            link: `/tasks?taskId=${clone._id}`,
+          })
+        )
+      );
+
+      const populated = await Task.find({ _id: { $in: clones.map((c) => c._id) } })
+        .populate('assignee', 'name email avatar')
+        .populate('project', 'name key')
+        .sort({ createdAt: -1 });
+
+      try { getIO().to('admin').emit('task:updated', baseTask); } catch {}
+      return res.json({ success: true, task: baseTask, tasks: populated, message: 'Assigned to all employees' });
+    }
+
     const task = await Task.findByIdAndUpdate(
       req.params.id,
-      { assignee: req.body.assignee },
+      { assignee },
       { new: true }
     ).populate('assignee', 'name email avatar');
     if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
 
-    if (req.body.assignee && req.body.assignee !== req.user.id.toString()) {
+    if (assignee && assignee !== req.user.id.toString()) {
       await pushNotification({
-        recipient: req.body.assignee,
+        recipient: assignee,
         sender:    req.user.id,
         type:      'task_assigned',
         title:     'Task Assigned to You',
         message:   `Task "${task.title}" has been assigned to you`,
-        link:      `/tasks/${task._id}`,
+        link:      `/tasks?taskId=${task._id}`,
       });
     }
 

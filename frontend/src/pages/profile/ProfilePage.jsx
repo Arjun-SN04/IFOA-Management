@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { userAPI, authAPI } from '../../api';
 import { Card, Button, Input, Avatar, Spinner, Alert, PageHeader, Badge } from '../../components/ui';
-import { Save, Lock, Mail, Building, Briefcase, Hash } from 'lucide-react';
+import { Save, Lock, Mail, Building, Briefcase, Hash, Package, CalendarClock } from 'lucide-react';
 
 export default function ProfilePage() {
   const { user, setUser } = useAuth();
@@ -12,10 +12,14 @@ export default function ProfilePage() {
   const [pwSaving, setPwSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [pwMsg, setPwMsg] = useState('');
+  const [accessories, setAccessories] = useState([]);
 
   useEffect(() => {
     if (user) {
       setForm({ name: user.name || '', phone: user.phone || '', skills: user.skills?.join(', ') || '' });
+      userAPI.getMyAccessories()
+        .then(res => setAccessories(res.data?.accessories || []))
+        .catch(() => setAccessories([]));
     }
   }, [user]);
 
@@ -45,8 +49,10 @@ export default function ProfilePage() {
   if (!user) return <div className="flex items-center justify-center h-64"><Spinner size="lg" /></div>;
 
   return (
-    <div className="max-w-2xl space-y-6 animate-fadeIn">
-      <PageHeader title="My Profile" subtitle="Manage your account information and preferences" />
+    <div className="max-w-2xl mx-auto space-y-6 animate-fadeIn">
+      <div className="text-center">
+        <PageHeader title="My Profile" subtitle="Manage your account information and preferences" />
+      </div>
 
       {/* Profile overview */}
       <Card className="p-6">
@@ -72,7 +78,7 @@ export default function ProfilePage() {
             { icon: Hash, label: 'Employee ID', value: user.employeeId || '—' },
           ].map(({ icon: Icon, label, value }) => (
             <div key={label} className="flex items-center gap-3 bg-slate-50 rounded-lg p-3">
-              <Icon className="w-4 h-4 text-slate-400 flex-shrink-0" />
+              <Icon className="w-4 h-4 text-slate-400 shrink-0" />
               <div>
                 <p className="text-xs text-slate-500">{label}</p>
                 <p className="font-medium text-slate-900">{value}</p>
@@ -111,6 +117,37 @@ export default function ProfilePage() {
             Update Password
           </Button>
         </div>
+      </Card>
+
+      {/* Assigned accessories (read-only) */}
+      <Card className="p-6">
+        <h3 className="text-sm font-semibold text-slate-900 mb-4">Assigned Accessories</h3>
+        {accessories.length === 0 ? (
+          <div className="text-sm text-slate-400 flex items-center gap-2">
+            <Package className="w-4 h-4" /> No accessories assigned yet
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {accessories.map(item => (
+              <div key={item._id} className="border border-slate-100 rounded-lg p-3 bg-slate-50">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">{item.name}</p>
+                    {item.serialNumber && <p className="text-xs text-slate-500">Serial: {item.serialNumber}</p>}
+                    {item.notes && <p className="text-xs text-slate-500 mt-1">{item.notes}</p>}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[11px] text-slate-500 inline-flex items-center gap-1">
+                      <CalendarClock className="w-3 h-3" />
+                      {item.assignedAt ? new Date(item.assignedAt).toLocaleDateString() : '—'}
+                    </p>
+                    {item.assignedBy?.name && <p className="text-[11px] text-slate-400">By: {item.assignedBy.name}</p>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
     </div>
   );

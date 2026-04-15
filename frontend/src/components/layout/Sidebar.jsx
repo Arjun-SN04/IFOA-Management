@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
   LayoutDashboard, FolderKanban, CheckSquare, Zap, CalendarDays,
-  Megaphone, BarChart3, Users, ChevronLeft, ChevronRight, Plane
+  Megaphone, BarChart3, Users, ChevronLeft, ChevronRight, Plane, ClipboardList
 } from 'lucide-react';
 import GreenLogo from '../../assets/Green_logo.png';
 
@@ -10,6 +10,7 @@ const NAV = [
   { to: '/dashboard',     label: 'Dashboard',     icon: LayoutDashboard },
   { to: '/projects',      label: 'Projects',      icon: FolderKanban },
   { to: '/tasks',         label: 'My Tasks',      icon: CheckSquare },
+  { to: '/daily-tasks',   label: 'Daily Tasks',   icon: ClipboardList },
   { to: '/sprints',       label: 'Sprints',       icon: Zap },
   { to: '/leaves',        label: 'Leaves',        icon: CalendarDays },
   { to: '/announcements', label: 'Announcements', icon: Megaphone },

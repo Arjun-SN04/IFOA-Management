@@ -82,14 +82,13 @@ export default function SprintsPage() {
       />
 
       {sprints.length === 0
-        ? <Empty icon={Zap} title="No sprints yet" description="Create your first sprint to start tracking work" action={isManagerOrAdmin && <Button onClick={() => setShowCreate(true)}>Create Sprint</Button>} />
+        ? <Empty icon={Zap} title="No sprints yet" description="Create your first sprint to start tracking work" />
         : (
           <div className="space-y-6">
             {/* Active */}
             {activeSprint && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="w-2 h-2 rounded-full bg-indigo-500" />
                   <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wider">Active Sprint</h2>
                 </div>
                 <SprintCard sprint={activeSprint} onOpen={openSprint} onAction={handleAction} isManagerOrAdmin={isManagerOrAdmin} />
@@ -100,7 +99,6 @@ export default function SprintsPage() {
             {plannedSprints.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="w-2 h-2 rounded-full bg-slate-400" />
                   <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wider">Upcoming ({plannedSprints.length})</h2>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -113,7 +111,6 @@ export default function SprintsPage() {
             {completedSprints.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
                   <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wider">Completed ({completedSprints.length})</h2>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { LogIn } from 'lucide-react';
+import IFOAWhite from '../../assets/IFOA_white.png';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -31,9 +32,11 @@ export default function Login() {
       <div className="w-full max-w-sm animate-fadeInUp">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-10 h-10 bg-blue-700 rounded-xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-white text-sm font-bold">IF</span>
-          </div>
+          <Link to="/" className="inline-flex items-center justify-center mx-auto mb-4 no-underline">
+            <div className="h-12 px-4 rounded-xl flex items-center justify-center">
+              <img src={IFOAWhite} alt="IFOA" className="h-20 w-auto object-contain" />
+            </div>
+          </Link>
           <h1 className="text-xl font-bold text-slate-900">Welcome back</h1>
           <p className="text-sm text-slate-500 mt-1">Sign in to your account</p>
         </div>

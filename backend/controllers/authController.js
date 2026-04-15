@@ -22,7 +22,16 @@ exports.register = async (req, res) => {
     const suffix = String(count + 1).padStart(4, '0');
     const employeeId = `IFOA-${suffix}`;
 
-    const user = await User.create({ name, email, password, role, department, designation, phone, employeeId });
+    const user = await User.create({
+      name,
+      email,
+      password,
+      role,
+      department,
+      designation,
+      phone,
+      employeeId,
+    });
     const token = generateToken(user._id);
     res.status(201).json({
       success: true, token,

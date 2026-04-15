@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useEffect, useRef, useState } from 'react';
@@ -162,11 +163,11 @@ export default function LandingPage() {
         className="fixed inset-x-0 top-0 z-50 bg-white/98 border-b border-gray-100 shadow-sm backdrop-blur-md"
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-          <Link to="/" className="flex shrink-0 items-center gap-3 no-underline">
-            <img src={IFOAWhite} alt="IFOA" className="h-10 w-auto object-contain" />
-            <div>
-              <div className="serif text-base font-bold tracking-wide text-slate-900">IFOA</div>
-              <div className="text-[9px] uppercase tracking-[0.14em] text-gray-400">Management Platform</div>
+          <Link to="/" className="flex shrink-0 items-end gap-3 no-underline">
+            <img src={IFOAWhite} alt="IFOA" className="h-10 w-auto object-contain mb-0.5" />
+            <div className="flex flex-col justify-end pb-0.5">
+              <div className="serif text-base font-bold tracking-wide text-slate-900 leading-none">IFOA</div>
+              <div className="text-[9px] uppercase tracking-[0.14em] text-gray-400 mt-0.5">Management Platform</div>
             </div>
           </Link>
 
@@ -181,15 +182,15 @@ export default function LandingPage() {
           <div className="flex items-center gap-2">
             {user ? (
               <Link to="/dashboard" className="glow-btn inline-flex items-center gap-2 rounded-full bg-blue-600 px-6 py-2 text-sm font-semibold text-white">
-                Open Dashboard <ArrowRight size={14} />
+                {user.name} <ArrowRight size={14} />
               </Link>
             ) : (
               <>
                 <Link to="/login" className="rounded-full border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-all hover:bg-gray-50 hover:border-gray-300">
-                  Sign in
+                  Login
                 </Link>
                 <Link to="/register" className="glow-btn inline-flex items-center gap-2 rounded-full bg-blue-600 px-6 py-2 text-sm font-semibold text-white">
-                  Get Access <ChevronRight size={14} />
+                  Sign up <ChevronRight size={14} />
                 </Link>
               </>
             )}
@@ -198,9 +199,8 @@ export default function LandingPage() {
       </motion.nav>
 
       {/* ─── HERO ───────────────────────────────────────────────────────── */}
-      <section ref={heroRef} className="relative flex min-h-screen items-center justify-center overflow-hidden pt-16">
+      <section ref={heroRef} className="relative flex min-h-screen items-center justify-start overflow-hidden pt-16">
         <motion.div
-          style={{ y: heroY }}
           className="absolute inset-0 bg-cover bg-top"
           style={{
             backgroundImage: `url('${HeroSectionImg}')`,
@@ -214,8 +214,9 @@ export default function LandingPage() {
 
         <motion.div
           style={{ opacity: heroOpacity }}
-          className="relative z-10 mx-0 max-w-2xl px-8 pb-32 pt-20 text-left"
+          className="relative z-10 w-full max-w-none px-5 sm:px-10 lg:px-16 xl:px-24 pb-32 pt-20 text-left"
         >
+          <div className="max-w-3xl">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -230,7 +231,7 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.45, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-            className="serif mb-6 text-5xl font-bold leading-tight text-white md:text-7xl"
+            className="serif mb-5 text-4xl font-bold leading-tight text-white md:text-6xl lg:text-7xl"
           >
             Your team's work,<br />
             <em className="text-white not-italic">cleared for takeoff.</em>
@@ -240,7 +241,7 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6, duration: 0.7 }}
-            className="mb-10 max-w-lg text-lg font-light leading-relaxed text-white/70"
+            className="mb-9 max-w-lg text-base font-light leading-relaxed text-white/75 md:text-lg"
           >
             Projects, tasks, sprints, leave management and analytics — a unified command centre built exclusively for IFOA members.
           </motion.p>
@@ -251,19 +252,31 @@ export default function LandingPage() {
             transition={{ delay: 0.75, duration: 0.7 }}
             className="flex flex-wrap items-center justify-start gap-4"
           >
-            <Link
-              to={user ? '/dashboard' : '/register'}
-              className="glow-btn inline-flex items-center gap-2 rounded-full bg-blue-600 px-9 py-4 text-[15px] font-bold text-white"
-            >
-              {user ? 'Go to Dashboard' : 'Get Started'} <ArrowRight size={16} />
-            </Link>
-            <Link
-              to="/login"
-              className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-8 py-4 text-[15px] font-medium text-white/90 backdrop-blur transition-all hover:bg-white/20"
-            >
-              Sign in to your account
-            </Link>
+            {user ? (
+              <Link
+                to="/dashboard"
+                className="glow-btn inline-flex items-center gap-2 rounded-full bg-blue-600 px-9 py-4 text-[15px] font-bold text-white"
+              >
+                Go to Dashboard <ArrowRight size={16} />
+              </Link>
+            ) : (
+              <>
+                <Link
+                  to="/register"
+                  className="glow-btn inline-flex items-center gap-2 rounded-full bg-blue-600 px-9 py-4 text-[15px] font-bold text-white"
+                >
+                  Sign up <ArrowRight size={16} />
+                </Link>
+                <Link
+                  to="/login"
+                  className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-8 py-4 text-[15px] font-medium text-white/90 backdrop-blur transition-all hover:bg-white/20"
+                >
+                  Login
+                </Link>
+              </>
+            )}
           </motion.div>
+          </div>
         </motion.div>
 
         <motion.div
@@ -275,7 +288,7 @@ export default function LandingPage() {
           <motion.div
             animate={{ y: [0, 8, 0] }}
             transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
-            className="h-10 w-px bg-gradient-to-b from-white/60 to-transparent"
+            className="h-10 w-px bg-linear-to-b from-white/60 to-transparent"
           />
           <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-white/45">Scroll</span>
         </motion.div>
@@ -428,13 +441,13 @@ export default function LandingPage() {
 
           {/* Right: mosaic visual panel */}
           <RevealSection delay={2}>
-            <div className="relative h-[520px] w-full overflow-hidden rounded-3xl bg-[#050F2D]">
+            <div className="relative h-130 w-full overflow-hidden rounded-3xl bg-[#050F2D]">
               <img
                 src="https://images.unsplash.com/photo-1488998527040-85054a85150e?w=900&q=80"
                 alt="Aviation control"
                 className="absolute inset-0 h-full w-full object-cover opacity-40 transition-transform duration-700 hover:scale-105"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#050F2D] via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-linear-to-t from-[#050F2D] via-transparent to-transparent" />
 
               <motion.div
                 animate={{ y: [0, -10, 0] }}
@@ -480,7 +493,7 @@ export default function LandingPage() {
             <h2 className="serif mb-14 text-5xl font-bold text-slate-900">Words worth flying by</h2>
           </RevealSection>
 
-          <div className="relative min-h-[220px]">
+          <div className="relative min-h-55">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTestimonial}

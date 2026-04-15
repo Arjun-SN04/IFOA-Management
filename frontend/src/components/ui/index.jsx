@@ -1,4 +1,5 @@
 import { X, Inbox, AlertCircle, CheckCircle, AlertTriangle, Info } from 'lucide-react';
+import { useEffect } from 'react';
 
 // ─── Button ───────────────────────────────────────────────────────────────────
 export function Button({
@@ -94,6 +95,23 @@ export function Card({ children, className = '', onClick }) {
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
 export function Modal({ open, onClose, title, children, size = 'md' }) {
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') onClose?.();
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open, onClose]);
+
   if (!open) return null
   const sizes = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' }
   return (
@@ -102,7 +120,7 @@ export function Modal({ open, onClose, title, children, size = 'md' }) {
       <div className={`relative bg-white rounded-2xl shadow-2xl w-full ${sizes[size]} max-h-[90vh] overflow-y-auto scrollbar-thin animate-scaleIn`}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+          <button type="button" onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -137,7 +155,7 @@ export function Avatar({ name = '', src, size = 'md', className = '' }) {
   const color = colors[(name.charCodeAt(0) || 0) % colors.length]
   if (src) return <img src={src} alt={name} className={`${sizes[size]} rounded-full object-cover ${className}`} />
   return (
-    <div className={`${sizes[size]} ${color} rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0 ${className}`}>
+    <div className={`${sizes[size]} ${color} rounded-full flex items-center justify-center text-white font-semibold shrink-0 ${className}`}>
       {name?.[0]?.toUpperCase() || '?'}
     </div>
   )
@@ -176,7 +194,7 @@ export function Alert({ children, variant = 'error' }) {
   const { cls, Icon } = config[variant] || config.error
   return (
     <div className={`flex items-center gap-3 px-4 py-3 rounded-lg border text-sm font-medium ${cls}`}>
-      <Icon className="w-4 h-4 flex-shrink-0" />
+      <Icon className="w-4 h-4 shrink-0" />
       {children}
     </div>
   )

@@ -11,7 +11,7 @@ import {
 import {
   FolderKanban, CheckSquare, CalendarDays, Users, ArrowRight, Clock,
   TrendingUp, AlertCircle, CheckCircle2, Zap, BarChart3, Activity,
-  Plus, Award, Target, Briefcase, Plane, Wind
+  Plus, Award, Target, Briefcase
 } from 'lucide-react';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -44,6 +44,38 @@ function timeAgo(dateStr) {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
+}
+
+function TypedGreeting({ text, storageKey = 'dashboard-greeting-typed', speed = 36 }) {
+  const [display, setDisplay] = useState('');
+
+  useEffect(() => {
+    let alreadyTyped = false;
+    try {
+      alreadyTyped = sessionStorage.getItem(storageKey) === '1';
+    } catch {}
+
+    if (alreadyTyped) {
+      setDisplay(text);
+      return;
+    }
+
+    let index = 0;
+    const timer = setInterval(() => {
+      index += 1;
+      setDisplay(text.slice(0, index));
+      if (index >= text.length) {
+        clearInterval(timer);
+        try {
+          sessionStorage.setItem(storageKey, '1');
+        } catch {}
+      }
+    }, speed);
+
+    return () => clearInterval(timer);
+  }, [text, storageKey, speed]);
+
+  return <>{display}</>;
 }
 
 // Inject dashboard CSS once
@@ -199,20 +231,42 @@ const DASH_CSS = `
 
   /* Hero greeting banner */
   .dash-hero {
-    border-radius: 24px; padding: 32px;
-    position: relative; overflow: hidden;
-    min-height: 160px; display: flex; align-items: center;
+    border-radius: 24px;
+    padding: 28px;
+    min-height: 168px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid #E2E8F0;
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
   }
-  .dash-hero-bg {
-    position: absolute; inset: 0;
-    background-image: url('https://images.unsplash.com/photo-1530521954074-e64f6810b32d?w=1400&q=70');
-    background-size: cover; background-position: center 40%;
+  .dash-hero-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 16px;
+    flex-wrap: wrap;
   }
-  .dash-hero-overlay {
-    position: absolute; inset: 0;
-    background: linear-gradient(110deg, rgba(15,23,42,0.75) 0%, rgba(15,23,42,0.55) 60%, rgba(37,99,235,0.15) 100%);
+  .dash-hero-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
   }
-  .dash-hero-content { position: relative; z-index: 1; }
+  .dash-hero-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: #EEF2FF;
+    color: #3730A3;
+    font-size: 11px;
+    font-weight: 600;
+  }
 
   /* Filter tabs */
   .dash-tabs {
@@ -309,7 +363,7 @@ export default function DashboardPage() {
       const results = await Promise.all(calls);
       setStats(results[0]?.data?.data || null);
       setMyTasks(results[1]?.data?.data || results[1]?.data?.tasks || []);
-      setLeaveBalance(results[2]?.data?.data || null);
+      setLeaveBalance(results[2]?.data?.summary || null);
       if (isManagerOrAdmin) {
         setAllTasks(results[3]?.data?.data || results[3]?.data?.tasks || []);
         setProjects(results[4]?.data?.data || []);
@@ -384,47 +438,50 @@ function AdminDashboard({ stats, allTasks, projects, user }) {
     .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
     .slice(0, 8);
 
+  const adminGreeting = `${getGreeting()}, ${user?.name?.split(' ')[0] || 'Admin'}`;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* ── Hero greeting ── */}
       <div className="dash-hero">
-        <div className="dash-hero-bg" />
-        <div className="dash-hero-overlay" />
         <div className="dash-hero-content" style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-            <div>
-              <p style={{ fontSize: 13, color: 'rgba(96,165,250,0.85)', fontWeight: 500, margin: '0 0 6px', letterSpacing: '0.04em' }}>
-                {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} · Admin Overview
-              </p>
-              <h1 style={{ fontSize: 26, fontWeight: 700, color: '#FFFFFF', margin: 0, fontFamily: "'Cormorant Garamond', serif" }}>
-                {getGreeting()}, {user?.name?.split(' ')[0]} ✈️
-              </h1>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', margin: '6px 0 0' }}>
-                IFOA Management Platform · Command Centre
-              </p>
+          <div>
+            <p style={{ fontSize: 12, color: '#64748B', fontWeight: 600, margin: '0 0 6px', letterSpacing: '0.03em' }}>
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+            </p>
+            <h1 style={{ fontSize: 28, fontWeight: 700, color: '#0F172A', margin: 0, fontFamily: "'Cormorant Garamond', serif" }}>
+              <TypedGreeting text={adminGreeting} />
+            </h1>
+            <p style={{ fontSize: 13, color: '#64748B', margin: '6px 0 0' }}>
+              Platform command center
+            </p>
+            <div className="dash-hero-meta" style={{ marginTop: 12 }}>
+              <span className="dash-hero-chip">{projects.length} projects</span>
+              <span className="dash-hero-chip">{inProgress} in progress</span>
+              <span className="dash-hero-chip">{blocked} blocked</span>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Link to="/tasks" style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '10px 20px', borderRadius: 100,
-                background: '#2563EB', color: '#FFFFFF',
-                fontSize: 13, fontWeight: 700, textDecoration: 'none',
-                transition: 'all 0.2s', whiteSpace: 'nowrap',
-              }}>
-                <Plus size={15} /> New Task
-              </Link>
-              <Link to="/reports" style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '10px 20px', borderRadius: 100,
-                background: 'rgba(255,255,255,0.1)',
-                border: '1px solid rgba(255,255,255,0.2)',
-                color: 'rgba(255,255,255,0.85)',
-                fontSize: 13, fontWeight: 600, textDecoration: 'none',
-                whiteSpace: 'nowrap',
-              }}>
-                <BarChart3 size={15} /> Reports
-              </Link>
-            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Link to="/tasks" style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '10px 20px', borderRadius: 100,
+              background: '#2563EB', color: '#FFFFFF',
+              fontSize: 13, fontWeight: 700, textDecoration: 'none',
+              transition: 'all 0.2s', whiteSpace: 'nowrap',
+            }}>
+              <Plus size={15} /> New Task
+            </Link>
+            <Link to="/reports" style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '10px 20px', borderRadius: 100,
+              background: '#FFFFFF',
+              border: '1px solid #CBD5E1',
+              color: '#1E293B',
+              fontSize: 13, fontWeight: 600, textDecoration: 'none',
+              whiteSpace: 'nowrap',
+            }}>
+              <BarChart3 size={15} /> Reports
+            </Link>
           </div>
         </div>
       </div>
@@ -465,7 +522,6 @@ function AdminDashboard({ stats, allTasks, projects, user }) {
         <div style={{ display: 'flex', gap: 20, marginTop: 16, flexWrap: 'wrap' }}>
           {statusPieData.map(d => (
             <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: d.fill, flexShrink: 0 }} />
               <span style={{ fontSize: 12, color: '#6B7280' }}>{d.name}: <strong style={{ color: '#1F2937' }}>{d.value}</strong></span>
             </div>
           ))}
@@ -597,10 +653,7 @@ function AdminDashboard({ stats, allTasks, projects, user }) {
               <div className="dash-card-title">Live Activity Feed</div>
               <div className="dash-card-sub">Most recently updated tasks</div>
             </div>
-            <div className="dash-live-dot">
-              <div className="dash-live-ping" />
-              <span style={{ fontSize: 11, color: '#5C7A3E', fontWeight: 600 }}>Live</span>
-            </div>
+            <span style={{ fontSize: 11, color: '#5C7A3E', fontWeight: 600 }}>Live</span>
           </div>
           {recentActivity.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '32px 0' }}>
@@ -642,54 +695,43 @@ function UserDashboard({ stats, myTasks, leaveBalance, user }) {
   ].filter(d => d.value > 0);
 
   const activityData = stats?.weeklyActivity || [];
+  const userGreeting = `${getGreeting()}, ${user?.name?.split(' ')[0] || 'there'}`;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* ── Hero greeting ── */}
       <div className="dash-hero">
-        <div className="dash-hero-bg" />
-        <div className="dash-hero-overlay" />
         <div className="dash-hero-content" style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-            <div>
-              <p style={{ fontSize: 13, color: 'rgba(96,165,250,0.85)', fontWeight: 500, margin: '0 0 6px', letterSpacing: '0.04em' }}>
-                {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          <div>
+            <p style={{ fontSize: 12, color: '#64748B', fontWeight: 600, margin: '0 0 6px', letterSpacing: '0.03em' }}>
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
               </p>
-              <h1 style={{ fontSize: 26, fontWeight: 700, color: '#FFFFFF', margin: 0, fontFamily: "'Cormorant Garamond', serif" }}>
-                {getGreeting()}, {user?.name?.split(' ')[0]}! ✈️
-              </h1>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', margin: '6px 0 0', textTransform: 'capitalize' }}>
-                {user?.department} · {user?.role}
-              </p>
-              {overdueTasks > 0 && (
-                <div style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 12,
-                  background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
-                  borderRadius: 100, padding: '5px 12px'
-                }}>
-                  <AlertCircle size={12} color="#EF4444" />
-                  <span style={{ fontSize: 12, color: '#EF4444', fontWeight: 600 }}>
-                    {overdueTasks} overdue task{overdueTasks !== 1 ? 's' : ''}
-                  </span>
-                </div>
-              )}
+            <h1 style={{ fontSize: 28, fontWeight: 700, color: '#0F172A', margin: 0, fontFamily: "'Cormorant Garamond', serif" }}>
+              <TypedGreeting text={userGreeting} />
+            </h1>
+            <p style={{ fontSize: 13, color: '#64748B', margin: '6px 0 0', textTransform: 'capitalize' }}>
+              {user?.department} · {user?.role}
+            </p>
+            <div className="dash-hero-meta" style={{ marginTop: 12 }}>
+              <span className="dash-hero-chip">{doneTasks} completed</span>
+              <span className="dash-hero-chip">{activeTasks} active</span>
+              {overdueTasks > 0 && <span className="dash-hero-chip" style={{ background: '#FEF2F2', color: '#B91C1C' }}>{overdueTasks} overdue</span>}
             </div>
-            {/* Circular progress */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-              <div style={{ position: 'relative', width: 80, height: 80 }}>
-                <svg width="80" height="80" viewBox="0 0 36 36" style={{ transform: 'rotate(-90deg)' }}>
-                  <circle cx="18" cy="18" r="15.5" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="3" />
-                  <circle cx="18" cy="18" r="15.5" fill="none" stroke="#2563EB" strokeWidth="3"
-                    strokeDasharray={`${myPct} ${100 - myPct}`} strokeLinecap="round" />
-                </svg>
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: 16, fontWeight: 700, color: '#FFFFFF', fontFamily: "'Cormorant Garamond', serif" }}>
-                    {myPct}%
-                  </span>
-                </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            <div style={{ position: 'relative', width: 80, height: 80 }}>
+              <svg width="80" height="80" viewBox="0 0 36 36" style={{ transform: 'rotate(-90deg)' }}>
+                <circle cx="18" cy="18" r="15.5" fill="none" stroke="#E2E8F0" strokeWidth="3" />
+                <circle cx="18" cy="18" r="15.5" fill="none" stroke="#2563EB" strokeWidth="3"
+                  strokeDasharray={`${myPct} ${100 - myPct}`} strokeLinecap="round" />
+              </svg>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: 16, fontWeight: 700, color: '#0F172A', fontFamily: "'Cormorant Garamond', serif" }}>
+                  {myPct}%
+                </span>
               </div>
-              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontWeight: 500 }}>Tasks done</p>
             </div>
+            <p style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Task completion</p>
           </div>
         </div>
       </div>
@@ -702,8 +744,8 @@ function UserDashboard({ stats, myTasks, leaveBalance, user }) {
           bg="linear-gradient(135deg, #10B981 0%, #059669 100%)" sub="Tasks finished" />
         <StatCard label="In Progress" value={inProgress} icon={Clock}
           bg="linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)" sub="Active right now" />
-        <StatCard label="Leave Days"  value={leaveBalance ? `${leaveBalance.annual ?? 0}` : '—'} icon={CalendarDays}
-          bg="linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)" sub="Annual remaining" />
+        <StatCard label="Pending Leaves"  value={leaveBalance ? `${leaveBalance.pending ?? 0}` : '—'} icon={CalendarDays}
+          bg="linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)" sub="Awaiting approval" />
       </div>
 
       {/* ── Charts + Task split ── */}
@@ -760,7 +802,6 @@ function UserDashboard({ stats, myTasks, leaveBalance, user }) {
                 {statusBreakdown.map(d => (
                   <div key={d.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: d.fill }} />
                       <span style={{ fontSize: 12, color: '#6B7280' }}>{d.name}</span>
                     </div>
                     <span style={{ fontSize: 12, fontWeight: 600, color: '#1F2937' }}>{d.value}</span>
@@ -848,25 +889,27 @@ function UserDashboard({ stats, myTasks, leaveBalance, user }) {
           <div className="dash-card">
             <div className="dash-section-row">
               <div>
-                <div className="dash-card-title">Leave Balance</div>
-                <div className="dash-card-sub">Remaining days by type</div>
+                <div className="dash-card-title">Leave Summary</div>
+                <div className="dash-card-sub">Current month request statuses</div>
               </div>
               <Link to="/leaves" className="dash-link">Apply <ArrowRight size={12} /></Link>
             </div>
             {leaveBalance ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {[
-                  { label: 'Annual', key: 'annual', color: '#B8860B', max: 21 },
-                  { label: 'Sick',   key: 'sick',   color: '#9B6B3A', max: 10 },
-                  { label: 'Casual', key: 'casual', color: '#5C7A3E', max: 7  },
-                ].map(({ label, key, color, max }) => {
+                  { label: 'Approved', key: 'approved', color: '#10B981' },
+                  { label: 'Pending',  key: 'pending',  color: '#2563EB' },
+                  { label: 'Rejected', key: 'rejected', color: '#EF4444' },
+                  { label: 'Cancelled', key: 'cancelled', color: '#9CA3AF' },
+                ].map(({ label, key, color }) => {
                   const val = leaveBalance[key] ?? 0;
-                  const pct = Math.min(100, Math.round((val / max) * 100));
+                  const total = Math.max(1, (leaveBalance.approved || 0) + (leaveBalance.pending || 0) + (leaveBalance.rejected || 0) + (leaveBalance.cancelled || 0));
+                  const pct = Math.min(100, Math.round((val / total) * 100));
                   return (
                     <div key={key}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                         <span style={{ fontSize: 13, fontWeight: 500, color: '#4A3820' }}>{label}</span>
-                        <span style={{ fontSize: 13, fontWeight: 700, color }}>{val} days</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color }}>{val}</span>
                       </div>
                       <div className="dash-progress-track" style={{ height: 6 }}>
                         <div className="dash-progress-fill" style={{ width: `${pct}%`, background: color }} />
@@ -876,7 +919,7 @@ function UserDashboard({ stats, myTasks, leaveBalance, user }) {
                 })}
               </div>
             ) : (
-              <p style={{ fontSize: 13, color: '#9B8272', textAlign: 'center', padding: '16px 0' }}>Leave balance not available</p>
+              <p style={{ fontSize: 13, color: '#9B8272', textAlign: 'center', padding: '16px 0' }}>Leave summary not available</p>
             )}
           </div>
 

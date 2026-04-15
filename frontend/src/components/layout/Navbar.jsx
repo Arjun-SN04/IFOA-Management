@@ -7,9 +7,42 @@ import { Avatar } from '../ui';
 import toast from 'react-hot-toast';
 import {
   Bell, User, CalendarDays, LogOut, LayoutDashboard, FolderKanban,
-  CheckSquare, Zap, Megaphone, BarChart3, Users, Menu, X, ChevronDown
+  CheckSquare, Zap, Megaphone, BarChart3, Users, Menu, X, ChevronDown, ClipboardList,
+  MessageSquare, Briefcase, AlertTriangle
 } from 'lucide-react';
 import IFOAWhite from '../../assets/IFOA_white.png';
+
+function normalizeNotificationLink(link = '') {
+  if (!link) return '/dashboard';
+  if (link.startsWith('/tasks/')) {
+    const taskId = link.split('/')[2];
+    return taskId ? `/tasks?taskId=${taskId}` : '/tasks';
+  }
+  if (link.startsWith('/leaves/')) return '/leaves';
+  if (link.startsWith('/admin/leaves')) return '/leaves';
+  return link;
+}
+
+function NotificationTypeIcon({ type }) {
+  const iconMap = {
+    task_assigned: CheckSquare,
+    task_updated: CheckSquare,
+    task_commented: MessageSquare,
+    task_due: AlertTriangle,
+    leave_applied: CalendarDays,
+    leave_approved: CalendarDays,
+    leave_rejected: CalendarDays,
+    project_added: Briefcase,
+    project_updated: Briefcase,
+    mention: MessageSquare,
+    announcement: Megaphone,
+    sprint_started: Zap,
+    sprint_ended: Zap,
+    deadline_reminder: AlertTriangle,
+  };
+  const Icon = iconMap[type] || Bell;
+  return <Icon className="w-3.5 h-3.5" />;
+}
 
 function useOutsideClick(ref, handler) {
   useEffect(() => {
@@ -23,6 +56,7 @@ const NAV_ITEMS = [
   { to: '/dashboard',     label: 'Dashboard',    icon: LayoutDashboard },
   { to: '/projects',      label: 'Projects',     icon: FolderKanban },
   { to: '/tasks',         label: 'Tasks',         icon: CheckSquare },
+  { to: '/daily-tasks',   label: 'Daily Tasks',   icon: ClipboardList },
   { to: '/sprints',       label: 'Sprints',       icon: Zap },
   { to: '/leaves',        label: 'Leaves',        icon: CalendarDays },
   { to: '/announcements', label: 'Announcements', icon: Megaphone },
@@ -58,7 +92,18 @@ export default function Navbar() {
     toast.success('All notifications marked as read');
   };
 
+  const handleNotificationClick = async (n) => {
+    if (!n?.isRead) {
+      try {
+        await markRead(n._id);
+      } catch {}
+    }
+    setShowNotifs(false);
+    navigate(normalizeNotificationLink(n?.link));
+  };
+
   const allNav = [...NAV_ITEMS, ...(isManagerOrAdmin ? ADMIN_ITEMS : [])];
+  const latestUnread = notifications.find((n) => !n.isRead);
 
   const linkCls = (isActive) =>
     `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150
@@ -71,14 +116,14 @@ export default function Navbar() {
       initial={{ y: -80, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-      className="bg-white border-b flex-shrink-0 shadow-sm" style={{ borderColor: '#E5E7EB', backgroundColor: '#FFFFFF' }}>
+      className="bg-white border-b shrink-0 shadow-sm" style={{ borderColor: '#E5E7EB', backgroundColor: '#FFFFFF' }}>
       {/* Main bar */}
       <div className="px-4 lg:px-6">
         <div className="flex items-center h-16 gap-4">
 
           {/* Logo */}
           <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5, delay: 0.1 }}>
-            <Link to="/" className="flex items-center flex-shrink-0">
+            <Link to="/" className="flex items-center shrink-0">
               <img src={IFOAWhite} alt="IFOA" className="h-12 w-auto object-contain" />
             </Link>
           </motion.div>
@@ -138,7 +183,7 @@ export default function Navbar() {
                 onClick={() => { setShowNotifs(s => !s); setShowProfile(false); }}
                 className="relative w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-gray-100"
                 style={{ color: 'var(--text-muted)' }}>
-                <Bell className="w-[18px] h-[18px]" />
+                <Bell className="w-4.5 h-4.5" />
                 {unreadCount > 0 && (
                   <motion.span
                     initial={{ scale: 0 }}
@@ -171,19 +216,20 @@ export default function Navbar() {
                     {notifications.length === 0
                       ? <p className="text-sm text-center py-10" style={{ color: 'var(--text-muted)' }}>No notifications yet</p>
                       : notifications.slice(0, 10).map(n => (
-                          <motion.div key={n._id} onClick={() => markRead(n._id)}
+                          <motion.div key={n._id} onClick={() => handleNotificationClick(n)}
                             whileHover={{ backgroundColor: 'rgba(0,0,0,0.02)' }}
                             className={`px-4 py-3 cursor-pointer transition-colors ${!n.isRead ? 'bg-blue-50/60' : ''}`}>
                             <div className="flex items-start gap-2">
-                              {!n.isRead && (
-                                <span className="mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: 'var(--blue)' }} />
-                              )}
-                              <p className={`text-sm leading-snug flex-1 ${!n.isRead ? '' : 'pl-3.5'}`}
+                              <span className="mt-0.5 w-6 h-6 rounded-full flex items-center justify-center shrink-0"
+                                style={{ background: !n.isRead ? 'rgba(37,99,235,0.12)' : 'rgba(100,116,139,0.12)', color: !n.isRead ? 'var(--blue)' : '#64748b' }}>
+                                <NotificationTypeIcon type={n.type} />
+                              </span>
+                              <p className="text-sm leading-snug flex-1"
                                 style={{ color: 'var(--text-mid)' }}>
                                 {n.message}
                               </p>
                             </div>
-                            <p className="text-xs mt-1 pl-3.5" style={{ color: 'var(--text-faint)' }}>
+                            <p className="text-xs mt-1 pl-8" style={{ color: 'var(--text-faint)' }}>
                               {new Date(n.createdAt).toLocaleDateString()}
                             </p>
                           </motion.div>
@@ -312,7 +358,7 @@ export default function Navbar() {
           transition={{ duration: 0.3 }}
           className="border-t px-4 lg:px-6" style={{ background: '#EBF1FF', borderColor: '#D1DEFF' }}>
           <div className="flex items-center gap-3 h-9">
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: 'var(--blue)' }} />
                 <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: 'var(--blue)' }} />
@@ -322,13 +368,17 @@ export default function Navbar() {
               </span>
             </div>
             <div className="h-3 w-px bg-blue-200" />
-            <p className="text-xs flex-1 truncate" style={{ color: '#1D4ED8' }}>
-              {notifications.find(n => !n.isRead)?.message || 'You have unread notifications'}
-            </p>
+            <button
+              type="button"
+              onClick={() => latestUnread && handleNotificationClick(latestUnread)}
+              className="text-xs flex-1 truncate text-left hover:underline"
+              style={{ color: '#1D4ED8' }}>
+              {latestUnread?.message || 'You have unread notifications'}
+            </button>
             <motion.button
               whileHover={{ opacity: 0.7 }}
               onClick={handleMarkAll}
-              className="text-[10px] font-bold uppercase tracking-wider flex-shrink-0 transition-opacity"
+              className="text-[10px] font-bold uppercase tracking-wider shrink-0 transition-opacity"
               style={{ color: 'var(--blue)' }}>
               Dismiss
             </motion.button>

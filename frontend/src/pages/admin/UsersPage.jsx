@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { userAPI } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { Card, Button, Modal, Input, Select, Badge, Avatar, Empty, Spinner, PageHeader } from '../../components/ui';
-import { Plus, Search, Users as UsersIcon, Shield, MoreVertical, UserX, UserCheck } from 'lucide-react';
+import { Search, Users as UsersIcon, Shield, UserX, UserCheck, Package, Trash2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const ROLE_V = { admin: 'danger', manager: 'warning', employee: 'default' };
 
@@ -16,6 +17,9 @@ export default function UsersPage() {
   const [selected, setSelected] = useState(null);
   const [showRoleModal, setShowRoleModal] = useState(null);
   const [newRole, setNewRole] = useState('');
+  const [showAccessoriesModal, setShowAccessoriesModal] = useState(null);
+  const [accessories, setAccessories] = useState([]);
+  const [accessoryForm, setAccessoryForm] = useState({ name: '', serialNumber: '', notes: '' });
 
   useEffect(() => {
     userAPI.getAll({ search, role: roleFilter, department: deptFilter })
@@ -37,6 +41,42 @@ export default function UsersPage() {
       const res = await userAPI.toggleStatus(userId);
       setUsers(prev => prev.map(u => u._id === userId ? { ...u, isActive: res.data.data?.isActive ?? !u.isActive } : u));
     } catch (e) { alert(e.response?.data?.message || 'Failed'); }
+  };
+
+  const openAccessories = async (u) => {
+    setShowAccessoriesModal(u);
+    try {
+      const res = await userAPI.getAccessories(u._id);
+      setAccessories(res.data?.accessories || []);
+    } catch {
+      setAccessories([]);
+      toast.error('Failed to load accessories');
+    }
+  };
+
+  const addAccessory = async () => {
+    if (!accessoryForm.name.trim()) {
+      toast.error('Accessory name is required');
+      return;
+    }
+    try {
+      const res = await userAPI.addAccessory(showAccessoriesModal._id, accessoryForm);
+      setAccessories(res.data?.accessories || []);
+      setAccessoryForm({ name: '', serialNumber: '', notes: '' });
+      toast.success('Accessory added');
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to add accessory');
+    }
+  };
+
+  const removeAccessory = async (accessoryId) => {
+    try {
+      const res = await userAPI.removeAccessory(showAccessoriesModal._id, accessoryId);
+      setAccessories(res.data?.accessories || []);
+      toast.success('Accessory removed');
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to remove accessory');
+    }
   };
 
   if (loading) return <div className="flex items-center justify-center h-64"><Spinner size="lg" /></div>;
@@ -97,6 +137,9 @@ export default function UsersPage() {
                     <Button variant="ghost" size="xs" onClick={() => { setShowRoleModal(u); setNewRole(u.role); }}>
                       <Shield className="w-3.5 h-3.5" />
                     </Button>
+                    <Button variant="ghost" size="xs" onClick={() => openAccessories(u)}>
+                      <Package className="w-3.5 h-3.5 text-indigo-600" />
+                    </Button>
                     <Button variant="ghost" size="xs" onClick={() => handleToggleStatus(u._id)}>
                       {u.isActive
                         ? <UserX className="w-3.5 h-3.5 text-red-500" />
@@ -128,6 +171,38 @@ export default function UsersPage() {
             <div className="flex justify-end gap-3 pt-2">
               <Button variant="secondary" onClick={() => setShowRoleModal(null)}>Cancel</Button>
               <Button onClick={handleRoleChange}>Update Role</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal open={!!showAccessoriesModal} onClose={() => setShowAccessoriesModal(null)} title={`Manage Accessories${showAccessoriesModal ? ` - ${showAccessoriesModal.name}` : ''}`} size="lg">
+        {showAccessoriesModal && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Input label="Name" value={accessoryForm.name} onChange={e => setAccessoryForm(p => ({ ...p, name: e.target.value }))} placeholder="Laptop, ID Card, Headset" />
+              <Input label="Serial" value={accessoryForm.serialNumber} onChange={e => setAccessoryForm(p => ({ ...p, serialNumber: e.target.value }))} placeholder="Optional" />
+              <Input label="Notes" value={accessoryForm.notes} onChange={e => setAccessoryForm(p => ({ ...p, notes: e.target.value }))} placeholder="Optional" />
+            </div>
+            <div className="flex justify-end">
+              <Button onClick={addAccessory}><Package className="w-4 h-4" /> Add Accessory</Button>
+            </div>
+
+            <div className="border border-slate-100 rounded-xl divide-y divide-slate-100 max-h-80 overflow-y-auto">
+              {accessories.length === 0 ? (
+                <div className="p-4 text-sm text-slate-400">No accessories assigned.</div>
+              ) : accessories.map(a => (
+                <div key={a._id} className="p-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">{a.name}</p>
+                    <p className="text-xs text-slate-500">{a.serialNumber ? `Serial: ${a.serialNumber}` : 'No serial'}{a.assignedAt ? ` · ${new Date(a.assignedAt).toLocaleDateString()}` : ''}</p>
+                    {a.notes && <p className="text-xs text-slate-500 mt-0.5">{a.notes}</p>}
+                  </div>
+                  <button onClick={() => removeAccessory(a._id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         )}

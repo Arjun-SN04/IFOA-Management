@@ -1,6 +1,6 @@
 const Comment = require('../models/Comment');
-const Notification = require('../models/Notification');
 const Task = require('../models/Task');
+const { createAndEmit } = require('./notificationController');
 
 // @desc  Add comment to task
 // @route POST /api/comments
@@ -12,15 +12,19 @@ exports.addComment = async (req, res) => {
 
     // Notify mentioned users
     if (mentions && mentions.length) {
-      const notifs = mentions.map(uid => ({
-        recipient: uid,
-        sender: req.user.id,
-        type: 'mention',
-        title: 'You were mentioned',
-        message: `${req.user.name} mentioned you in a comment`,
-        link: `/tasks/${task}`,
-      }));
-      await Notification.insertMany(notifs);
+      const uniqueMentions = [...new Set(mentions.map(String))].filter(uid => uid !== req.user.id);
+      await Promise.all(
+        uniqueMentions.map((uid) =>
+          createAndEmit({
+            recipient: uid,
+            sender: req.user.id,
+            type: 'mention',
+            title: 'You were mentioned',
+            message: `${req.user.name} mentioned you in a comment`,
+            link: `/tasks/${task}`,
+          })
+        )
+      );
     }
 
     // Notify task watchers/assignee
@@ -28,15 +32,21 @@ exports.addComment = async (req, res) => {
     const toNotify = new Set();
     if (taskDoc.assignee && taskDoc.assignee._id.toString() !== req.user.id) toNotify.add(taskDoc.assignee._id.toString());
     taskDoc.watchers.forEach(w => { if (w._id.toString() !== req.user.id) toNotify.add(w._id.toString()); });
-    const watcherNotifs = [...toNotify].map(uid => ({
-      recipient: uid,
-      sender: req.user.id,
-      type: 'task_commented',
-      title: 'New Comment',
-      message: `${req.user.name} commented on task: ${taskDoc.title}`,
-      link: `/tasks/${task}`,
-    }));
-    if (watcherNotifs.length) await Notification.insertMany(watcherNotifs);
+    const watcherNotifs = [...toNotify];
+    if (watcherNotifs.length) {
+      await Promise.all(
+        watcherNotifs.map((uid) =>
+          createAndEmit({
+            recipient: uid,
+            sender: req.user.id,
+            type: 'task_commented',
+            title: 'New Comment',
+            message: `${req.user.name} commented on task: ${taskDoc.title}`,
+            link: `/tasks/${task}`,
+          })
+        )
+      );
+    }
 
     res.status(201).json({ success: true, comment });
   } catch (err) {

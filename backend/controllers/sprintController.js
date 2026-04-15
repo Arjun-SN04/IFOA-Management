@@ -1,5 +1,30 @@
 const Sprint = require('../models/Sprint');
 const Task = require('../models/Task');
+const Project = require('../models/Project');
+const { createAndEmit } = require('./notificationController');
+
+const notifyProjectTeam = async ({ projectId, actorId, type, title, message, link }) => {
+  const project = await Project.findById(projectId).select('lead members');
+  if (!project) return;
+
+  const recipients = [...new Set([project.lead, ...(project.members || [])].map((id) => String(id)))]
+    .filter((id) => id !== String(actorId));
+
+  if (!recipients.length) return;
+
+  await Promise.all(
+    recipients.map((recipient) =>
+      createAndEmit({
+        recipient,
+        sender: actorId,
+        type,
+        title,
+        message,
+        link,
+      })
+    )
+  );
+};
 
 // @desc  Create sprint
 // @route POST /api/sprints
@@ -50,6 +75,16 @@ exports.startSprint = async (req, res) => {
 
     sprint.status = 'active';
     await sprint.save();
+
+    await notifyProjectTeam({
+      projectId: sprint.project,
+      actorId: req.user.id,
+      type: 'sprint_started',
+      title: 'Sprint Started',
+      message: `Sprint "${sprint.name}" has started`,
+      link: '/sprints',
+    });
+
     res.json({ success: true, sprint });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -69,6 +104,15 @@ exports.completeSprint = async (req, res) => {
 
     // Move incomplete tasks to backlog
     await Task.updateMany({ sprint: sprint._id, status: { $nin: ['done', 'cancelled'] } }, { $unset: { sprint: 1 }, status: 'backlog' });
+
+    await notifyProjectTeam({
+      projectId: sprint.project,
+      actorId: req.user.id,
+      type: 'sprint_ended',
+      title: 'Sprint Completed',
+      message: `Sprint "${sprint.name}" completed with velocity ${sprint.velocity}`,
+      link: '/sprints',
+    });
 
     res.json({ success: true, sprint, message: `Sprint completed. Velocity: ${sprint.velocity} points.` });
   } catch (err) {

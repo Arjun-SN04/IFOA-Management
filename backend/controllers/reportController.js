@@ -96,7 +96,7 @@ exports.getUserReport = async (req, res) => {
 exports.getLeaveReport = async (req, res) => {
   try {
     const leaveStats = await Leave.aggregate([
-      { $group: { _id: { status: '$status', type: '$leaveType' }, count: { $sum: 1 } } }
+      { $group: { _id: { status: '$status' }, count: { $sum: 1 } } }
     ]);
 
     const pendingLeaves = await Leave.find({ status: 'pending' })

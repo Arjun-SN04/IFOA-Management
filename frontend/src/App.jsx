@@ -16,6 +16,7 @@ import ProjectDetailPage from './pages/projects/ProjectDetailPage'
 import TasksPage from './pages/tasks/TasksPage'
 import SprintsPage from './pages/sprints/SprintsPage'
 import LeavesPage from './pages/leaves/LeavesPage'
+import DailyTasksPage from './pages/daily-tasks/DailyTasksPage'
 import AnnouncementsPage from './pages/announcements/AnnouncementsPage'
 import ReportsPage from './pages/reports/ReportsPage'
 import UsersPage from './pages/admin/UsersPage'
@@ -31,7 +32,7 @@ function ProtectedRoute({ children, adminOnly = false }) {
       </div>
     </div>
   )
-  if (!user) return <Navigate to="/login" replace />
+  if (!user) return <Navigate to="/" replace />
   if (adminOnly && !isManagerOrAdmin) return <Navigate to="/dashboard" replace />
   return children
 }
@@ -62,6 +63,7 @@ export default function App() {
           <Route path="tasks" element={<TasksPage />} />
           <Route path="sprints" element={<SprintsPage />} />
           <Route path="leaves" element={<LeavesPage />} />
+          <Route path="daily-tasks" element={<DailyTasksPage />} />
           <Route path="announcements" element={<AnnouncementsPage />} />
           <Route path="reports" element={<ProtectedRoute adminOnly><ReportsPage /></ProtectedRoute>} />
           <Route path="admin/users" element={<ProtectedRoute adminOnly><UsersPage /></ProtectedRoute>} />

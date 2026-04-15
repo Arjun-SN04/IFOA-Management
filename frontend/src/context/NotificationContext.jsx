@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
+import { Bell } from 'lucide-react';
 import { notificationAPI } from '../api';
 import { useAuth } from './AuthContext';
 
@@ -61,7 +62,7 @@ export const NotificationProvider = ({ children }) => {
 
       // Show toast popup
       toast(notif.message || notif.title, {
-        icon: '🔔',
+        icon: <Bell size={16} />,
         duration: 5000,
         style: {
           borderRadius: '12px',

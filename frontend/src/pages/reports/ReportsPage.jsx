@@ -41,7 +41,7 @@ function KpiCard({ icon: Icon, label, value, sub, color = 'blue', trend }) {
   const c = colors[color] || colors.blue;
   return (
     <Card className="p-5 flex items-start gap-4">
-      <div className={`p-3 rounded-xl ${c.bg} flex-shrink-0`}>
+      <div className={`p-3 rounded-xl ${c.bg}`} style={{ flexShrink: 0 }}>
         <Icon className={`w-5 h-5 ${c.icon}`} />
       </div>
       <div className="flex-1 min-w-0">
@@ -66,7 +66,7 @@ function ProgressRow({ label, value, max, color, sub }) {
     <div>
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-sm font-medium text-slate-700 truncate pr-3">{label}</span>
-        <div className="flex items-center gap-3 flex-shrink-0">
+        <div className="flex items-center gap-3" style={{ flexShrink: 0 }}>
           {sub && <span className="text-xs text-slate-400">{sub}</span>}
           <span className="text-sm font-bold text-slate-900 w-10 text-right">{pct}%</span>
         </div>
@@ -89,7 +89,7 @@ function CustomTooltip({ active, payload, label }) {
       {label && <p className="font-semibold text-slate-800 mb-1 capitalize">{label}</p>}
       {payload.map((p, i) => (
         <div key={i} className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.fill || p.color }} />
+          <span className="w-2 h-2 rounded-full" style={{ background: p.fill || p.color, flexShrink: 0 }} />
           <span className="text-slate-600 capitalize">{p.name}:</span>
           <span className="font-semibold text-slate-900">{p.value}</span>
         </div>
@@ -161,12 +161,14 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <PageHeader
-          title="Reports & Analytics"
-          subtitle="Live insights across projects, tasks, and team performance"
-        />
-        <div className="flex items-center gap-3 flex-shrink-0 mt-1">
+      <div className="space-y-2">
+        <div className="text-center">
+          <PageHeader
+            title="Reports & Analytics"
+            subtitle="Live insights across projects, tasks, and team performance"
+          />
+        </div>
+        <div className="flex items-center justify-center gap-3">
           {lastUpdated && (
             <p className="text-xs text-slate-400 hidden sm:block">
               Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -250,7 +252,7 @@ export default function ReportsPage() {
                     {taskStatusData.map((d, i) => (
                       <div key={i} className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: d.fill }} />
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ background: d.fill, flexShrink: 0 }} />
                           <span className="text-xs text-slate-600">{d.name}</span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -317,12 +319,12 @@ export default function ReportsPage() {
                   const sc = STATUS_COLORS[task.status] || { fill: '#94a3b8', label: task.status };
                   return (
                     <div key={task._id || i} className="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0">
-                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: sc.fill }} />
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ background: sc.fill, flexShrink: 0 }} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-slate-800 truncate">{task.title}</p>
                         <p className="text-xs text-slate-400">{task.project?.name || '—'}</p>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>
                         <span className="text-xs px-2 py-0.5 rounded-full font-medium"
                           style={{ background: sc.fill + '20', color: sc.fill }}>
                           {sc.label}
@@ -534,8 +536,9 @@ export default function ReportsPage() {
                           <tr key={i} className="hover:bg-slate-50 transition-colors">
                             <td className="px-5 py-3.5">
                               <div className="flex items-center gap-2.5">
-                                <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                                  style={{ background: TEAM_PALETTE[i % TEAM_PALETTE.length] }}>
+                                <div
+                                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                                  style={{ background: TEAM_PALETTE[i % TEAM_PALETTE.length], flexShrink: 0 }}>
                                   {u.name?.charAt(0).toUpperCase()}
                                 </div>
                                 <div>
@@ -558,7 +561,9 @@ export default function ReportsPage() {
                                       background: u.completionRate >= 75 ? '#10b981' : u.completionRate >= 50 ? '#f59e0b' : '#94a3b8'
                                     }} />
                                 </div>
-                                <span className={`font-bold text-xs min-w-[2.5rem] text-right ${u.completionRate >= 75 ? 'text-emerald-600' : u.completionRate >= 50 ? 'text-amber-600' : 'text-slate-500'}`}>
+                                <span
+                                  className={`font-bold text-xs text-right ${u.completionRate >= 75 ? 'text-emerald-600' : u.completionRate >= 50 ? 'text-amber-600' : 'text-slate-500'}`}
+                                  style={{ minWidth: '2.5rem' }}>
                                   {u.completionRate}%
                                 </span>
                               </div>

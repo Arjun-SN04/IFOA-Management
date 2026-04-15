@@ -64,7 +64,7 @@ function StatusBreakdown({ tasks }) {
 export default function ProjectDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { isManagerOrAdmin } = useAuth();
+  const { isManagerOrAdmin, user } = useAuth();
   const [project, setProject]   = useState(null);
   const [tasks, setTasks]       = useState([]);
   const [allUsers, setAllUsers] = useState([]);
@@ -72,7 +72,8 @@ export default function ProjectDetailPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab]           = useState('overview');
   const [showAddTask, setShowAddTask] = useState(false);
-  const [taskForm, setTaskForm] = useState({ title: '', description: '', priority: 'medium', status: 'todo', dueDate: '', assignee: '' });
+  const [taskForm, setTaskForm] = useState({ title: '', description: '', priority: 'medium', status: 'todo', dueDate: '', assignee: '', type: 'task', parent: '' });
+  const [selectedMember, setSelectedMember] = useState('');
   const [saving, setSaving]     = useState(false);
 
   const loadData = async (isRefresh = false) => {
@@ -96,6 +97,9 @@ export default function ProjectDetailPage() {
 
   useEffect(() => { loadData(); }, [id]);
 
+  const isProjectLead = project && String(project.lead?._id || project.lead) === String(user?._id || user?.id);
+  const canManageProject = isManagerOrAdmin || isProjectLead;
+
   const handleCreateTask = async () => {
     setSaving(true);
     try {
@@ -103,7 +107,7 @@ export default function ProjectDetailPage() {
       const newTask = res.data.data || res.data.task;
       if (newTask) setTasks(t => [newTask, ...t]);
       setShowAddTask(false);
-      setTaskForm({ title: '', description: '', priority: 'medium', status: 'todo', dueDate: '', assignee: '' });
+      setTaskForm({ title: '', description: '', priority: 'medium', status: 'todo', dueDate: '', assignee: '', type: 'task', parent: '' });
     } catch (e) { alert(e.response?.data?.message || 'Failed to create task'); }
     finally { setSaving(false); }
   };
@@ -116,6 +120,27 @@ export default function ProjectDetailPage() {
   };
 
   const set = k => e => setTaskForm(p => ({ ...p, [k]: e.target.value }));
+
+  const handleAddMember = async () => {
+    if (!selectedMember) return;
+    try {
+      const res = await projectAPI.addMember(id, { userId: selectedMember });
+      setProject((prev) => ({ ...prev, ...(res.data.project || {}) }));
+      setSelectedMember('');
+    } catch (e) {
+      alert(e.response?.data?.message || 'Failed to add member');
+    }
+  };
+
+  const handleRemoveMember = async (userId) => {
+    if (!window.confirm('Remove this member from project?')) return;
+    try {
+      const res = await projectAPI.removeMember(id, userId);
+      setProject((prev) => ({ ...prev, ...(res.data.project || {}) }));
+    } catch (e) {
+      alert(e.response?.data?.message || 'Failed to remove member');
+    }
+  };
 
   if (loading) return <div className="flex items-center justify-center h-64"><Spinner size="lg" /></div>;
   if (!project) return null;
@@ -161,14 +186,14 @@ export default function ProjectDetailPage() {
           <h1 className="text-xl font-bold text-slate-900">{project.name}</h1>
           {project.description && <p className="text-sm text-slate-500 mt-1">{project.description}</p>}
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => loadData(true)}
             disabled={refreshing}
             className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50">
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
-          {isManagerOrAdmin && (
+          {canManageProject && (
             <Button onClick={() => setShowAddTask(true)}>
               <Plus className="w-4 h-4" />
               Add Task
@@ -208,7 +233,6 @@ export default function ProjectDetailPage() {
               if (count === 0) return null;
               return (
                 <span key={col.key} className="flex items-center gap-1 text-xs text-slate-500">
-                  <span className={`w-2 h-2 rounded-full ${col.dot}`} />
                   {col.label} ({count})
                 </span>
               );
@@ -260,7 +284,7 @@ export default function ProjectDetailPage() {
                     <th className="text-left px-5 py-3 hidden sm:table-cell">Assignee</th>
                     <th className="text-center px-5 py-3">Priority</th>
                     <th className="text-center px-5 py-3">Status</th>
-                    {isManagerOrAdmin && <th className="text-center px-5 py-3">Update Status</th>}
+                      {canManageProject && <th className="text-center px-5 py-3">Update Status</th>}
                     <th className="text-right px-5 py-3 hidden md:table-cell">Due</th>
                   </tr>
                 </thead>
@@ -296,12 +320,12 @@ export default function ProjectDetailPage() {
                       <td className="px-5 py-3.5 text-center">
                         <StatusPill status={task.status} />
                       </td>
-                      {isManagerOrAdmin && (
+                      {canManageProject && (
                         <td className="px-5 py-3.5 text-center">
                           <select
                             value={task.status}
                             onChange={e => handleStatusChange(task._id, e.target.value)}
-                            className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-300 cursor-pointer min-w-[110px]">
+                            className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-300 cursor-pointer min-w-27.5">
                             {COLUMNS.map(c => (
                               <option key={c.key} value={c.key}>{c.label}</option>
                             ))}
@@ -324,25 +348,64 @@ export default function ProjectDetailPage() {
 
       {/* ── Members tab ───────────────────────────────────────────────────── */}
       {tab === 'members' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-          {!project.members?.length ? (
-            <Empty icon={UsersIcon} title="No members" description="Add members to this project" />
-          ) : (
-            project.members.map((m, i) => (
-              <Card key={i} className="p-4">
-                <div className="flex items-center gap-3">
-                  <Avatar name={m.user?.name || m.name || '?'} size="md" />
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">{m.user?.name || m.name || '—'}</p>
-                    <p className="text-xs text-slate-500 capitalize">{m.role || m.user?.role || 'member'}</p>
-                    {m.user?.department && (
-                      <p className="text-xs text-slate-400">{m.user.department}</p>
+        <div className="space-y-4">
+          {canManageProject && (
+            <Card className="p-4">
+              <p className="text-sm font-semibold text-slate-900 mb-2">Add Member</p>
+              <div className="flex items-center gap-2">
+                <select
+                  value={selectedMember}
+                  onChange={(e) => setSelectedMember(e.target.value)}
+                  className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-300">
+                  <option value="">Select user</option>
+                  {allUsers
+                    .filter((u) => String(u._id) !== String(project.lead?._id || project.lead))
+                    .filter((u) => !(project.members || []).some((m) => String(m._id || m.user?._id) === String(u._id)))
+                    .map((u) => <option key={u._id} value={u._id}>{u.name} ({u.email})</option>)}
+                </select>
+                <Button onClick={handleAddMember} disabled={!selectedMember}>Add</Button>
+              </div>
+            </Card>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            <Card className="p-4 border-blue-200 bg-blue-50/40">
+              <div className="flex items-center gap-3">
+                <Avatar name={project.lead?.name || '?'} size="md" />
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">{project.lead?.name || '—'}</p>
+                  <p className="text-xs text-blue-700 capitalize">Team Lead</p>
+                  {project.lead?.department && <p className="text-xs text-slate-500">{project.lead.department}</p>}
+                </div>
+              </div>
+            </Card>
+
+            {!(project.members || []).length ? (
+              <Empty icon={UsersIcon} title="No members" description="Add members to this project" />
+            ) : (
+              project.members
+                .filter((m) => String(m._id || m.user?._id) !== String(project.lead?._id || project.lead))
+                .map((m, i) => (
+                <Card key={i} className="p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Avatar name={m.user?.name || m.name || '?'} size="md" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-900 truncate">{m.user?.name || m.name || '—'}</p>
+                        <p className="text-xs text-slate-500 capitalize">{m.role || m.user?.role || 'member'}</p>
+                        {m.user?.department && (
+                          <p className="text-xs text-slate-400 truncate">{m.user.department}</p>
+                        )}
+                      </div>
+                    </div>
+                    {canManageProject && (
+                      <Button variant="ghost" size="xs" onClick={() => handleRemoveMember(m._id || m.user?._id)}>Remove</Button>
                     )}
                   </div>
-                </div>
-              </Card>
-            ))
-          )}
+                </Card>
+              ))
+            )}
+          </div>
         </div>
       )}
 
@@ -369,13 +432,12 @@ export default function ProjectDetailPage() {
           <Card className="p-5">
             <h3 className="text-sm font-semibold text-slate-900 mb-4">Task Breakdown</h3>
             <div className="space-y-3">
-              {COLUMNS.map(({ key, label, dot, fill }) => {
+              {COLUMNS.map(({ key, label, fill }) => {
                 const count = tasks.filter(t => t.status === key).length;
                 const pct   = tasks.length ? Math.round((count / tasks.length) * 100) : 0;
                 return (
                   <div key={key}>
                     <div className="flex items-center gap-2 mb-1">
-                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dot}`} />
                       <span className="flex-1 text-sm text-slate-600">{label}</span>
                       <span className="text-sm font-bold text-slate-900">{count}</span>
                       <span className="text-xs text-slate-400 w-8 text-right">{pct}%</span>
@@ -400,6 +462,16 @@ export default function ProjectDetailPage() {
           <Input label="Title" value={taskForm.title} onChange={set('title')} placeholder="Task title" required />
           <Textarea label="Description" value={taskForm.description} onChange={set('description')} placeholder="Optional description" />
           <div className="grid grid-cols-2 gap-3">
+            <Select label="Task Type" value={taskForm.type} onChange={set('type')}>
+              <option value="task">Task</option>
+              <option value="subtask">Sub Task</option>
+            </Select>
+            <Select label="Parent Task" value={taskForm.parent} onChange={set('parent')} disabled={taskForm.type !== 'subtask'}>
+              <option value="">Select parent task</option>
+              {tasks.filter((t) => !t.parent).map((t) => <option key={t._id} value={t._id}>{t.title}</option>)}
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <Select label="Priority" value={taskForm.priority} onChange={set('priority')}>
               <option value="low">Low</option>
               <option value="medium">Medium</option>
@@ -408,6 +480,7 @@ export default function ProjectDetailPage() {
             </Select>
             <Select label="Assignee" value={taskForm.assignee} onChange={set('assignee')}>
               <option value="">Unassigned</option>
+              {canManageProject && <option value="__all__">Assign to all employees</option>}
               {allUsers.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
             </Select>
           </div>

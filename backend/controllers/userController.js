@@ -127,14 +127,95 @@ exports.toggleUserStatus = async (req, res) => {
 // @route PUT /api/users/:id/leave-balance
 exports.updateLeaveBalance = async (req, res) => {
   try {
-    const { casual, sick, annual } = req.body;
+    const { casual, sick, annual, unpaid, compensatory } = req.body;
     const update = {};
     if (casual !== undefined) update['leaveBalance.casual'] = casual;
     if (sick !== undefined) update['leaveBalance.sick'] = sick;
     if (annual !== undefined) update['leaveBalance.annual'] = annual;
+    if (unpaid !== undefined) update['leaveBalance.unpaid'] = unpaid;
+    if (compensatory !== undefined) update['leaveBalance.compensatory'] = compensatory;
     const user = await User.findByIdAndUpdate(req.params.id, update, { new: true }).select('-password');
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
     res.json({ success: true, user });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// @desc  Get accessories for current user (read-only for employee)
+// @route GET /api/users/me/accessories
+exports.getMyAccessories = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id)
+      .select('accessories')
+      .populate('accessories.assignedBy', 'name email');
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    res.json({ success: true, accessories: user.accessories || [] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// @desc  Get accessories by user id (manager/admin)
+// @route GET /api/users/:id/accessories
+exports.getUserAccessories = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id)
+      .select('name email accessories')
+      .populate('accessories.assignedBy', 'name email');
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    res.json({ success: true, user: { _id: user._id, name: user.name, email: user.email }, accessories: user.accessories || [] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// @desc  Add accessory for an employee (manager/admin)
+// @route POST /api/users/:id/accessories
+exports.addUserAccessory = async (req, res) => {
+  try {
+    const { name, serialNumber, notes } = req.body;
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ success: false, message: 'Accessory name is required' });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const accessory = {
+      name: String(name).trim(),
+      serialNumber: serialNumber ? String(serialNumber).trim() : '',
+      notes: notes ? String(notes).trim() : '',
+      assignedAt: new Date(),
+      assignedBy: req.user.id,
+    };
+
+    user.accessories.push(accessory);
+    await user.save();
+    await user.populate('accessories.assignedBy', 'name email');
+
+    res.status(201).json({ success: true, accessories: user.accessories || [] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// @desc  Remove accessory from an employee (manager/admin)
+// @route DELETE /api/users/:id/accessories/:accessoryId
+exports.removeUserAccessory = async (req, res) => {
+  try {
+    const { id, accessoryId } = req.params;
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const found = user.accessories.id(accessoryId);
+    if (!found) return res.status(404).json({ success: false, message: 'Accessory not found' });
+
+    found.deleteOne();
+    await user.save();
+    await user.populate('accessories.assignedBy', 'name email');
+
+    res.json({ success: true, accessories: user.accessories || [] });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

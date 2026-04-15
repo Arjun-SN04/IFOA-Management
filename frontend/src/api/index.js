@@ -18,6 +18,10 @@ export const userAPI = {
   updateLeaveBalance: (id, data) => API.put(`/users/${id}/leave-balance`, data),
   getProfile: () => API.get('/users/profile'),
   updateProfile: (data) => API.put('/users/profile', data),
+  getMyAccessories: () => API.get('/users/me/accessories'),
+  getAccessories: (id) => API.get(`/users/${id}/accessories`),
+  addAccessory: (id, data) => API.post(`/users/${id}/accessories`, data),
+  removeAccessory: (id, accessoryId) => API.delete(`/users/${id}/accessories/${accessoryId}`),
   // FIX: registered as PATCH in updated userRoutes.js
   toggleStatus: (id) => API.patch(`/users/${id}/toggle-status`),
 };
@@ -52,6 +56,8 @@ export const leaveAPI = {
   getAll: (params) => API.get('/leaves', { params }),
   getBalance: () => API.get('/leaves/balance'),
   getCalendar: () => API.get('/leaves/calendar'),
+  getResetSettings: () => API.get('/leaves/reset-settings'),
+  updateResetSettings: (data) => API.put('/leaves/reset-settings', data),
   review: (id, data) => API.put(`/leaves/${id}/review`, data),
   cancel: (id) => API.put(`/leaves/${id}/cancel`),
 };
@@ -98,4 +104,15 @@ export const reportAPI = {
   getUserReport: () => API.get('/reports/users'),
   getLeaveReport: () => API.get('/reports/leaves'),
   getSprintReport: () => API.get('/reports/sprints'),
+};
+
+export const dailyTaskAPI = {
+  submit: (data) => API.post('/daily-tasks/submit', data),
+  getMyToday: () => API.get('/daily-tasks/my-today'),
+  getMyStatus: () => API.get('/daily-tasks/my-status'),
+  adminGetAll: () => API.get('/daily-tasks/admin/all'),
+  adminGetSettings: () => API.get('/daily-tasks/admin/settings'),
+  adminToggle: (userId, isRequired) => API.patch(`/daily-tasks/admin/settings/${userId}`, { isRequired }),
+  adminBulkToggle: (isRequired) => API.post('/daily-tasks/admin/settings/bulk', { isRequired }),
+  adminSetSelected: (userIds, isRequired) => API.post('/daily-tasks/admin/settings/selected', { userIds, isRequired }),
 };

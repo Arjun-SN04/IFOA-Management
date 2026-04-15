@@ -26,6 +26,7 @@ app.use('/api/comments',      require('./routes/commentRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/announcements', require('./routes/announcementRoutes'));
 app.use('/api/reports',       require('./routes/reportRoutes'));
+app.use('/api/daily-tasks',   require('./routes/dailyTaskRoutes'));
 
 // Health check
 app.get('/', (req, res) => res.json({ message: 'IFOA Management API Running ✅' }));

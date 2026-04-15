@@ -1,9 +1,50 @@
 const Announcement = require('../models/Announcement');
+const User = require('../models/User');
+const { createAndEmit } = require('./notificationController');
+
+const getAnnouncementAudienceFilter = (announcement) => {
+  if (announcement.audience === 'employees') {
+    return { role: 'employee' };
+  }
+
+  if (announcement.audience === 'managers') {
+    return { role: { $in: ['admin', 'manager'] } };
+  }
+
+  if (announcement.audience === 'department' && announcement.department) {
+    return { department: announcement.department };
+  }
+
+  return {};
+};
 
 // @desc  Create announcement
 exports.createAnnouncement = async (req, res) => {
   try {
     const announcement = await Announcement.create({ ...req.body, createdBy: req.user._id });
+
+    const audienceFilter = getAnnouncementAudienceFilter(announcement);
+    const recipients = await User.find({
+      ...audienceFilter,
+      isActive: true,
+      _id: { $ne: req.user._id },
+    }).select('_id');
+
+    if (recipients.length) {
+      await Promise.all(
+        recipients.map((recipient) =>
+          createAndEmit({
+            recipient: recipient._id,
+            sender: req.user._id,
+            type: 'announcement',
+            title: 'New Announcement',
+            message: `${req.user.name} posted: ${announcement.title}`,
+            link: '/announcements',
+          })
+        )
+      );
+    }
+
     res.status(201).json({ success: true, data: announcement });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
