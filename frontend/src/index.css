@@ -1,61 +1,116 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap');
 
 @import "tailwindcss";
 
 :root {
-  --font-main: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --blue: #1e40af;
-  --blue-light: #3b82f6;
-  --blue-dark: #1e3a8a;
+  --font-main: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Cormorant Garamond', Georgia, serif;
+
+  /* White & Blue palette */
+  --cream:        #FFFFFF;
+  --cream-2:      #F4F7FF;
+  --cream-3:      #E8EEFF;
+  --gold:         #1B4FD8;
+  --gold-mid:     #1A44C2;
+  --gold-light:   #3B82F6;
+  --gold-pale:    #EFF6FF;
+  --brown:        #0F172A;
+  --brown-mid:    #1E293B;
+  --brown-light:  #334155;
+  --tan:          #64748B;
+  --tan-light:    #94A3B8;
+  --green:        #0EA5E9;
+  --rust:         #2563EB;
+
+  /* Semantic */
+  --surface:      #FFFFFF;
+  --surface-2:    #F8FAFF;
+  --border:       rgba(27, 79, 216, 0.12);
+  --border-mid:   rgba(27, 79, 216, 0.2);
+  --text-main:    #0F172A;
+  --text-mid:     #1E293B;
+  --text-muted:   #475569;
+  --text-faint:   #94A3B8;
+
+  /* Blue variable used in Navbar */
+  --blue:         #1B4FD8;
 }
 
 * {
   font-family: var(--font-main);
+  box-sizing: border-box;
 }
 
 body {
-  margin: 0;
-  padding: 0;
-  background: #ffffff;
-  color: #1e293b;
+  margin: 0; padding: 0;
+  background: #FFFFFF;
+  color: var(--text-main);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Scrollbar */
-.scrollbar-thin::-webkit-scrollbar { width: 4px; }
-.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-.scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 100px; }
-.scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+/* Scrollbar — thin, blue tone */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(27,79,216,0.2); border-radius: 100px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(27,79,216,0.35); }
 
-/* Smooth animations */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+/* ── Animations ── */
+@keyframes fadeIn      { from{opacity:0} to{opacity:1} }
+@keyframes fadeInUp    { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
+@keyframes fadeInDown  { from{opacity:0;transform:translateY(-12px)} to{opacity:1;transform:translateY(0)} }
+@keyframes slideInLeft { from{opacity:0;transform:translateX(-20px)} to{opacity:1;transform:translateX(0)} }
+@keyframes scaleIn     { from{opacity:0;transform:scale(0.94)} to{opacity:1;transform:scale(1)} }
+@keyframes float       { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+
+.animate-fadeIn      { animation: fadeIn 0.3s ease-out both; }
+.animate-fadeInUp    { animation: fadeInUp 0.45s ease-out both; }
+.animate-fadeInDown  { animation: fadeInDown 0.3s ease-out both; }
+.animate-slideInLeft { animation: slideInLeft 0.35s ease-out both; }
+.animate-scaleIn     { animation: scaleIn 0.25s ease-out both; }
+.animate-float       { animation: float 4s ease-in-out infinite; }
+
+/* ── App shell background ── */
+.app-bg {
+  background: #FFFFFF;
+  min-height: 100vh;
 }
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+
+/* ── Blue accent text ── */
+.gradient-text {
+  background: linear-gradient(135deg, #1B4FD8 0%, #2563EB 50%, #3B82F6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
-@keyframes fadeInDown {
-  from { opacity: 0; transform: translateY(-12px); }
-  to { opacity: 1; transform: translateY(0); }
+
+/* ── Blue button glow ── */
+.btn-gold-glow {
+  box-shadow: 0 4px 20px rgba(27,79,216,0.28);
 }
-@keyframes slideInLeft {
-  from { opacity: 0; transform: translateX(-16px); }
-  to { opacity: 1; transform: translateX(0); }
+.btn-gold-glow:hover {
+  box-shadow: 0 6px 28px rgba(27,79,216,0.42);
 }
-@keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+
+/* ── Feature card hover ── */
+.feature-card {
+  position: relative;
+  transition: box-shadow 0.25s, border-color 0.25s, transform 0.25s;
 }
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-8px); }
+.feature-card:hover {
+  border-color: rgba(27,79,216,0.25);
+  box-shadow: 0 12px 40px rgba(15,23,42,0.1);
+  transform: translateY(-3px);
 }
-.animate-fadeIn { animation: fadeIn 0.3s ease-out both; }
-.animate-fadeInUp { animation: fadeInUp 0.4s ease-out both; }
-.animate-fadeInDown { animation: fadeInDown 0.3s ease-out both; }
-.animate-slideInLeft { animation: slideInLeft 0.3s ease-out both; }
-.animate-scaleIn { animation: scaleIn 0.2s ease-out both; }
-.animate-float { animation: float 3s ease-in-out infinite; }
+
+/* ── Dot pattern ── */
+.dot-pattern {
+  background-image: radial-gradient(circle, rgba(27,79,216,0.12) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ── Layout sidebar dark ── */
+.sidebar-warm {
+  background: var(--brown);
+  border-right: none;
+}

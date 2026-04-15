@@ -1,7 +1,9 @@
+const http = require('http');
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const connectDB = require('./config/db');
+const { initSocket } = require('./socket');
 
 dotenv.config();
 connectDB();
@@ -14,16 +16,16 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
-app.use('/api/auth',     require('./routes/authRoutes'));
-app.use('/api/users',    require('./routes/userRoutes'));
-app.use('/api/projects', require('./routes/projectRoutes'));
-app.use('/api/tasks',    require('./routes/taskRoutes'));
-app.use('/api/leaves',   require('./routes/leaveRoutes'));
-app.use('/api/sprints',  require('./routes/sprintRoutes'));
-app.use('/api/comments', require('./routes/commentRoutes'));
+app.use('/api/auth',          require('./routes/authRoutes'));
+app.use('/api/users',         require('./routes/userRoutes'));
+app.use('/api/projects',      require('./routes/projectRoutes'));
+app.use('/api/tasks',         require('./routes/taskRoutes'));
+app.use('/api/leaves',        require('./routes/leaveRoutes'));
+app.use('/api/sprints',       require('./routes/sprintRoutes'));
+app.use('/api/comments',      require('./routes/commentRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/announcements', require('./routes/announcementRoutes'));
-app.use('/api/reports',  require('./routes/reportRoutes'));
+app.use('/api/reports',       require('./routes/reportRoutes'));
 
 // Health check
 app.get('/', (req, res) => res.json({ message: 'IFOA Management API Running ✅' }));
@@ -37,5 +39,9 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ success: false, message: err.message || 'Internal Server Error' });
 });
 
+// Create HTTP server and attach Socket.io
+const server = http.createServer(app);
+initSocket(server);
+
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT} with WebSocket support`));

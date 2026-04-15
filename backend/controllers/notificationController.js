@@ -1,4 +1,5 @@
 const Notification = require('../models/Notification');
+const { getIO } = require('../socket');
 
 // @desc  Get my notifications
 exports.getMyNotifications = async (req, res) => {
@@ -58,4 +59,12 @@ exports.deleteNotification = async (req, res) => {
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
+};
+
+// @desc  Create a notification (internal helper used by other controllers)
+// Exposed so other controllers can call this if they don't import socket directly
+exports.createAndEmit = async ({ recipient, sender, type, title, message, link }) => {
+  const notif = await Notification.create({ recipient, sender, type, title, message, link });
+  try { getIO().to(`user:${recipient}`).emit('notification:new', notif); } catch {}
+  return notif;
 };

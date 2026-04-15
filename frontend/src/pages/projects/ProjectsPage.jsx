@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { projectAPI, userAPI } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { Card, Button, Modal, Input, Textarea, Select, Badge, Avatar, Empty, Spinner, PageHeader } from '../../components/ui';
@@ -78,29 +79,52 @@ export default function ProjectsPage() {
       />
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.1 }}
+        className="flex flex-col sm:flex-row gap-3 p-4 bg-gradient-to-r from-blue-50 to-slate-50 rounded-xl border border-blue-100/50">
         <input
           placeholder="Search projects…"
           value={search} onChange={e => setSearch(e.target.value)}
-          className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          className="flex-1 px-4 py-2.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
         />
         <div className="flex gap-2 flex-wrap">
-          {['all', 'planning', 'in-progress', 'completed', 'on-hold'].map(s => (
-            <button key={s} onClick={() => setFilter(s)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors
-                ${filter === s ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
+          {['all', 'planning', 'in-progress', 'completed', 'on-hold'].map((s, idx) => (
+            <motion.button
+              key={s}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: idx * 0.05 }}
+              onClick={() => setFilter(s)}
+              className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all duration-200 whitespace-nowrap
+                ${filter === s
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-md'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300'}`}>
               {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1).replace('-', ' ')}
-            </button>
+            </motion.button>
           ))}
         </div>
-      </div>
+      </motion.div>
 
       {/* Grid */}
       {filtered.length === 0
         ? <Empty icon={FolderKanban} title="No projects found" description={search ? "Try a different search term" : "Create your first project to get started"} action={isManagerOrAdmin && <Button onClick={() => setShowCreate(true)}>Create Project</Button>} />
-        : <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filtered.map(p => <ProjectCard key={p._id} project={p} onClick={() => navigate(`/projects/${p._id}`)} />)}
-          </div>
+        : <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4 }}
+            className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            {filtered.map((p, idx) => (
+              <motion.div
+                key={p._id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: idx * 0.05 }}>
+                <ProjectCard project={p} onClick={() => navigate(`/projects/${p._id}`)} />
+              </motion.div>
+            ))}
+          </motion.div>
       }
 
       {/* Create Modal */}
@@ -155,55 +179,84 @@ function ProjectCard({ project: p, onClick }) {
   const memberCount = p.members?.length || 0;
 
   return (
-    <Card onClick={onClick} className="p-5 group">
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <Badge variant={STATUS_COLORS[p.status] || 'default'}>{p.status?.replace('-', ' ')}</Badge>
-            {p.priority === 'high' || p.priority === 'critical'
-              ? <Badge variant="danger">{p.priority}</Badge>
-              : null
-            }
-          </div>
-          <h3 className="text-base font-semibold text-slate-900 group-hover:text-slate-700 transition-colors truncate">{p.name}</h3>
-        </div>
-      </div>
-
-      {p.description && (
-        <p className="text-sm text-slate-500 line-clamp-2 mb-4">{p.description}</p>
-      )}
-
-      {/* Progress */}
-      <div className="mb-4">
-        <div className="flex justify-between text-xs text-slate-500 mb-1">
-          <span>Progress</span>
-          <span className="font-medium">{progress}%</span>
-        </div>
-        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-          <div className={`h-full rounded-full transition-all duration-500 ${progress === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`}
-            style={{ width: `${progress}%` }} />
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="flex items-center justify-between">
-        <div className="flex -space-x-1.5">
-          {p.members?.slice(0, 4).map((m, i) => (
-            <Avatar key={i} name={m.user?.name || m.name || '?'} size="xs"
-              className="ring-2 ring-white" />
-          ))}
-          {memberCount > 4 && (
-            <div className="w-6 h-6 rounded-full bg-slate-200 ring-2 ring-white flex items-center justify-center text-xs text-slate-600 font-medium">
-              +{memberCount - 4}
+    <motion.div
+      whileHover={{ y: -6, boxShadow: '0 20px 40px rgba(37, 99, 235, 0.15)' }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}>
+      <Card onClick={onClick} className="p-6 group h-full cursor-pointer bg-gradient-to-br from-white to-slate-50 border-slate-100 hover:border-blue-200">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2">
+              <Badge variant={STATUS_COLORS[p.status] || 'default'}>{p.status?.replace('-', ' ')}</Badge>
+              {p.priority === 'high' || p.priority === 'critical'
+                ? <Badge variant="danger">{p.priority}</Badge>
+                : null
+              }
             </div>
+            <motion.h3
+              className="text-lg font-semibold text-slate-900 group-hover:text-blue-600 transition-colors truncate"
+              whileHover={{ scale: 1.02 }}>
+              {p.name}
+            </motion.h3>
+          </div>
+        </div>
+
+        {p.description && (
+          <motion.p
+            initial={{ opacity: 0.7 }}
+            whileHover={{ opacity: 1 }}
+            className="text-sm text-slate-600 line-clamp-2 mb-5 transition-all duration-300">
+            {p.description}
+          </motion.p>
+        )}
+
+        {/* Progress */}
+        <div className="mb-5">
+          <div className="flex justify-between text-xs font-medium text-slate-600 mb-2">
+            <span>Progress</span>
+            <motion.span
+              initial={{ scale: 0.8 }}
+              whileHover={{ scale: 1.1 }}
+              className={`${progress === 100 ? 'text-emerald-600' : 'text-blue-600'}`}>
+              {progress}%
+            </motion.span>
+          </div>
+          <motion.div
+            className="h-2 bg-slate-100 rounded-full overflow-hidden"
+            whileHover={{ boxShadow: '0 0 8px rgba(37, 99, 235, 0.2)' }}>
+            <motion.div
+              className={`h-full rounded-full transition-all duration-500 ${progress === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`}
+              initial={{ width: 0 }}
+              animate={{ width: `${progress}%` }}
+              transition={{ delay: 0.2, duration: 0.8 }}
+            />
+          </motion.div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+          <div className="flex -space-x-1.5">
+            {p.members?.slice(0, 4).map((m, i) => (
+              <Avatar key={i} name={m.user?.name || m.name || '?'} size="xs"
+                className="ring-2 ring-white" />
+            ))}
+            {memberCount > 4 && (
+              <motion.div
+                whileHover={{ scale: 1.1 }}
+                className="w-6 h-6 rounded-full bg-slate-200 ring-2 ring-white flex items-center justify-center text-xs text-slate-600 font-medium">
+                +{memberCount - 4}
+              </motion.div>
+            )}
+          </div>
+          {p.endDate && (
+            <motion.span
+              initial={{ opacity: 0.6 }}
+              whileHover={{ opacity: 1 }}
+              className="text-xs text-slate-500 font-medium">
+              Due {new Date(p.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </motion.span>
           )}
         </div>
-        {p.endDate && (
-          <span className="text-xs text-slate-400">
-            Due {new Date(p.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-          </span>
-        )}
-      </div>
-    </Card>
+      </Card>
+    </motion.div>
   );
 }

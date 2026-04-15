@@ -9,7 +9,7 @@ exports.getDashboardStats = async (req, res) => {
   try {
     const [totalUsers, totalProjects, totalTasks, pendingLeaves] = await Promise.all([
       User.countDocuments({ isActive: true }),
-      Project.countDocuments(),
+      Project.countDocuments({ isArchived: false }),
       Task.countDocuments(),
       Leave.countDocuments({ status: 'pending' }),
     ]);
@@ -19,6 +19,7 @@ exports.getDashboardStats = async (req, res) => {
     ]);
 
     const projectsByStatus = await Project.aggregate([
+      { $match: { isArchived: false } },
       { $group: { _id: '$status', count: { $sum: 1 } } }
     ]);
 
@@ -44,8 +45,9 @@ exports.getDashboardStats = async (req, res) => {
 // @desc  Project-level report
 exports.getProjectReport = async (req, res) => {
   try {
-    const projects = await Project.find()
-      .populate('members.user', 'name')
+    // FIX: members is an array of ObjectIds, not objects — remove .user populate
+    const projects = await Project.find({ isArchived: false })
+      .populate('members', 'name')
       .populate('lead', 'name');
 
     const report = await Promise.all(projects.map(async (p) => {
@@ -55,6 +57,7 @@ exports.getProjectReport = async (req, res) => {
         project: p.name,
         key: p.key,
         status: p.status,
+        lead: p.lead?.name || 'N/A',
         totalTasks: tasks.length,
         completedTasks: done,
         completionRate: tasks.length ? Math.round((done / tasks.length) * 100) : 0,
@@ -75,7 +78,8 @@ exports.getUserReport = async (req, res) => {
     const report = await Promise.all(users.map(async (u) => {
       const assigned = await Task.countDocuments({ assignee: u._id });
       const completed = await Task.countDocuments({ assignee: u._id, status: 'done' });
-      const inProgress = await Task.countDocuments({ assignee: u._id, status: 'in_progress' });
+      // FIX: was 'in_progress' (underscore) — Task model uses 'in-progress' (hyphen)
+      const inProgress = await Task.countDocuments({ assignee: u._id, status: 'in-progress' });
       return {
         name: u.name, email: u.email, role: u.role, department: u.department,
         assigned, completed, inProgress,
@@ -118,8 +122,11 @@ exports.getSprintReport = async (req, res) => {
       const completed = tasks.filter(t => t.status === 'done');
       const velocity = completed.reduce((sum, t) => sum + (t.storyPoints || 0), 0);
       return {
-        sprint: s.name, project: s.project?.name,
-        totalTasks: tasks.length, completedTasks: completed.length, velocity
+        sprint: s.name,
+        project: s.project?.name || 'N/A',
+        totalTasks: tasks.length,
+        completedTasks: completed.length,
+        velocity
       };
     }));
 

@@ -185,12 +185,12 @@ export function Alert({ children, variant = 'error' }) {
 // ─── PageHeader ───────────────────────────────────────────────────────────────
 export function PageHeader({ title, subtitle, actions }) {
   return (
-    <div className="flex items-start justify-between mb-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
-        {subtitle && <p className="text-sm text-slate-500 mt-1">{subtitle}</p>}
+    <div className="flex flex-col items-center justify-center mb-8 space-y-3">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold text-slate-900 transition-all duration-300 hover:text-blue-600 hover:scale-105 cursor-default">{title}</h1>
+        {subtitle && <p className="text-sm text-slate-500 mt-2 hover:text-slate-600 transition-colors duration-300">{subtitle}</p>}
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && <div className="flex items-center gap-2 mt-4">{actions}</div>}
     </div>
   )
 }
