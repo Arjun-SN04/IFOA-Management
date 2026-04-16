@@ -9,10 +9,12 @@ const {
 	getLeaveCalendar,
 	getLeaveResetSettings,
 	updateLeaveResetSettings,
+	adminCreateLeave,
 } = require('../controllers/leaveController');
 const { protect, managerOrAdmin, adminOnly } = require('../middleware/authMiddleware');
 
 // FIX: static named routes before wildcard /:id routes
+router.post('/admin/create', protect, adminOnly, adminCreateLeave);
 router.post('/apply', protect, applyLeave);
 router.get('/my', protect, getLeaves);          // employee's own leaves
 router.get('/balance', protect, getLeaveBalance);

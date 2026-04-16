@@ -6,10 +6,12 @@ const { getIO } = require('../socket');
 
 // Helper to generate task key safely (e.g. PROJ-12)
 const generateTaskKey = async (projectId) => {
-  const project = await Project.findById(projectId).select('key');
+  const project = await Project.findById(projectId).select('key name');
   if (!project) throw new Error('Project not found');
   const count = await Task.countDocuments({ project: projectId });
-  return `${project.key}-${count + 1}`;
+  // Fallback: derive key from project name if key is missing
+  const keyBase = project.key || project.name.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 6) || 'TASK';
+  return `${keyBase}-${count + 1}`;
 };
 
 // Helper: push a notification via DB + WebSocket
@@ -71,7 +73,7 @@ exports.createTask = async (req, res) => {
       );
 
       const populated = await Task.find({ _id: { $in: tasks.map((t) => t._id) } })
-        .populate('assignee', 'name email avatar')
+        .populate('assignee', 'name email avatar role')
         .populate('reporter', 'name email')
         .populate('project', 'name key')
         .sort({ createdAt: -1 });
@@ -95,7 +97,7 @@ exports.createTask = async (req, res) => {
     }
 
     await task.populate([
-      { path: 'assignee', select: 'name email avatar' },
+      { path: 'assignee', select: 'name email avatar role' },
       { path: 'reporter', select: 'name email' },
       { path: 'project',  select: 'name key' },
     ]);
@@ -124,7 +126,7 @@ exports.getTasks = async (req, res) => {
     if (search)   query.title    = { $regex: search, $options: 'i' };
 
     const tasks = await Task.find(query)
-      .populate('assignee', 'name email avatar')
+      .populate('assignee', 'name email avatar role')
       .populate('reporter', 'name email')
       .populate('project',  'name key')
       .populate('sprint',   'name status')
@@ -144,7 +146,7 @@ exports.getTasks = async (req, res) => {
 exports.getTaskById = async (req, res) => {
   try {
     const task = await Task.findById(req.params.id)
-      .populate('assignee', 'name email avatar department')
+      .populate('assignee', 'name email avatar department role')
       .populate('reporter', 'name email avatar')
       .populate('watchers', 'name email')
       .populate('project',  'name key')
@@ -168,7 +170,7 @@ exports.updateTask = async (req, res) => {
     if (req.body.status && req.body.status !== 'done' && oldTask.status === 'done') req.body.completedDate = null;
 
     const task = await Task.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true })
-      .populate('assignee', 'name email avatar')
+      .populate('assignee', 'name email avatar role')
       .populate('reporter', 'name email')
       .populate('project',  'name key');
 
@@ -206,7 +208,7 @@ exports.updateTaskStatus = async (req, res) => {
     if (status !== 'done') update.completedDate = null;
 
     const task = await Task.findByIdAndUpdate(req.params.id, update, { new: true })
-      .populate('assignee', 'name email avatar')
+      .populate('assignee', 'name email avatar role')
       .populate('project',  'name key');
     if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
 
@@ -316,7 +318,7 @@ exports.assignTask = async (req, res) => {
       );
 
       const populated = await Task.find({ _id: { $in: clones.map((c) => c._id) } })
-        .populate('assignee', 'name email avatar')
+        .populate('assignee', 'name email avatar role')
         .populate('project', 'name key')
         .sort({ createdAt: -1 });
 
@@ -328,7 +330,7 @@ exports.assignTask = async (req, res) => {
       req.params.id,
       { assignee },
       { new: true }
-    ).populate('assignee', 'name email avatar');
+    ).populate('assignee', 'name email avatar role');
     if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
 
     if (assignee && assignee !== req.user.id.toString()) {
@@ -342,6 +344,27 @@ exports.assignTask = async (req, res) => {
       });
     }
 
+    try { getIO().to('admin').emit('task:updated', task); } catch {}
+    res.json({ success: true, task });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// @desc  Assign or remove task from sprint (Jira-style backlog management)
+// @route PATCH /api/tasks/:id/sprint
+exports.updateTaskSprint = async (req, res) => {
+  try {
+    const { sprintId } = req.body; // pass null/undefined to remove from sprint
+    const task = await Task.findByIdAndUpdate(
+      req.params.id,
+      { sprint: sprintId || null },
+      { new: true }
+    )
+      .populate('assignee', 'name email avatar role')
+      .populate('project',  'name key')
+      .populate('sprint',   'name status');
+    if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
     try { getIO().to('admin').emit('task:updated', task); } catch {}
     res.json({ success: true, task });
   } catch (err) {

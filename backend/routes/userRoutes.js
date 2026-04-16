@@ -8,7 +8,7 @@ const {
 const { protect, adminOnly, managerOrAdmin } = require('../middleware/authMiddleware');
 
 // Static/specific routes MUST come before wildcard /:id routes
-router.get('/', protect, managerOrAdmin, getAllUsers);
+router.get('/', protect, getAllUsers);
 router.get('/profile', protect, getMyProfile);
 router.put('/profile', protect, updateMyProfile);
 router.get('/me/accessories', protect, getMyAccessories);

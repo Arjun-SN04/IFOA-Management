@@ -119,7 +119,7 @@ export default function Navbar() {
       className="bg-white border-b shrink-0 shadow-sm" style={{ borderColor: '#E5E7EB', backgroundColor: '#FFFFFF' }}>
       {/* Main bar */}
       <div className="px-4 lg:px-6">
-        <div className="flex items-center h-16 gap-4">
+        <div className="relative flex items-center h-16 gap-4">
 
           {/* Logo */}
           <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5, delay: 0.1 }}>
@@ -128,12 +128,17 @@ export default function Navbar() {
             </Link>
           </motion.div>
 
-          {/* Desktop nav — centered with pill shapes */}
+          {/* Desktop nav — absolutely centered in the full header */}
           <motion.nav
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="hidden lg:flex items-center gap-2 flex-1 justify-center">
+            className="hidden lg:flex items-center gap-2"
+            style={{
+              position: 'absolute',
+              left: '50%',
+              transform: 'translateX(-50%)',
+            }}>
             {allNav.map(({ to, label, icon: Icon }, idx) => (
               <motion.div
                 key={to}
@@ -166,7 +171,7 @@ export default function Navbar() {
           </motion.nav>
 
           {/* Mobile spacer */}
-          <div className="flex-1 lg:hidden" />
+          <div className="flex-1" />
 
           {/* Right — notifications + profile */}
           <motion.div

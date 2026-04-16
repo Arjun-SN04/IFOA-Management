@@ -8,8 +8,10 @@ import {
 } from '../../components/ui';
 import {
   Plus, ArrowLeft, CheckSquare, Users as UsersIcon,
-  Circle, Clock, Eye, CheckCircle2, XCircle, RefreshCw
+  Circle, Clock, Eye, CheckCircle2, XCircle, RefreshCw,
+  Pencil, Trash2, AlertTriangle
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 // ── Status column config ───────────────────────────────────────────────────
 const COLUMNS = [
@@ -38,7 +40,6 @@ function StatusPill({ status }) {
   );
 }
 
-// ── Task status breakdown bar ──────────────────────────────────────────────
 function StatusBreakdown({ tasks }) {
   const total = tasks.length;
   if (total === 0) return null;
@@ -71,10 +72,24 @@ export default function ProjectDetailPage() {
   const [loading, setLoading]   = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab]           = useState('overview');
+
+  // Task add
   const [showAddTask, setShowAddTask] = useState(false);
   const [taskForm, setTaskForm] = useState({ title: '', description: '', priority: 'medium', status: 'todo', dueDate: '', assignee: '', type: 'task', parent: '' });
-  const [selectedMember, setSelectedMember] = useState('');
   const [saving, setSaving]     = useState(false);
+
+  // Member management
+  const [selectedMember, setSelectedMember] = useState('');
+
+  // Edit project modal
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({});
+  const [editSaving, setEditSaving] = useState(false);
+
+  // Delete project modal
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   const loadData = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -84,9 +99,9 @@ export default function ProjectDetailPage() {
         taskAPI.getAll({ project: id }).catch(() => ({ data: { data: [] } })),
         userAPI.getAll().catch(() => ({ data: { data: [] } })),
       ]);
-      setProject(pRes.data.data || pRes.data.project);
-      setTasks(tRes.data.data || tRes.data.tasks || []);
-      setAllUsers(uRes.data.data || []);
+      setProject(pRes.data.project || pRes.data.data);
+      setTasks(tRes.data.tasks || tRes.data.data || []);
+      setAllUsers(uRes.data.users || uRes.data.data || []);
     } catch {
       navigate('/projects');
     } finally {
@@ -98,7 +113,10 @@ export default function ProjectDetailPage() {
   useEffect(() => { loadData(); }, [id]);
 
   const isProjectLead = project && String(project.lead?._id || project.lead) === String(user?._id || user?.id);
+  // Admin/manager can fully manage; project lead can add/remove members and tasks
   const canManageProject = isManagerOrAdmin || isProjectLead;
+  // Only admin can edit or delete the project itself
+  const canEditProject = isManagerOrAdmin;
 
   const handleCreateTask = async () => {
     setSaving(true);
@@ -108,7 +126,8 @@ export default function ProjectDetailPage() {
       if (newTask) setTasks(t => [newTask, ...t]);
       setShowAddTask(false);
       setTaskForm({ title: '', description: '', priority: 'medium', status: 'todo', dueDate: '', assignee: '', type: 'task', parent: '' });
-    } catch (e) { alert(e.response?.data?.message || 'Failed to create task'); }
+      toast.success('Task created');
+    } catch (e) { toast.error(e.response?.data?.message || 'Failed to create task'); }
     finally { setSaving(false); }
   };
 
@@ -127,8 +146,9 @@ export default function ProjectDetailPage() {
       const res = await projectAPI.addMember(id, { userId: selectedMember });
       setProject((prev) => ({ ...prev, ...(res.data.project || {}) }));
       setSelectedMember('');
+      toast.success('Member added');
     } catch (e) {
-      alert(e.response?.data?.message || 'Failed to add member');
+      toast.error(e.response?.data?.message || 'Failed to add member');
     }
   };
 
@@ -137,8 +157,55 @@ export default function ProjectDetailPage() {
     try {
       const res = await projectAPI.removeMember(id, userId);
       setProject((prev) => ({ ...prev, ...(res.data.project || {}) }));
+      toast.success('Member removed');
     } catch (e) {
-      alert(e.response?.data?.message || 'Failed to remove member');
+      toast.error(e.response?.data?.message || 'Failed to remove member');
+    }
+  };
+
+  // ── Edit project ──
+  const openEdit = () => {
+    setEditForm({
+      name: project.name || '',
+      description: project.description || '',
+      status: project.status || 'planning',
+      priority: project.priority || 'medium',
+      category: project.category || 'software',
+      startDate: project.startDate ? project.startDate.slice(0, 10) : '',
+      endDate: project.endDate ? project.endDate.slice(0, 10) : '',
+    });
+    setShowEditModal(true);
+  };
+
+  const handleEditProject = async () => {
+    if (!editForm.name?.trim()) { toast.error('Project name is required'); return; }
+    setEditSaving(true);
+    try {
+      const res = await projectAPI.update(id, editForm);
+      setProject(prev => ({ ...prev, ...(res.data.project || res.data.data || editForm) }));
+      setShowEditModal(false);
+      toast.success('Project updated');
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to update project');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  // ── Delete project ──
+  const handleDeleteProject = async () => {
+    if (deleteConfirmName !== project.name) {
+      toast.error('Project name does not match');
+      return;
+    }
+    setDeleting(true);
+    try {
+      await projectAPI.archive(id);
+      toast.success('Project deleted');
+      navigate('/projects');
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to delete project');
+      setDeleting(false);
     }
   };
 
@@ -186,13 +253,36 @@ export default function ProjectDetailPage() {
           <h1 className="text-xl font-bold text-slate-900">{project.name}</h1>
           {project.description && <p className="text-sm text-slate-500 mt-1">{project.description}</p>}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
           <button
             onClick={() => loadData(true)}
             disabled={refreshing}
-            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50">
+            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+            title="Refresh">
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
+
+          {/* Edit Project — admin/manager only */}
+          {canEditProject && (
+            <button
+              onClick={openEdit}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors"
+              title="Edit Project">
+              <Pencil className="w-4 h-4" /> Edit
+            </button>
+          )}
+
+          {/* Delete Project — admin/manager only */}
+          {canEditProject && (
+            <button
+              onClick={() => { setShowDeleteModal(true); setDeleteConfirmName(''); }}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-red-700 bg-red-50 border border-red-200 hover:bg-red-100 rounded-lg transition-colors"
+              title="Delete Project">
+              <Trash2 className="w-4 h-4" /> Delete
+            </button>
+          )}
+
+          {/* Add Task — admin/manager/lead */}
           {canManageProject && (
             <Button onClick={() => setShowAddTask(true)}>
               <Plus className="w-4 h-4" />
@@ -259,9 +349,7 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      {/* ════════════════════════════════════════════════════════════════════
-          TASKS TAB — live status + update controls
-      ════════════════════════════════════════════════════════════════════ */}
+      {/* ── Tasks Tab ── */}
       {tab === 'tasks' && (
         <div>
           {tasks.length === 0 ? (
@@ -269,7 +357,7 @@ export default function ProjectDetailPage() {
               icon={CheckSquare}
               title="No tasks yet"
               description="Add tasks to this project to get started"
-              action={isManagerOrAdmin && (
+              action={canManageProject && (
                 <Button onClick={() => setShowAddTask(true)}>
                   <Plus className="w-4 h-4" /> Add First Task
                 </Button>
@@ -284,7 +372,7 @@ export default function ProjectDetailPage() {
                     <th className="text-left px-5 py-3 hidden sm:table-cell">Assignee</th>
                     <th className="text-center px-5 py-3">Priority</th>
                     <th className="text-center px-5 py-3">Status</th>
-                      {canManageProject && <th className="text-center px-5 py-3">Update Status</th>}
+                    {canManageProject && <th className="text-center px-5 py-3">Update Status</th>}
                     <th className="text-right px-5 py-3 hidden md:table-cell">Due</th>
                   </tr>
                 </thead>
@@ -346,9 +434,10 @@ export default function ProjectDetailPage() {
         </div>
       )}
 
-      {/* ── Members tab ───────────────────────────────────────────────────── */}
+      {/* ── Members Tab ── */}
       {tab === 'members' && (
         <div className="space-y-4">
+          {/* Add member: admin/manager OR project lead */}
           {canManageProject && (
             <Card className="p-4">
               <p className="text-sm font-semibold text-slate-900 mb-2">Add Member</p>
@@ -357,10 +446,10 @@ export default function ProjectDetailPage() {
                   value={selectedMember}
                   onChange={(e) => setSelectedMember(e.target.value)}
                   className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-300">
-                  <option value="">Select user</option>
+                  <option value="">Select user to add</option>
                   {allUsers
                     .filter((u) => String(u._id) !== String(project.lead?._id || project.lead))
-                    .filter((u) => !(project.members || []).some((m) => String(m._id || m.user?._id) === String(u._id)))
+                    .filter((u) => !(project.members || []).some((m) => String(m._id || m.user?._id || m) === String(u._id)))
                     .map((u) => <option key={u._id} value={u._id}>{u.name} ({u.email})</option>)}
                 </select>
                 <Button onClick={handleAddMember} disabled={!selectedMember}>Add</Button>
@@ -369,12 +458,13 @@ export default function ProjectDetailPage() {
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {/* Lead card */}
             <Card className="p-4 border-blue-200 bg-blue-50/40">
               <div className="flex items-center gap-3">
                 <Avatar name={project.lead?.name || '?'} size="md" />
                 <div>
                   <p className="text-sm font-semibold text-slate-900">{project.lead?.name || '—'}</p>
-                  <p className="text-xs text-blue-700 capitalize">Team Lead</p>
+                  <p className="text-xs text-blue-700 capitalize font-medium">Team Lead</p>
                   {project.lead?.department && <p className="text-xs text-slate-500">{project.lead.department}</p>}
                 </div>
               </div>
@@ -384,32 +474,34 @@ export default function ProjectDetailPage() {
               <Empty icon={UsersIcon} title="No members" description="Add members to this project" />
             ) : (
               project.members
-                .filter((m) => String(m._id || m.user?._id) !== String(project.lead?._id || project.lead))
+                .filter((m) => String(m._id || m.user?._id || m) !== String(project.lead?._id || project.lead))
                 .map((m, i) => (
-                <Card key={i} className="p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <Avatar name={m.user?.name || m.name || '?'} size="md" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-900 truncate">{m.user?.name || m.name || '—'}</p>
-                        <p className="text-xs text-slate-500 capitalize">{m.role || m.user?.role || 'member'}</p>
-                        {m.user?.department && (
-                          <p className="text-xs text-slate-400 truncate">{m.user.department}</p>
-                        )}
+                  <Card key={i} className="p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Avatar name={m.user?.name || m.name || '?'} size="md" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-900 truncate">{m.user?.name || m.name || '—'}</p>
+                          <p className="text-xs text-slate-500 capitalize">{m.role || m.user?.role || 'member'}</p>
+                          {(m.user?.department || m.department) && (
+                            <p className="text-xs text-slate-400 truncate">{m.user?.department || m.department}</p>
+                          )}
+                        </div>
                       </div>
+                      {canManageProject && (
+                        <Button variant="ghost" size="xs" onClick={() => handleRemoveMember(m._id || m.user?._id || m)}>
+                          Remove
+                        </Button>
+                      )}
                     </div>
-                    {canManageProject && (
-                      <Button variant="ghost" size="xs" onClick={() => handleRemoveMember(m._id || m.user?._id)}>Remove</Button>
-                    )}
-                  </div>
-                </Card>
-              ))
+                  </Card>
+                ))
             )}
           </div>
         </div>
       )}
 
-      {/* ── Overview tab ─────────────────────────────────────────────────── */}
+      {/* ── Overview Tab ── */}
       {tab === 'overview' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="p-5 space-y-3">
@@ -456,7 +548,7 @@ export default function ProjectDetailPage() {
         </div>
       )}
 
-      {/* ── Add Task modal ────────────────────────────────────────────────── */}
+      {/* ── Add Task Modal ── */}
       <Modal open={showAddTask} onClose={() => setShowAddTask(false)} title="Add Task to Project">
         <div className="space-y-4">
           <Input label="Title" value={taskForm.title} onChange={set('title')} placeholder="Task title" required />
@@ -480,7 +572,6 @@ export default function ProjectDetailPage() {
             </Select>
             <Select label="Assignee" value={taskForm.assignee} onChange={set('assignee')}>
               <option value="">Unassigned</option>
-              {canManageProject && <option value="__all__">Assign to all employees</option>}
               {allUsers.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
             </Select>
           </div>
@@ -488,6 +579,93 @@ export default function ProjectDetailPage() {
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="secondary" onClick={() => setShowAddTask(false)}>Cancel</Button>
             <Button onClick={handleCreateTask} loading={saving} disabled={!taskForm.title}>Add Task</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Edit Project Modal (admin/manager only) ── */}
+      <Modal open={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Project" size="lg">
+        <div className="space-y-4">
+          <Input
+            label="Project Name *"
+            value={editForm.name || ''}
+            onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
+            placeholder="Project name"
+          />
+          <Textarea
+            label="Description"
+            value={editForm.description || ''}
+            onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))}
+            placeholder="Project description"
+            rows={3}
+          />
+          <div className="grid grid-cols-3 gap-3">
+            <Select label="Status" value={editForm.status || 'planning'} onChange={e => setEditForm(p => ({ ...p, status: e.target.value }))}>
+              <option value="planning">Planning</option>
+              <option value="in-progress">In Progress</option>
+              <option value="on-hold">On Hold</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </Select>
+            <Select label="Priority" value={editForm.priority || 'medium'} onChange={e => setEditForm(p => ({ ...p, priority: e.target.value }))}>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
+            </Select>
+            <Select label="Category" value={editForm.category || 'software'} onChange={e => setEditForm(p => ({ ...p, category: e.target.value }))}>
+              <option value="software">Software</option>
+              <option value="marketing">Marketing</option>
+              <option value="operations">Operations</option>
+              <option value="hr">HR</option>
+              <option value="finance">Finance</option>
+              <option value="other">Other</option>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Start Date" type="date" value={editForm.startDate || ''} onChange={e => setEditForm(p => ({ ...p, startDate: e.target.value }))} />
+            <Input label="End Date" type="date" value={editForm.endDate || ''} onChange={e => setEditForm(p => ({ ...p, endDate: e.target.value }))} />
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="secondary" onClick={() => setShowEditModal(false)}>Cancel</Button>
+            <Button onClick={handleEditProject} loading={editSaving} disabled={!editForm.name?.trim()}>Save Changes</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Delete Project Confirmation Modal (admin/manager only) ── */}
+      <Modal open={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="Delete Project" size="sm">
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
+            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-red-800">This action cannot be undone</p>
+              <p className="text-xs text-red-700 mt-1">
+                Deleting <strong>"{project.name}"</strong> will archive it and remove it from all views. All associated tasks may become inaccessible.
+              </p>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+              Type <span className="font-mono text-red-600">{project.name}</span> to confirm
+            </label>
+            <input
+              value={deleteConfirmName}
+              onChange={e => setDeleteConfirmName(e.target.value)}
+              placeholder={project.name}
+              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-300"
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-1">
+            <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
+            <button
+              onClick={handleDeleteProject}
+              disabled={deleteConfirmName !== project.name || deleting}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              {deleting ? 'Deleting…' : 'Delete Project'}
+            </button>
           </div>
         </div>
       </Modal>

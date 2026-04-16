@@ -48,7 +48,7 @@ export const NotificationProvider = ({ children }) => {
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      console.log('🔌 WebSocket connected:', socket.id);
+      console.log('WebSocket connected:', socket.id);
     });
 
     socket.on('connect_error', (err) => {

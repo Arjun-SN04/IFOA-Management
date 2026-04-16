@@ -24,6 +24,57 @@ async function runMonthlyResetIfDue() {
   return settings;
 }
 
+// @desc  Admin manually create leave for any user
+// @route POST /api/leaves/admin/create
+exports.adminCreateLeave = async (req, res) => {
+  try {
+    const { employeeId, startDate, endDate, reason, status = 'approved' } = req.body;
+    if (!employeeId || !startDate || !endDate || !reason) {
+      return res.status(400).json({ success: false, message: 'employeeId, startDate, endDate and reason are required' });
+    }
+
+    const employee = await User.findById(employeeId);
+    if (!employee) return res.status(404).json({ success: false, message: 'Employee not found' });
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    if (end < start) {
+      return res.status(400).json({ success: false, message: 'End date cannot be before start date' });
+    }
+
+    const totalDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+
+    const leave = await Leave.create({
+      employee: employeeId,
+      startDate,
+      endDate,
+      totalDays,
+      reason,
+      status,
+      reviewedBy: req.user.id,
+      reviewedAt: new Date(),
+      reviewComment: 'Manually added by admin',
+    });
+
+    await leave.populate('employee', 'name email department employeeId');
+    await leave.populate('reviewedBy', 'name email');
+
+    // Notify employee
+    await createAndEmit({
+      recipient: employeeId,
+      sender: req.user.id,
+      type: status === 'approved' ? 'leave_approved' : 'leave_applied',
+      title: 'Leave Added by Admin',
+      message: `A ${totalDays}-day leave has been added to your record by admin`,
+      link: '/leaves',
+    });
+
+    res.status(201).json({ success: true, leave });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 // @desc  Apply for leave
 // @route POST /api/leaves
 exports.applyLeave = async (req, res) => {

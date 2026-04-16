@@ -22,7 +22,6 @@ export const userAPI = {
   getAccessories: (id) => API.get(`/users/${id}/accessories`),
   addAccessory: (id, data) => API.post(`/users/${id}/accessories`, data),
   removeAccessory: (id, accessoryId) => API.delete(`/users/${id}/accessories/${accessoryId}`),
-  // FIX: registered as PATCH in updated userRoutes.js
   toggleStatus: (id) => API.patch(`/users/${id}/toggle-status`),
 };
 
@@ -40,7 +39,6 @@ export const projectAPI = {
 export const taskAPI = {
   create: (data) => API.post('/tasks', data),
   getAll: (params) => API.get('/tasks', { params }),
-  // FIX: backend route is /tasks/my (matches router.get('/my', ...))
   getMy: () => API.get('/tasks/my'),
   getById: (id) => API.get(`/tasks/${id}`),
   update: (id, data) => API.put(`/tasks/${id}`, data),
@@ -48,10 +46,12 @@ export const taskAPI = {
   updateStatus: (id, status, order) => API.patch(`/tasks/${id}/status`, { status, order }),
   assign: (id, assignee) => API.patch(`/tasks/${id}/assign`, { assignee }),
   logTime: (id, data) => API.post(`/tasks/${id}/log-time`, data),
+  assignSprint: (id, sprintId) => API.patch(`/tasks/${id}/sprint`, { sprintId }),
 };
 
 export const leaveAPI = {
   apply: (data) => API.post('/leaves/apply', data),
+  adminCreate: (data) => API.post('/leaves/admin/create', data),
   getMy: () => API.get('/leaves/my'),
   getAll: (params) => API.get('/leaves', { params }),
   getBalance: () => API.get('/leaves/balance'),
@@ -66,18 +66,18 @@ export const sprintAPI = {
   create: (data) => API.post('/sprints', data),
   getAll: (params) => API.get('/sprints', { params }),
   update: (id, data) => API.put(`/sprints/${id}`, data),
+  delete: (id) => API.delete(`/sprints/${id}`),
   start: (id) => API.patch(`/sprints/${id}/start`),
-  complete: (id) => API.patch(`/sprints/${id}/complete`),
+  // body may include { nextSprintId } to roll incomplete tasks to next sprint (Jira-style)
+  complete: (id, body = {}) => API.patch(`/sprints/${id}/complete`, body),
   getBoard: (id) => API.get(`/sprints/${id}/board`),
 };
 
 export const commentAPI = {
   add: (data) => API.post('/comments', data),
-  // FIX: backend uses query param ?task=id, not path /comments/task/:id
   getTaskComments: (taskId) => API.get('/comments', { params: { task: taskId } }),
   update: (id, data) => API.put(`/comments/${id}`, data),
   delete: (id) => API.delete(`/comments/${id}`),
-  // FIX: no /reply route on backend — replies are just comments with a parentComment field
   reply: (parentId, data) => API.post('/comments', { ...data, parentComment: parentId }),
 };
 

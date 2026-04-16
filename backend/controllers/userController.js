@@ -174,7 +174,7 @@ exports.getUserAccessories = async (req, res) => {
 // @route POST /api/users/:id/accessories
 exports.addUserAccessory = async (req, res) => {
   try {
-    const { name, serialNumber, notes } = req.body;
+    const { name, serialNumber, notes, assignedAt } = req.body;
     if (!name || !String(name).trim()) {
       return res.status(400).json({ success: false, message: 'Accessory name is required' });
     }
@@ -182,11 +182,12 @@ exports.addUserAccessory = async (req, res) => {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
+    // Use the admin-provided date if given, otherwise default to now
     const accessory = {
       name: String(name).trim(),
       serialNumber: serialNumber ? String(serialNumber).trim() : '',
       notes: notes ? String(notes).trim() : '',
-      assignedAt: new Date(),
+      assignedAt: assignedAt ? new Date(assignedAt) : new Date(),
       assignedBy: req.user.id,
     };
 

@@ -162,7 +162,7 @@ export default function LandingPage() {
         transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
         className="fixed inset-x-0 top-0 z-50 bg-white/98 border-b border-gray-100 shadow-sm backdrop-blur-md"
       >
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
+        <div className="mx-auto flex w-full max-w-none items-center justify-between px-5 sm:px-10 lg:px-16 xl:px-24 py-3">
           <Link to="/" className="flex shrink-0 items-end gap-3 no-underline">
             <img src={IFOAWhite} alt="IFOA" className="h-10 w-auto object-contain mb-0.5" />
             <div className="flex flex-col justify-end pb-0.5">
@@ -179,7 +179,7 @@ export default function LandingPage() {
             ))}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="ml-2 flex items-center gap-2">
             {user ? (
               <Link to="/dashboard" className="glow-btn inline-flex items-center gap-2 rounded-full bg-blue-600 px-6 py-2 text-sm font-semibold text-white">
                 {user.name} <ArrowRight size={14} />
@@ -201,15 +201,18 @@ export default function LandingPage() {
       {/* ─── HERO ───────────────────────────────────────────────────────── */}
       <section ref={heroRef} className="relative flex min-h-screen items-center justify-start overflow-hidden pt-16">
         <motion.div
-          className="absolute inset-0 bg-cover bg-top"
+          className="absolute inset-0 bg-center bg-no-repeat"
           style={{
-            backgroundImage: `url('${HeroSectionImg}')`,
+            backgroundImage: `url('https://i.pinimg.com/1200x/33/af/c2/33afc28f3f95140295a67622f9020d40.jpg')`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center center',
+            filter: 'brightness(1.06) contrast(1.08) saturate(1.06)',
             y: heroY,
           }}
         />
         {/* Lightweight overlay — no blue tint */}
         <div className="absolute inset-0" style={{
-          background: 'linear-gradient(to bottom, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.45) 60%, rgba(0,0,0,0.55) 100%)',
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0.16) 0%, rgba(0,0,0,0.24) 55%, rgba(0,0,0,0.34) 100%)',
         }} />
 
         <motion.div
@@ -233,8 +236,8 @@ export default function LandingPage() {
             transition={{ delay: 0.45, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
             className="serif mb-5 text-4xl font-bold leading-tight text-white md:text-6xl lg:text-7xl"
           >
-            Your team's work,<br />
-            <em className="text-white not-italic">cleared for takeoff.</em>
+            Your team's work,<br /> cleared for <br />
+            <em className="text-white not-italic"> takeoff.</em>
           </motion.h1>
 
           <motion.p
@@ -555,12 +558,14 @@ export default function LandingPage() {
               >
                 {user ? 'Go to Dashboard' : 'Access Platform'} <ArrowRight size={16} />
               </Link>
-              <Link
-                to="/login"
-                className="inline-flex items-center gap-2 rounded-full border border-white/25 px-8 py-4 text-[15px] font-medium text-white/80 transition-all hover:bg-white/10"
-              >
-                Sign in
-              </Link>
+              {!user && (
+                <Link
+                  to="/login"
+                  className="inline-flex items-center gap-2 rounded-full border border-white/25 px-8 py-4 text-[15px] font-medium text-white/80 transition-all hover:bg-white/10"
+                >
+                  Sign in
+                </Link>
+              )}
             </div>
           </RevealSection>
         </div>

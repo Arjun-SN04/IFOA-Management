@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { reportAPI } from '../../api';
-import { Card, Spinner, PageHeader, Badge } from '../../components/ui';
+import { Card, Spinner } from '../../components/ui';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   PieChart, Pie, Cell, Legend, RadialBarChart, RadialBar
@@ -10,6 +10,7 @@ import {
   TrendingUp, CheckCircle2, Clock, AlertTriangle,
   CalendarDays, Target, Layers, Award
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // ── Color palette ──────────────────────────────────────────────────────────
 const STATUS_COLORS = {
@@ -161,43 +162,60 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <div className="text-center">
-          <PageHeader
-            title="Reports & Analytics"
-            subtitle="Live insights across projects, tasks, and team performance"
-          />
+      {/* ── Hero Header ── */}
+      <section style={{ padding: '8px 2px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <p style={{ margin: 0, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#64748B' }}>
+            Analytics
+          </p>
+          <h1 style={{ margin: '4px 0 0', fontSize: 30, fontWeight: 800, color: '#0F172A', lineHeight: 1.1 }}>
+            Reports &amp; <span style={{ color: '#2563EB' }}>Analytics</span>
+          </h1>
+          <p style={{ margin: '5px 0 0', fontSize: 13, color: '#64748B' }}>
+            Live insights across projects, tasks, and team performance.
+          </p>
         </div>
-        <div className="flex items-center justify-center gap-3">
+        <motion.button
+          whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
+          onClick={() => loadData(true)}
+          disabled={refreshing}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '9px 16px', borderRadius: 12,
+            border: '1px solid #E2E8F0', background: '#fff',
+            fontSize: 12, fontWeight: 600, color: '#475569', cursor: 'pointer',
+            opacity: refreshing ? 0.6 : 1, boxShadow: '0 2px 8px rgba(15,23,42,0.06)',
+          }}
+        >
+          <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
+          Refresh
           {lastUpdated && (
-            <p className="text-xs text-slate-400 hidden sm:block">
-              Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </p>
+            <span style={{ color: '#94A3B8', fontWeight: 500 }}>
+              · {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
           )}
-          <button
-            onClick={() => loadData(true)}
-            disabled={refreshing}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50">
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
-        </div>
-      </div>
+        </motion.button>
+      </section>
 
-      {/* ── Tabs ─────────────────────────────────────────────────────────── */}
-      <div className="border-b border-slate-200">
-        <div className="flex gap-6">
-          {tabs.map(({ key, label, icon: Icon }) => (
-            <button key={key} onClick={() => setTab(key)}
-              className={`flex items-center gap-2 pb-3 text-sm font-medium border-b-2 -mb-px transition-colors
-                ${tab === key
-                  ? 'border-blue-600 text-blue-700'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
-              <Icon className="w-4 h-4" />
-              {label}
-            </button>
-          ))}
-        </div>
+      {/* ── Tabs ── */}
+      <div style={{ display: 'flex', gap: 6, background: '#F8FAFC', borderRadius: 14, padding: 4, border: '1px solid #E2E8F0', width: 'fit-content' }}>
+        {tabs.map(({ key, label, icon: Icon }) => (
+          <motion.button key={key} onClick={() => setTab(key)}
+            whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 7,
+              padding: '9px 18px', borderRadius: 10, border: 'none', cursor: 'pointer',
+              fontSize: 13, fontWeight: 600,
+              background: tab === key ? '#fff' : 'transparent',
+              color: tab === key ? '#2563EB' : '#64748B',
+              boxShadow: tab === key ? '0 2px 8px rgba(15,23,42,0.08)' : 'none',
+              transition: 'all 0.2s',
+            }}
+          >
+            <Icon size={14} />
+            {label}
+          </motion.button>
+        ))}
       </div>
 
       {/* ════════════════════════════════════════════════════════════════════

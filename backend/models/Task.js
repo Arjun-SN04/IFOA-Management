@@ -6,7 +6,7 @@ const taskSchema = new mongoose.Schema({
   project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true },
   sprint: { type: mongoose.Schema.Types.ObjectId, ref: 'Sprint' },
   type: { type: String, enum: ['story', 'bug', 'task', 'epic', 'subtask', 'improvement'], default: 'task' },
-  status: { type: String, enum: ['backlog', 'todo', 'in-progress', 'in-review', 'testing', 'done', 'cancelled'], default: 'backlog' },
+  status: { type: String, enum: ['backlog', 'todo', 'in-progress', 'in-review', 'testing', 'done', 'blocked', 'cancelled'], default: 'todo' },
   priority: { type: String, enum: ['lowest', 'low', 'medium', 'high', 'critical'], default: 'medium' },
   assignee: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   reporter: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },

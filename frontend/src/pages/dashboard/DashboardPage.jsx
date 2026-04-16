@@ -1,346 +1,194 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { reportAPI, taskAPI, leaveAPI, projectAPI } from '../../api';
 import { useAuth } from '../../context/AuthContext';
-import { useNotifications } from '../../context/NotificationContext';
-import { Avatar, Spinner, Badge } from '../../components/ui';
+import { Spinner } from '../../components/ui';
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
-} from 'recharts';
-import {
-  FolderKanban, CheckSquare, CalendarDays, Users, ArrowRight, Clock,
-  TrendingUp, AlertCircle, CheckCircle2, Zap, BarChart3, Activity,
-  Plus, Award, Target, Briefcase
+  ChevronLeft,
+  ChevronRight,
+  CheckSquare,
+  FolderKanban,
+  Clock,
+  AlertTriangle,
+  CalendarDays,
+  Activity,
+  ArrowRight,
 } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+} from 'recharts';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function getGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 17) return 'Good afternoon';
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
   return 'Good evening';
 }
 
-function statusColor(s) {
-  return {
-    done:          '#10B981',
-    'in-progress': '#1D4ED8',
-    backlog:       '#6B7280',
-    todo:          '#9CA3AF',
-    'in-review':   '#3B82F6',
-    blocked:       '#EF4444',
-    cancelled:     '#D1D5DB',
-    testing:       '#8B5CF6',
-  }[s] || '#9CA3AF';
+function formatDayLabel(date) {
+  return new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-function timeAgo(dateStr) {
-  if (!dateStr) return '';
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
+/* ─────────────────────────────────────────
+   Colour palette — white primary, rich accents
+   - Indigo   : primary actions, active states
+   - Emerald  : success / completion
+   - Amber    : warnings / overdue
+   - Sky      : in-progress / activity
+   - Black    : headings, strong labels
+───────────────────────────────────────── */
+const C = {
+  indigo:       '#2563EB',
+  indigoBg:     '#EFF6FF',
+  indigoBorder: '#BFDBFE',
 
-function TypedGreeting({ text, storageKey = 'dashboard-greeting-typed', speed = 36 }) {
-  const [display, setDisplay] = useState('');
+  emerald:       '#059669',
+  emeraldBg:     '#ECFDF5',
+  emeraldBorder: '#A7F3D0',
 
-  useEffect(() => {
-    let alreadyTyped = false;
-    try {
-      alreadyTyped = sessionStorage.getItem(storageKey) === '1';
-    } catch {}
+  amber:         '#D97706',
+  amberBg:       '#FFFBEB',
+  amberBorder:   '#FDE68A',
 
-    if (alreadyTyped) {
-      setDisplay(text);
-      return;
-    }
+  sky:           '#0284C7',
+  skyBg:         '#F0F9FF',
+  skyBorder:     '#BAE6FD',
 
-    let index = 0;
-    const timer = setInterval(() => {
-      index += 1;
-      setDisplay(text.slice(0, index));
-      if (index >= text.length) {
-        clearInterval(timer);
-        try {
-          sessionStorage.setItem(storageKey, '1');
-        } catch {}
-      }
-    }, speed);
+  black:         '#0F172A',
+  blackMid:      '#1E293B',
 
-    return () => clearInterval(timer);
-  }, [text, storageKey, speed]);
+  slate:         '#475569',
+  slateMid:      '#64748B',
+  slateLight:    '#94A3B8',
 
-  return <>{display}</>;
-}
+  border:        '#E2E8F0',
+  borderLight:   '#F1F5F9',
+  surface:       '#FFFFFF',
+  surfaceAlt:    '#F8FAFC',
+};
 
-// Inject dashboard CSS once
-const DASH_CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap');
+/* Each metric card gets its own accent colour */
+const METRIC_ACCENTS = [
+  { bg: C.indigoBg,   border: C.indigoBorder,   icon: C.indigo  },   // Total Tasks
+  { bg: C.emeraldBg,  border: C.emeraldBorder,  icon: C.emerald },   // Completion
+  { bg: C.skyBg,      border: C.skyBorder,      icon: C.sky     },   // In Progress
+  { bg: C.amberBg,    border: C.amberBorder,    icon: C.amber   },   // Overdue
+  { bg: C.indigoBg,   border: C.indigoBorder,   icon: C.indigo  },   // Projects
+  { bg: C.emeraldBg,  border: C.emeraldBorder,  icon: C.emerald },   // Leave Pending
+];
 
-  .dash-root * { font-family: 'Outfit', sans-serif; box-sizing: border-box; }
+function Carousel({ slides }) {
+  const [index, setIndex] = useState(0);
+  const total = slides.length;
+  const prev = () => setIndex((i) => (i === 0 ? total - 1 : i - 1));
+  const next = () => setIndex((i) => (i === total - 1 ? 0 : i + 1));
 
-  /* Stat cards */
-  .dash-stat {
-    border-radius: 20px; padding: 24px;
-    position: relative; overflow: hidden;
-    transition: transform 0.25s cubic-bezier(.22,1,.36,1), box-shadow 0.25s ease, opacity 0.25s ease;
-    cursor: default;
-    animation: slideUp 0.6s cubic-bezier(.22,1,.36,1) backwards;
-  }
-  @keyframes slideUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  .dash-stat:hover { transform: translateY(-3px); box-shadow: 0 16px 48px rgba(37,99,235,0.12); }
-  .dash-stat-ring {
-    position: absolute; border-radius: 50%;
-    background: rgba(255,255,255,0.1);
-  }
-  .dash-stat-val {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 42px; font-weight: 700; line-height: 1;
-    margin-bottom: 4px;
-  }
-  .dash-stat-label { font-size: 13px; font-weight: 500; opacity: 0.75; }
-  .dash-stat-sub   { font-size: 11px; opacity: 0.55; margin-top: 3px; }
-  .dash-stat-icon  {
-    width: 40px; height: 40px; border-radius: 12px;
-    background: rgba(255,255,255,0.18);
-    display: flex; align-items: center; justify-content: center;
-    margin-bottom: 16px;
-  }
-
-  /* Cards */
-  .dash-card {
-    background: #FFFFFF;
-    border: 1px solid #E5E7EB;
-    border-radius: 20px; padding: 24px;
-    transition: box-shadow 0.25s cubic-bezier(.22,1,.36,1), transform 0.25s ease, opacity 0.25s ease;
-    animation: slideUp 0.6s cubic-bezier(.22,1,.36,1) backwards;
-  }
-  .dash-card:hover { box-shadow: 0 8px 32px rgba(37,99,235,0.08); transform: translateY(-2px); }
-  .dash-card-title {
-    font-size: 15px; font-weight: 600; color: #1F2937;
-    margin-bottom: 4px;
-  }
-  .dash-card-sub { font-size: 12px; color: #6B7280; }
-
-  /* Progress bar */
-  .dash-progress-track {
-    height: 8px; border-radius: 100px;
-    background: #E5E7EB; overflow: hidden;
-    margin-top: 8px;
-  }
-  .dash-progress-fill {
-    height: 100%; border-radius: 100px;
-    transition: width 0.8s cubic-bezier(0.16,1,0.3,1);
-  }
-
-  /* Activity item */
-  .dash-activity-item {
-    display: flex; align-items: flex-start; gap: 12px;
-    padding: 10px 0; border-bottom: 1px solid #F3F4F6;
-    transition: background 0.15s; border-radius: 12px;
-  }
-  .dash-activity-item:last-child { border-bottom: none; }
-
-  /* Task item */
-  .dash-task-item {
-    display: flex; align-items: center; gap: 12px;
-    padding: 10px 12px; border-radius: 12px;
-    transition: background 0.15s; cursor: pointer;
-  }
-  .dash-task-item:hover { background: #F3F4F6; }
-
-  /* Status pill */
-  .dash-status-pill {
-    font-size: 11px; font-weight: 600;
-    padding: 3px 10px; border-radius: 100px;
-    text-transform: capitalize; flex-shrink: 0;
-  }
-
-  /* Section header */
-  .dash-section-row {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 20px;
-  }
-  .dash-link {
-    font-size: 12px; font-weight: 600;
-    color: #2563EB; text-decoration: none;
-    display: flex; align-items: center; gap: 4px;
-    transition: color 0.2s;
-  }
-  .dash-link:hover { color: #1D4ED8; }
-
-  /* Quick actions */
-  .dash-quick-grid {
-    display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
-    margin-top: 16px;
-  }
-  .dash-quick-btn {
-    display: flex; align-items: center; gap: 8px;
-    padding: 12px 14px; border-radius: 14px;
-    background: #F8FAFF;
-    border: 1px solid #DBEAFE;
-    color: #2563EB; font-size: 12px; font-weight: 600;
-    text-decoration: none; transition: all 0.2s;
-  }
-  .dash-quick-btn:hover {
-    background: #EFF6FF;
-    border-color: #60A5FA;
-    color: #1D4ED8;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(37,99,235,0.1);
-  }
-
-  /* Avatar initial */
-  .dash-avatar {
-    width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 12px; font-weight: 700; color: white;
-    background: linear-gradient(135deg, #2563EB, #1D4ED8);
-    position: relative;
-  }
-
-  /* Live indicator */
-  .dash-live-dot {
-    display: inline-flex; align-items: center; gap: 5px;
-  }
-  .dash-live-ping {
-    position: relative; width: 8px; height: 8px;
-  }
-  .dash-live-ping::before {
-    content: '';
-    position: absolute; inset: 0; border-radius: 50%;
-    background: #2563EB;
-    animation: lp-ping 2s cubic-bezier(0,0,0.2,1) infinite;
-  }
-  .dash-live-ping::after {
-    content: '';
-    position: absolute; inset: 1px; border-radius: 50%;
-    background: #2563EB;
-  }
-  @keyframes lp-ping {
-    75%,100% { transform: scale(2.2); opacity: 0; }
-  }
-
-  /* Hero greeting banner */
-  .dash-hero {
-    border-radius: 24px;
-    padding: 28px;
-    min-height: 168px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-    border: 1px solid #E2E8F0;
-    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
-  }
-  .dash-hero-content {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-  .dash-hero-meta {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-  .dash-hero-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 10px;
-    border-radius: 999px;
-    background: #EEF2FF;
-    color: #3730A3;
-    font-size: 11px;
-    font-weight: 600;
-  }
-
-  /* Filter tabs */
-  .dash-tabs {
-    display: flex; background: #F3F4F6;
-    border-radius: 10px; padding: 3px; gap: 2px;
-  }
-  .dash-tab {
-    padding: 6px 14px; border-radius: 8px;
-    font-size: 12px; font-weight: 600;
-    border: none; cursor: pointer; transition: all 0.2s;
-    background: transparent; color: #6B7280;
-  }
-  .dash-tab.active { background: #FFFFFF; color: #2563EB; box-shadow: 0 1px 4px rgba(37,99,235,0.1); }
-`;
-
-function DashCSS() {
-  return <style dangerouslySetInnerHTML={{ __html: DASH_CSS }} />;
-}
-
-// ── Stat Card ────────────────────────────────────────────────────────────────
-function StatCard({ label, value, icon: Icon, bg, color, textColor = '#FFF', sub, trend }) {
   return (
-    <div className="dash-stat" style={{ background: bg, color: textColor }}>
-      <div className="dash-stat-ring" style={{ width: 100, height: 100, top: -30, right: -30 }} />
-      <div className="dash-stat-ring" style={{ width: 60, height: 60, bottom: -20, right: 16, background: 'rgba(255,255,255,0.06)' }} />
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <div className="dash-stat-icon"><Icon size={18} color={textColor} /></div>
-        {trend && (
-          <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 100, background: 'rgba(255,255,255,0.18)', fontWeight: 600 }}>
-            {trend}
-          </span>
-        )}
-      </div>
-      <div className="dash-stat-val" style={{ color: textColor }}>{value ?? '—'}</div>
-      <div className="dash-stat-label">{label}</div>
-      {sub && <div className="dash-stat-sub">{sub}</div>}
-    </div>
-  );
-}
-
-// ── Activity Item ─────────────────────────────────────────────────────────────
-function ActivityItem({ task }) {
-  const sc = statusColor(task.status);
-  return (
-    <div className="dash-activity-item">
-      <div className="dash-avatar">
-        {task.assignee?.name?.charAt(0) || '?'}
-        <span style={{
-          position: 'absolute', bottom: -1, right: -1,
-          width: 10, height: 10, borderRadius: '50%',
-          background: sc, border: '2px solid #FFFFFF'
-        }} />
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 13, fontWeight: 500, color: '#2A1F0E', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {task.title}
-        </p>
-        <div style={{ display: 'flex', gap: 8, marginTop: 3 }}>
-          <span style={{ fontSize: 11, color: '#9B8272' }}>{task.project?.name || 'No project'}</span>
-          <span style={{ color: '#D4C4B0' }}>·</span>
-          <span style={{ fontSize: 11, color: '#9B8272' }}>{timeAgo(task.updatedAt || task.createdAt)}</span>
+    <div style={{ marginTop: 6 }}>
+      <div style={{ overflow: 'hidden', borderRadius: 24, border: `1px solid ${C.border}`, background: C.surface }}>
+        <div
+          style={{
+            display: 'flex',
+            width: `${total * 100}%`,
+            transform: `translateX(-${(100 / total) * index}%)`,
+            transition: 'transform 0.45s cubic-bezier(0.22,1,0.36,1)',
+          }}
+        >
+          {slides.map((slide, idx) => (
+            <section key={idx} style={{ width: `${100 / total}%`, padding: 28 }}>
+              {slide}
+            </section>
+          ))}
         </div>
       </div>
-      <span className="dash-status-pill" style={{ background: sc + '18', color: sc }}>
-        {task.status?.replace('-', ' ')}
-      </span>
+
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, marginTop: 12 }}>
+        <button onClick={prev} style={{ width: 36, height: 36, borderRadius: 999, border: `1px solid ${C.border}`, background: C.surface, color: C.slate, cursor: 'pointer' }}>
+          <ChevronLeft size={16} style={{ margin: 'auto' }} />
+        </button>
+        {slides.map((_, idx) => (
+          <button
+            key={idx}
+            onClick={() => setIndex(idx)}
+            aria-label={`Slide ${idx + 1}`}
+            style={{
+              width: idx === index ? 22 : 8,
+              height: 8,
+              borderRadius: 999,
+              border: 'none',
+              background: idx === index ? C.indigo : '#93C5FD',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+          />
+        ))}
+        <button onClick={next} style={{ width: 36, height: 36, borderRadius: 999, border: `1px solid ${C.border}`, background: C.surface, color: C.slate, cursor: 'pointer' }}>
+          <ChevronRight size={16} style={{ margin: 'auto' }} />
+        </button>
+      </div>
     </div>
   );
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
+function Metric({ icon: Icon, label, value, hint, accentIndex = 0 }) {
+  const acc = METRIC_ACCENTS[accentIndex % METRIC_ACCENTS.length];
+  return (
+    <div
+      style={{
+        border: `1px solid ${C.border}`,
+        borderRadius: 16,
+        padding: 14,
+        background: C.surface,
+        boxShadow: '0 4px 16px rgba(15,23,42,0.05)',
+        borderTop: `3px solid ${acc.icon}`,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: acc.icon, fontSize: 11, fontWeight: 700 }}>
+        <span
+          style={{
+            width: 22,
+            height: 22,
+            borderRadius: 999,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: acc.bg,
+            border: `1px solid ${acc.border}`,
+          }}
+        >
+          <Icon size={13} />
+        </span>
+        {label}
+      </div>
+      <p style={{ margin: '8px 0 2px', fontSize: 28, fontWeight: 700, color: C.black, lineHeight: 1 }}>{value}</p>
+      <p style={{ margin: 0, fontSize: 11, color: C.slateMid }}>{hint}</p>
+    </div>
+  );
+}
+
+/* Coloured status badge */
+function StatusBadge({ status }) {
+  const s = (status || 'todo').replace('-', ' ');
+  let bg, color;
+  if (status === 'done')        { bg = C.emeraldBg;  color = C.emerald; }
+  else if (status === 'in-progress') { bg = C.skyBg; color = C.sky;     }
+  else if (status === 'review') { bg = C.indigoBg;   color = C.indigo;  }
+  else                          { bg = C.surfaceAlt;  color = C.slate;  }
+  return (
+    <span style={{ background: bg, color, fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 999, textTransform: 'capitalize', whiteSpace: 'nowrap' }}>
+      {s}
+    </span>
+  );
+}
+
 export default function DashboardPage() {
   const { user, isManagerOrAdmin } = useAuth();
-  const { taskEvents } = useNotifications();
 
   const [stats, setStats]             = useState(null);
   const [myTasks, setMyTasks]         = useState([]);
@@ -349,7 +197,7 @@ export default function DashboardPage() {
   const [leaveBalance, setLeaveBalance] = useState(null);
   const [loading, setLoading]         = useState(true);
 
-  const loadAll = useCallback(async () => {
+  const loadData = useCallback(async () => {
     try {
       const calls = [
         reportAPI.getDashboard().catch(() => null),
@@ -360,595 +208,397 @@ export default function DashboardPage() {
         calls.push(taskAPI.getAll().catch(() => ({ data: { data: [] } })));
         calls.push(projectAPI.getAll().catch(() => ({ data: { data: [] } })));
       }
-      const results = await Promise.all(calls);
-      setStats(results[0]?.data?.data || null);
-      setMyTasks(results[1]?.data?.data || results[1]?.data?.tasks || []);
-      setLeaveBalance(results[2]?.data?.summary || null);
+      const result = await Promise.all(calls);
+      setStats(result[0]?.data?.data || null);
+      setMyTasks(result[1]?.data?.tasks || result[1]?.data?.data || []);
+      setLeaveBalance(result[2]?.data?.summary || null);
       if (isManagerOrAdmin) {
-        setAllTasks(results[3]?.data?.data || results[3]?.data?.tasks || []);
-        setProjects(results[4]?.data?.data || []);
+        setAllTasks(result[3]?.data?.tasks || result[3]?.data?.data || []);
+        setProjects(result[4]?.data?.projects || result[4]?.data?.data || []);
       }
     } finally {
       setLoading(false);
     }
   }, [isManagerOrAdmin]);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const name            = user?.name?.split(' ')?.[0] || 'there';
+  const greetingPrefix  = `${getGreeting()}, `;
+  const fullGreeting    = `${greetingPrefix}${name}`;
+  const today           = formatDayLabel(new Date());
+
+  const [typedGreeting, setTypedGreeting] = useState('');
+  const [showCaret, setShowCaret]         = useState(true);
 
   useEffect(() => {
-    if (!taskEvents) return;
-    const { type, payload } = taskEvents;
-    if (type === 'created') {
-      setAllTasks(prev => [payload, ...prev]);
-    } else if (type === 'updated' || type === 'statusChanged') {
-      const updated = payload.task || payload;
-      setAllTasks(prev => prev.map(t => t._id === updated._id ? { ...t, ...updated } : t));
-      setMyTasks(prev => prev.map(t => t._id === updated._id ? { ...t, ...updated } : t));
-    } else if (type === 'deleted') {
-      setAllTasks(prev => prev.filter(t => t._id !== payload.taskId));
-      setMyTasks(prev => prev.filter(t => t._id !== payload.taskId));
-    }
-  }, [taskEvents]);
+    setTypedGreeting('');
+    let idx = 0;
+    const t = setInterval(() => {
+      idx += 1;
+      setTypedGreeting(fullGreeting.slice(0, idx));
+      if (idx >= fullGreeting.length) clearInterval(t);
+    }, 55);
+    return () => clearInterval(t);
+  }, [fullGreeting]);
 
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 256 }}>
-      <Spinner size="lg" />
-    </div>
+  useEffect(() => {
+    const t = setInterval(() => setShowCaret((p) => !p), 460);
+    return () => clearInterval(t);
+  }, []);
+
+  const taskPool       = isManagerOrAdmin ? allTasks : myTasks;
+  const totalTasks     = taskPool.length;
+  const completedTasks = taskPool.filter((t) => t.status === 'done').length;
+  const inProgressTasks = taskPool.filter((t) => t.status === 'in-progress').length;
+  const overdueTasks   = taskPool.filter(
+    (t) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'done'
+  ).length;
+  const completionRate = totalTasks ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  const upcomingTasks = useMemo(
+    () => [...taskPool].filter((t) => t.dueDate).sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate)).slice(0, 8),
+    [taskPool]
+  );
+  const recentUpdates = useMemo(
+    () => [...taskPool].sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt)).slice(0, 8),
+    [taskPool]
   );
 
-  return (
-    <>
-      <DashCSS />
-      <div className="dash-root">
-        {isManagerOrAdmin
-          ? <AdminDashboard stats={stats} allTasks={allTasks} projects={projects} user={user} />
-          : <UserDashboard  stats={stats} myTasks={myTasks}  leaveBalance={leaveBalance} user={user} />}
+  const chartData = stats?.weeklyActivity || [];
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 320 }}>
+        <Spinner size="lg" />
       </div>
-    </>
-  );
-}
+    );
+  }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// ADMIN DASHBOARD
-// ══════════════════════════════════════════════════════════════════════════════
-function AdminDashboard({ stats, allTasks, projects, user }) {
-  const totalTasks = allTasks.length;
-  const doneTasks  = allTasks.filter(t => t.status === 'done').length;
-  const inProgress = allTasks.filter(t => t.status === 'in-progress').length;
-  const blocked    = allTasks.filter(t => t.status === 'blocked').length;
-  const overallPct = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
+  /* ─── Leave tile colours ─── */
+  const leaveTileAccent = {
+    Approved:  { bg: C.emeraldBg,  color: C.emerald },
+    Pending:   { bg: C.amberBg,    color: C.amber   },
+    Rejected:  { bg: '#FEF2F2',    color: '#DC2626' },
+    Cancelled: { bg: C.surfaceAlt, color: C.slate   },
+  };
 
-  const activityData  = stats?.weeklyActivity || [];
-  const statusPieData = [
-    { name: 'Done',        value: doneTasks,                                              fill: '#10B981' },
-    { name: 'In Progress', value: inProgress,                                             fill: '#2563EB' },
-    { name: 'In Review',   value: allTasks.filter(t => t.status === 'in-review').length,  fill: '#3B82F6' },
-    { name: 'To Do',       value: allTasks.filter(t => t.status === 'todo').length,       fill: '#9CA3AF' },
-    { name: 'Blocked',     value: blocked,                                                fill: '#EF4444' },
-  ].filter(d => d.value > 0);
+  /* ─── Action queue pill colours ─── */
+  const actionAccent = [C.indigo, C.sky, C.amber, C.emerald];
 
-  const projectHealth = projects.map(p => {
-    const pt   = allTasks.filter(t => (t.project?._id || t.project) === p._id);
-    const done = pt.filter(t => t.status === 'done').length;
-    const blk  = pt.filter(t => t.status === 'blocked').length;
-    return { ...p, total: pt.length, done, blocked: blk, pct: pt.length ? Math.round((done / pt.length) * 100) : 0 };
-  }).filter(p => p.total > 0).sort((a, b) => b.total - a.total).slice(0, 6);
+  const slides = [
+    /* ── Slide 1 : Overview ── */
+    <div key="overview" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <p style={{ margin: 0, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slateMid, fontWeight: 700 }}>
+            Operations Snapshot
+          </p>
+          <h2 style={{ margin: '6px 0 0', fontSize: 28, color: C.black, fontWeight: 700 }}>
+            Large Scale Data{' '}
+            <span style={{ color: '#2563EB' }}>Overview</span>
+          </h2>
+          <p style={{ margin: '6px 0 0', color: C.slateMid, fontSize: 13 }}>
+            Unified metrics for workload, completion, and delivery status.
+          </p>
+        </div>
+        <Link
+          to="/tasks"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            textDecoration: 'none',
+            fontSize: 12,
+            fontWeight: 700,
+            color: C.surface,
+            border: 'none',
+            borderRadius: 10,
+            padding: '9px 14px',
+            background: C.black,
+          }}
+        >
+          Open Task Board
+          <ArrowRight size={12} />
+        </Link>
+      </div>
 
-  const recentActivity = [...allTasks]
-    .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
-    .slice(0, 8);
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+        <Metric icon={CheckSquare}  label="Total Tasks"   value={totalTasks}    hint="Across current scope"       accentIndex={0} />
+        <Metric icon={Activity}     label="Completion"    value={`${completionRate}%`} hint="Overall completion rate" accentIndex={1} />
+        <Metric icon={Clock}        label="In Progress"   value={inProgressTasks} hint="Currently active"         accentIndex={2} />
+        <Metric icon={AlertTriangle} label="Overdue"      value={overdueTasks}  hint="Need immediate action"      accentIndex={3} />
+        <Metric icon={FolderKanban} label="Projects"      value={isManagerOrAdmin ? projects.length : stats?.totalProjects ?? '-'} hint="Tracked project spaces" accentIndex={4} />
+        <Metric icon={CalendarDays} label="Leave Pending" value={leaveBalance?.pending ?? 0} hint="Requests waiting approval" accentIndex={5} />
+      </div>
 
-  const adminGreeting = `${getGreeting()}, ${user?.name?.split(' ')[0] || 'Admin'}`;
+      <div style={{ border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+        <div style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, background: C.surfaceAlt, fontSize: 12, fontWeight: 700, color: C.blackMid, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 999, background: C.indigo, display: 'inline-block' }} />
+          Upcoming deadlines and ownership
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 680 }}>
+            <thead>
+              <tr style={{ background: C.surface }}>
+                {['Task', 'Project', 'Assignee', 'Due Date', 'Status'].map((head) => (
+                  <th key={head} style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, color: C.slateMid, fontWeight: 700, borderBottom: `1px solid ${C.border}` }}>
+                    {head}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {upcomingTasks.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ padding: 20, textAlign: 'center', color: C.slateLight, fontSize: 12 }}>
+                    No upcoming tasks found.
+                  </td>
+                </tr>
+              ) : (
+                upcomingTasks.map((task) => (
+                  <tr key={task._id} style={{ transition: 'background 0.15s' }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = C.surfaceAlt}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <td style={{ padding: '10px 14px', fontSize: 12, color: C.black, fontWeight: 600, borderBottom: `1px solid ${C.borderLight}`, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {task.title}
+                    </td>
+                    <td style={{ padding: '10px 14px', fontSize: 12, color: C.slate, borderBottom: `1px solid ${C.borderLight}` }}>
+                      {task.project?.name || 'No project'}
+                    </td>
+                    <td style={{ padding: '10px 14px', fontSize: 12, color: C.slate, borderBottom: `1px solid ${C.borderLight}` }}>
+                      {task.assignee?.name || user?.name || 'Unassigned'}
+                    </td>
+                    <td style={{ padding: '10px 14px', fontSize: 12, color: C.slate, borderBottom: `1px solid ${C.borderLight}` }}>
+                      {formatDayLabel(task.dueDate)}
+                    </td>
+                    <td style={{ padding: '10px 14px', borderBottom: `1px solid ${C.borderLight}` }}>
+                      <StatusBadge status={task.status} />
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>,
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* ── Hero greeting ── */}
-      <div className="dash-hero">
-        <div className="dash-hero-content" style={{ flex: 1 }}>
+    /* ── Slide 2 : Activity ── */
+    <div key="activity" style={{ display: 'grid', gridTemplateColumns: '1.15fr 1fr', gap: 16 }}>
+      <div style={{ border: `1px solid ${C.border}`, borderRadius: 16, padding: 16, background: C.surface }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14, gap: 8, flexWrap: 'wrap' }}>
           <div>
-            <p style={{ fontSize: 12, color: '#64748B', fontWeight: 600, margin: '0 0 6px', letterSpacing: '0.03em' }}>
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-            </p>
-            <h1 style={{ fontSize: 28, fontWeight: 700, color: '#0F172A', margin: 0, fontFamily: "'Cormorant Garamond', serif" }}>
-              <TypedGreeting text={adminGreeting} />
-            </h1>
-            <p style={{ fontSize: 13, color: '#64748B', margin: '6px 0 0' }}>
-              Platform command center
-            </p>
-            <div className="dash-hero-meta" style={{ marginTop: 12 }}>
-              <span className="dash-hero-chip">{projects.length} projects</span>
-              <span className="dash-hero-chip">{inProgress} in progress</span>
-              <span className="dash-hero-chip">{blocked} blocked</span>
+            <h3 style={{ margin: 0, fontSize: 16, color: C.black, fontWeight: 700 }}>Weekly Throughput</h3>
+            <p style={{ margin: '4px 0 0', fontSize: 12, color: C.slateMid }}>Tasks completed over the last 7 days</p>
+          </div>
+          <div style={{ fontSize: 11, color: C.slate, fontWeight: 600, border: `1px solid ${C.border}`, borderRadius: 8, padding: '4px 10px', background: C.surfaceAlt, flexShrink: 0, whiteSpace: 'nowrap' }}>
+            {today}
+          </div>
+        </div>
+        <div style={{ height: 290 }}>
+          {chartData.length === 0 ? (
+            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.slateLight, fontSize: 12 }}>
+              No chart data available.
             </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link to="/tasks" style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '10px 20px', borderRadius: 100,
-              background: '#2563EB', color: '#FFFFFF',
-              fontSize: 13, fontWeight: 700, textDecoration: 'none',
-              transition: 'all 0.2s', whiteSpace: 'nowrap',
-            }}>
-              <Plus size={15} /> New Task
-            </Link>
-            <Link to="/reports" style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '10px 20px', borderRadius: 100,
-              background: '#FFFFFF',
-              border: '1px solid #CBD5E1',
-              color: '#1E293B',
-              fontSize: 13, fontWeight: 600, textDecoration: 'none',
-              whiteSpace: 'nowrap',
-            }}>
-              <BarChart3 size={15} /> Reports
-            </Link>
-          </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData}>
+                <defs>
+                  <linearGradient id="throughputArea" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor={C.sky} stopOpacity={0.28} />
+                    <stop offset="95%" stopColor={C.sky} stopOpacity={0}    />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke={C.borderLight} />
+                <XAxis dataKey="day" tick={{ fill: C.slateMid, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: C.slateMid, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={{ borderRadius: 12, border: `1px solid ${C.border}`, background: C.surface, fontSize: 12 }} />
+                <Area type="monotone" dataKey="tasks" stroke={C.sky} strokeWidth={2} fill="url(#throughputArea)" dot={{ fill: C.sky, r: 3 }} />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
-      {/* ── Stat cards ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
-        <StatCard label="Total Projects" value={stats?.totalProjects ?? projects.length} icon={FolderKanban}
-          bg="linear-gradient(135deg, #1F2937 0%, #374151 100%)" trend={`${overallPct}%`} sub="Active workspace" />
-        <StatCard label="Total Tasks"    value={totalTasks}  icon={CheckSquare}
-          bg="linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)" sub={`${doneTasks} completed`} />
-        <StatCard label="In Progress"    value={inProgress}  icon={Activity}
-          bg="linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)" sub="Active right now" />
-        <StatCard label="Team Members"   value={stats?.totalUsers ?? '—'} icon={Users}
-          bg="linear-gradient(135deg, #10B981 0%, #059669 100%)" sub={`${blocked} blocked`} />
+      <div style={{ border: `1px solid ${C.border}`, borderRadius: 16, padding: 16, background: C.surface }}>
+        <h3 style={{ margin: 0, fontSize: 16, color: C.black, fontWeight: 700 }}>Recent Updates</h3>
+        <p style={{ margin: '4px 0 12px', fontSize: 12, color: C.slateMid }}>Latest changes in tasks and progress.</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 330, overflowY: 'auto' }}>
+          {recentUpdates.length === 0 ? (
+            <div style={{ padding: 12, border: `1px dashed ${C.border}`, borderRadius: 12, color: C.slateLight, fontSize: 12 }}>
+              No recent updates available.
+            </div>
+          ) : (
+            recentUpdates.map((task) => (
+              <div
+                key={task._id}
+                style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', background: C.surface }}
+              >
+                <p style={{ margin: 0, fontSize: 12, color: C.black, fontWeight: 600 }}>{task.title}</p>
+                <p style={{ margin: '3px 0 0', fontSize: 11, color: C.slateMid }}>{task.project?.name || 'No project'}</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+                  <StatusBadge status={task.status} />
+                  <span style={{ fontSize: 10, color: C.slateLight }}>{formatDayLabel(task.updatedAt || task.createdAt)}</span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>,
+
+    /* ── Slide 3 : Capacity ── */
+    <div key="capacity" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div style={{ border: `1px solid ${C.border}`, borderRadius: 16, padding: 16, background: C.surface }}>
+        <h3 style={{ margin: 0, fontSize: 16, color: C.black, fontWeight: 700 }}>Capacity and Leave</h3>
+        <p style={{ margin: '4px 0 14px', fontSize: 12, color: C.slateMid }}>Current leave ledger and request pressure.</p>
+        {leaveBalance ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+            {[
+              ['Approved', leaveBalance.approved ?? 0],
+              ['Pending',  leaveBalance.pending  ?? 0],
+              ['Rejected', leaveBalance.rejected ?? 0],
+              ['Cancelled',leaveBalance.cancelled?? 0],
+            ].map(([label, value]) => {
+              const acc = leaveTileAccent[label] || { bg: C.surfaceAlt, color: C.slate };
+              return (
+                <div key={label} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, background: acc.bg }}>
+                  <p style={{ margin: 0, fontSize: 11, color: acc.color, fontWeight: 700 }}>{label}</p>
+                  <p style={{ margin: '8px 0 0', fontSize: 24, color: C.black, fontWeight: 700 }}>{value}</p>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div style={{ border: `1px dashed ${C.border}`, borderRadius: 12, padding: 14, color: C.slateLight, fontSize: 12 }}>
+            No leave summary available.
+          </div>
+        )}
       </div>
 
-      {/* ── Overall progress ── */}
-      <div className="dash-card">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <div>
-            <div className="dash-card-title">Overall Workspace Progress</div>
-            <div className="dash-card-sub">{doneTasks} of {totalTasks} tasks complete</div>
-          </div>
-          <span style={{
-            fontFamily: "'Cormorant Garamond', serif",
-            fontSize: 36, fontWeight: 700,
-            color: overallPct >= 75 ? '#10B981' : overallPct >= 40 ? '#2563EB' : '#F97316'
-          }}>{overallPct}%</span>
-        </div>
-        <div className="dash-progress-track">
-          <div className="dash-progress-fill" style={{
-            width: `${overallPct}%`,
-            background: overallPct >= 75
-              ? 'linear-gradient(90deg, #10B981, #059669)'
-              : 'linear-gradient(90deg, #2563EB, #1D4ED8)',
-          }} />
-        </div>
-        <div style={{ display: 'flex', gap: 20, marginTop: 16, flexWrap: 'wrap' }}>
-          {statusPieData.map(d => (
-            <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 12, color: '#6B7280' }}>{d.name}: <strong style={{ color: '#1F2937' }}>{d.value}</strong></span>
-            </div>
+      <div style={{ border: `1px solid ${C.border}`, borderRadius: 16, padding: 16, background: C.surface }}>
+        <h3 style={{ margin: 0, fontSize: 16, color: C.black, fontWeight: 700 }}>Action Queue</h3>
+        <p style={{ margin: '4px 0 14px', fontSize: 12, color: C.slateMid }}>Quick links for high-priority actions.</p>
+        <div style={{ display: 'grid', gap: 10 }}>
+          {[
+            { to: '/tasks',         label: 'Review all tasks',        helper: `${totalTasks} total tasks in scope` },
+            { to: '/projects',      label: 'Check project boards',    helper: `${isManagerOrAdmin ? projects.length : stats?.totalProjects ?? 0} active projects` },
+            { to: '/leaves',        label: 'Handle leave requests',   helper: `${leaveBalance?.pending ?? 0} pending approvals` },
+            { to: '/announcements', label: 'Publish update',          helper: 'Share operations updates' },
+          ].map((item, i) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              style={{
+                border: `1px solid ${C.border}`,
+                borderLeft: `3px solid ${actionAccent[i]}`,
+                borderRadius: 12,
+                padding: '10px 12px',
+                textDecoration: 'none',
+                color: C.black,
+                background: C.surface,
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = C.surfaceAlt}
+              onMouseLeave={(e) => e.currentTarget.style.background = C.surface}
+            >
+              <p style={{ margin: 0, fontSize: 12, fontWeight: 700 }}>{item.label}</p>
+              <p style={{ margin: '4px 0 0', fontSize: 11, color: C.slateMid }}>{item.helper}</p>
+            </Link>
           ))}
         </div>
       </div>
-
-      {/* ── Charts row ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
-        {/* Activity */}
-        <div className="dash-card">
-          <div className="dash-section-row">
-            <div>
-              <div className="dash-card-title">Weekly Activity</div>
-              <div className="dash-card-sub">Task completions over the past 7 days</div>
-            </div>
-            <div style={{ width: 36, height: 36, borderRadius: 12, background: 'rgba(184,134,11,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <TrendingUp size={16} color="#B8860B" />
-            </div>
-          </div>
-          {activityData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={200}>
-              <AreaChart data={activityData}>
-                <defs>
-                  <linearGradient id="adminGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#B8860B" stopOpacity={0.18} />
-                    <stop offset="95%" stopColor="#B8860B" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(184,134,11,0.08)" />
-                <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#9B8272' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#9B8272' }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ borderRadius: 14, border: '1px solid rgba(184,134,11,0.15)', fontSize: 12, fontFamily: 'Outfit' }} />
-                <Area type="monotone" dataKey="tasks" stroke="#B8860B" strokeWidth={2.5} fill="url(#adminGrad)"
-                  dot={{ fill: '#B8860B', strokeWidth: 0, r: 3 }} />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8 }}>
-              <Activity size={32} color="rgba(184,134,11,0.2)" />
-              <p style={{ fontSize: 13, color: '#9B8272' }}>No activity data yet</p>
-            </div>
-          )}
-        </div>
-
-        {/* Status donut */}
-        <div className="dash-card">
-          <div className="dash-section-row">
-            <div>
-              <div className="dash-card-title">Task Status</div>
-              <div className="dash-card-sub">Live breakdown</div>
-            </div>
-            <div style={{ width: 36, height: 36, borderRadius: 12, background: 'rgba(92,122,62,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Target size={16} color="#5C7A3E" />
-            </div>
-          </div>
-          {statusPieData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie data={statusPieData} cx="50%" cy="50%" innerRadius={52} outerRadius={78} paddingAngle={3} dataKey="value">
-                  {statusPieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-                </Pie>
-                <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid rgba(184,134,11,0.15)', fontSize: 12 }} />
-                <Legend iconType="circle" iconSize={8}
-                  formatter={(v) => <span style={{ fontSize: 11, color: '#7A6648' }}>{v}</span>} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <p style={{ fontSize: 13, color: '#9B8272' }}>No task data yet</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Bottom row ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        {/* Project health */}
-        <div className="dash-card">
-          <div className="dash-section-row">
-            <div>
-              <div className="dash-card-title">Project Health</div>
-              <div className="dash-card-sub">Completion rate per project</div>
-            </div>
-            <Link to="/projects" className="dash-link">View all <ArrowRight size={12} /></Link>
-          </div>
-          {projectHealth.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '32px 0' }}>
-              <Briefcase size={32} color="rgba(184,134,11,0.2)" style={{ margin: '0 auto 8px' }} />
-              <p style={{ fontSize: 13, color: '#9B8272' }}>No projects with tasks yet</p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {projectHealth.map(p => (
-                <div key={p._id}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                      <span style={{ fontSize: 13, fontWeight: 500, color: '#2A1F0E', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {p.name}
-                      </span>
-                      {p.blocked > 0 && (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: 11, color: '#A0432A', fontWeight: 600, flexShrink: 0 }}>
-                          <AlertCircle size={12} />{p.blocked}
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                      <span style={{ fontSize: 11, color: '#9B8272' }}>{p.done}/{p.total}</span>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: p.pct >= 75 ? '#5C7A3E' : p.pct >= 40 ? '#B8860B' : '#9B8272' }}>
-                        {p.pct}%
-                      </span>
-                    </div>
-                  </div>
-                  <div className="dash-progress-track" style={{ height: 6 }}>
-                    <div className="dash-progress-fill" style={{
-                      width: `${p.pct}%`,
-                      background: p.pct >= 75 ? '#5C7A3E' : p.pct >= 40 ? '#B8860B' : '#B5A99A',
-                    }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Activity feed */}
-        <div className="dash-card">
-          <div className="dash-section-row">
-            <div>
-              <div className="dash-card-title">Live Activity Feed</div>
-              <div className="dash-card-sub">Most recently updated tasks</div>
-            </div>
-            <span style={{ fontSize: 11, color: '#5C7A3E', fontWeight: 600 }}>Live</span>
-          </div>
-          {recentActivity.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '32px 0' }}>
-              <Activity size={32} color="rgba(184,134,11,0.2)" style={{ margin: '0 auto 8px' }} />
-              <p style={{ fontSize: 13, color: '#9B8272' }}>No activity yet</p>
-            </div>
-          ) : (
-            <div>{recentActivity.map(task => <ActivityItem key={task._id} task={task} />)}</div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// USER DASHBOARD
-// ══════════════════════════════════════════════════════════════════════════════
-function UserDashboard({ stats, myTasks, leaveBalance, user }) {
-  const [taskFilter, setTaskFilter] = useState('active');
-
-  const totalTasks   = myTasks.length;
-  const doneTasks    = myTasks.filter(t => t.status === 'done').length;
-  const activeTasks  = myTasks.filter(t => t.status !== 'done').length;
-  const inProgress   = myTasks.filter(t => t.status === 'in-progress').length;
-  const overdueTasks = myTasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'done').length;
-  const myPct        = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
-
-  const displayedTasks = taskFilter === 'done'
-    ? myTasks.filter(t => t.status === 'done')
-    : myTasks.filter(t => t.status !== 'done');
-
-  const statusBreakdown = [
-    { name: 'Done',        value: doneTasks,   fill: '#10B981' },
-    { name: 'In Progress', value: inProgress,  fill: '#2563EB' },
-    { name: 'In Review',   value: myTasks.filter(t => t.status === 'in-review').length, fill: '#3B82F6' },
-    { name: 'To Do',       value: myTasks.filter(t => t.status === 'todo').length,      fill: '#9CA3AF' },
-    { name: 'Blocked',     value: myTasks.filter(t => t.status === 'blocked').length,   fill: '#EF4444' },
-  ].filter(d => d.value > 0);
-
-  const activityData = stats?.weeklyActivity || [];
-  const userGreeting = `${getGreeting()}, ${user?.name?.split(' ')[0] || 'there'}`;
+    </div>,
+  ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* ── Hero greeting ── */}
-      <div className="dash-hero">
-        <div className="dash-hero-content" style={{ flex: 1 }}>
-          <div>
-            <p style={{ fontSize: 12, color: '#64748B', fontWeight: 600, margin: '0 0 6px', letterSpacing: '0.03em' }}>
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-              </p>
-            <h1 style={{ fontSize: 28, fontWeight: 700, color: '#0F172A', margin: 0, fontFamily: "'Cormorant Garamond', serif" }}>
-              <TypedGreeting text={userGreeting} />
-            </h1>
-            <p style={{ fontSize: 13, color: '#64748B', margin: '6px 0 0', textTransform: 'capitalize' }}>
-              {user?.department} · {user?.role}
-            </p>
-            <div className="dash-hero-meta" style={{ marginTop: 12 }}>
-              <span className="dash-hero-chip">{doneTasks} completed</span>
-              <span className="dash-hero-chip">{activeTasks} active</span>
-              {overdueTasks > 0 && <span className="dash-hero-chip" style={{ background: '#FEF2F2', color: '#B91C1C' }}>{overdueTasks} overdue</span>}
-            </div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-            <div style={{ position: 'relative', width: 80, height: 80 }}>
-              <svg width="80" height="80" viewBox="0 0 36 36" style={{ transform: 'rotate(-90deg)' }}>
-                <circle cx="18" cy="18" r="15.5" fill="none" stroke="#E2E8F0" strokeWidth="3" />
-                <circle cx="18" cy="18" r="15.5" fill="none" stroke="#2563EB" strokeWidth="3"
-                  strokeDasharray={`${myPct} ${100 - myPct}`} strokeLinecap="round" />
-              </svg>
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: 16, fontWeight: 700, color: '#0F172A', fontFamily: "'Cormorant Garamond', serif" }}>
-                  {myPct}%
-                </span>
-              </div>
-            </div>
-            <p style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Task completion</p>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Stats ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
-        <StatCard label="My Tasks"    value={totalTasks} icon={CheckSquare}
-          bg="linear-gradient(135deg, #1F2937 0%, #374151 100%)" sub="All assigned tasks" />
-        <StatCard label="Completed"   value={doneTasks}  icon={CheckCircle2}
-          bg="linear-gradient(135deg, #10B981 0%, #059669 100%)" sub="Tasks finished" />
-        <StatCard label="In Progress" value={inProgress} icon={Clock}
-          bg="linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)" sub="Active right now" />
-        <StatCard label="Pending Leaves"  value={leaveBalance ? `${leaveBalance.pending ?? 0}` : '—'} icon={CalendarDays}
-          bg="linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)" sub="Awaiting approval" />
-      </div>
-
-      {/* ── Charts + Task split ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
-        <div className="dash-card">
-          <div className="dash-section-row">
-            <div>
-              <div className="dash-card-title">My Activity</div>
-              <div className="dash-card-sub">Task updates this week</div>
-            </div>
-            <TrendingUp size={16} color="#B8860B" />
-          </div>
-          {activityData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={180}>
-              <AreaChart data={activityData}>
-                <defs>
-                  <linearGradient id="userGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#5C7A3E" stopOpacity={0.18} />
-                    <stop offset="95%" stopColor="#5C7A3E" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(184,134,11,0.08)" />
-                <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#9B8272' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#9B8272' }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ borderRadius: 14, border: '1px solid rgba(184,134,11,0.15)', fontSize: 12 }} />
-                <Area type="monotone" dataKey="tasks" stroke="#5C7A3E" strokeWidth={2.5} fill="url(#userGrad)"
-                  dot={{ fill: '#5C7A3E', strokeWidth: 0, r: 3 }} />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8 }}>
-              <Activity size={32} color="rgba(184,134,11,0.2)" />
-              <p style={{ fontSize: 13, color: '#9B8272' }}>No activity data yet</p>
-            </div>
-          )}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* ── Greeting header ── */}
+      <section
+        style={{
+          padding: '8px 2px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 18,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ flex: '1 1 420px', minWidth: 280 }}>
+          <p style={{ margin: 0, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slateMid }}>
+            Daily Greeting
+          </p>
+          <h1 style={{ margin: '4px 0 0', fontSize: 34, lineHeight: 1.1, color: C.black, fontWeight: 700 }}>
+            <span>{typedGreeting.slice(0, greetingPrefix.length)}</span>
+            <span style={{ color: '#2563EB' }}>{typedGreeting.slice(greetingPrefix.length)}</span>
+            <span style={{ marginLeft: 2, color: '#2563EB', opacity: showCaret ? 1 : 0, transition: 'opacity 0.2s ease' }}>|</span>
+          </h1>
+          <p style={{ margin: '5px 0 0', fontSize: 14, color: C.slateMid }}>
+            Welcome back. Today is {today}. Here is your expanded operational view.
+          </p>
         </div>
 
-        <div className="dash-card">
-          <div className="dash-section-row">
-            <div className="dash-card-title">My Task Split</div>
-            <Award size={16} color="#2563EB" />
-          </div>
-          {statusBreakdown.length > 0 ? (
-            <>
-              <ResponsiveContainer width="100%" height={140}>
-                <PieChart>
-                  <Pie data={statusBreakdown} cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={3} dataKey="value">
-                    {statusBreakdown.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-                  </Pie>
-                  <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #E5E7EB', fontSize: 11, background: '#FFFFFF' }} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-                {statusBreakdown.map(d => (
-                  <div key={d.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 12, color: '#6B7280' }}>{d.name}</span>
-                    </div>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: '#1F2937' }}>{d.value}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '32px 0' }}>
-              <CheckSquare size={32} color="rgba(37,99,235,0.1)" style={{ margin: '0 auto 8px' }} />
-              <p style={{ fontSize: 13, color: '#6B7280' }}>No tasks yet</p>
+        {/* ── Quick stats card ── */}
+        <div
+          style={{
+            flex: '0 0 260px',
+            width: '100%',
+            maxWidth: 320,
+            border: `1px solid ${C.border}`,
+            borderRadius: 14,
+            background: C.surface,
+            padding: '10px 12px',
+          }}
+        >
+          <p style={{ margin: 0, fontSize: 11, color: C.slateMid, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            Quick Updates
+          </p>
+          <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+              <span style={{ color: C.slate }}>Overdue Tasks</span>
+              <span style={{ color: C.amber, fontWeight: 700 }}>{overdueTasks}</span>
             </div>
-          )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+              <span style={{ color: C.slate }}>Pending Leave</span>
+              <span style={{ color: C.amber, fontWeight: 700 }}>{leaveBalance?.pending ?? 0}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+              <span style={{ color: C.slate }}>In Progress</span>
+              <span style={{ color: C.sky, fontWeight: 700 }}>{inProgressTasks}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+              <span style={{ color: C.slate }}>Completed</span>
+              <span style={{ color: C.emerald, fontWeight: 700 }}>{completedTasks}</span>
+            </div>
+          </div>
+          <Link
+            to="/tasks"
+            style={{
+              marginTop: 10,
+              width: '100%',
+              textDecoration: 'none',
+              border: 'none',
+              color: C.surface,
+              background: C.black,
+              borderRadius: 10,
+              padding: '8px 10px',
+              fontSize: 12,
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+            }}
+          >
+            <CheckSquare size={13} />
+            Open Tasks
+          </Link>
         </div>
-      </div>
+      </section>
 
-      {/* ── Tasks + Leave ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        {/* My tasks */}
-        <div className="dash-card">
-          <div className="dash-section-row">
-            <div className="dash-card-title">My Tasks</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div className="dash-tabs">
-                <button className={`dash-tab ${taskFilter === 'active' ? 'active' : ''}`}
-                  onClick={() => setTaskFilter('active')}>
-                  Active ({activeTasks})
-                </button>
-                <button className={`dash-tab ${taskFilter === 'done' ? 'active' : ''}`}
-                  onClick={() => setTaskFilter('done')}>
-                  Done ({doneTasks})
-                </button>
-              </div>
-              <Link to="/tasks" className="dash-link">All <ArrowRight size={12} /></Link>
-            </div>
-          </div>
-
-          {displayedTasks.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '32px 0' }}>
-              <CheckSquare size={32} color="rgba(184,134,11,0.2)" style={{ margin: '0 auto 8px' }} />
-              <p style={{ fontSize: 13, color: '#9B8272' }}>
-                {taskFilter === 'done' ? 'No completed tasks yet' : "You're all caught up!"}
-              </p>
-            </div>
-          ) : (
-            <div>
-              {displayedTasks.slice(0, 6).map(task => {
-                const sc = statusColor(task.status);
-                const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done';
-                return (
-                  <div key={task._id} className="dash-task-item">
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: sc, flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{
-                        fontSize: 13, fontWeight: 500, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        color: task.status === 'done' ? '#B5A99A' : '#2A1F0E',
-                        textDecoration: task.status === 'done' ? 'line-through' : 'none',
-                      }}>{task.title}</p>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                        <span style={{ fontSize: 11, color: '#9B8272' }}>{task.project?.name || 'No project'}</span>
-                        {isOverdue && (
-                          <span style={{ fontSize: 11, color: '#A0432A', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <AlertCircle size={10} /> Overdue
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <span className="dash-status-pill" style={{ background: sc + '18', color: sc }}>
-                      {task.status?.replace('-', ' ')}
-                    </span>
-                  </div>
-                );
-              })}
-              {displayedTasks.length > 6 && (
-                <Link to="/tasks" className="dash-link" style={{ justifyContent: 'center', display: 'flex', paddingTop: 12 }}>
-                  +{displayedTasks.length - 6} more <ArrowRight size={12} />
-                </Link>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Leave + Quick Actions */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div className="dash-card">
-            <div className="dash-section-row">
-              <div>
-                <div className="dash-card-title">Leave Summary</div>
-                <div className="dash-card-sub">Current month request statuses</div>
-              </div>
-              <Link to="/leaves" className="dash-link">Apply <ArrowRight size={12} /></Link>
-            </div>
-            {leaveBalance ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {[
-                  { label: 'Approved', key: 'approved', color: '#10B981' },
-                  { label: 'Pending',  key: 'pending',  color: '#2563EB' },
-                  { label: 'Rejected', key: 'rejected', color: '#EF4444' },
-                  { label: 'Cancelled', key: 'cancelled', color: '#9CA3AF' },
-                ].map(({ label, key, color }) => {
-                  const val = leaveBalance[key] ?? 0;
-                  const total = Math.max(1, (leaveBalance.approved || 0) + (leaveBalance.pending || 0) + (leaveBalance.rejected || 0) + (leaveBalance.cancelled || 0));
-                  const pct = Math.min(100, Math.round((val / total) * 100));
-                  return (
-                    <div key={key}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <span style={{ fontSize: 13, fontWeight: 500, color: '#4A3820' }}>{label}</span>
-                        <span style={{ fontSize: 13, fontWeight: 700, color }}>{val}</span>
-                      </div>
-                      <div className="dash-progress-track" style={{ height: 6 }}>
-                        <div className="dash-progress-fill" style={{ width: `${pct}%`, background: color }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p style={{ fontSize: 13, color: '#9B8272', textAlign: 'center', padding: '16px 0' }}>Leave summary not available</p>
-            )}
-          </div>
-
-          {/* Quick actions */}
-          <div style={{
-            borderRadius: 20, padding: 24, overflow: 'hidden', position: 'relative',
-            background: '#FFFFFF', border: '1px solid #E5E7EB',
-            animation: 'slideUp 0.6s cubic-bezier(.22,1,.36,1) 0.2s backwards',
-          }}>
-            <div style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: '50%', background: 'rgba(37,99,235,0.04)' }} />
-            <p style={{ fontSize: 14, fontWeight: 600, color: '#1F2937', marginBottom: 14, position: 'relative' }}>
-              Quick Actions
-            </p>
-            <div className="dash-quick-grid" style={{ position: 'relative' }}>
-              {[
-                { icon: CalendarDays, label: 'Apply Leave',   to: '/leaves' },
-                { icon: FolderKanban, label: 'Projects',      to: '/projects' },
-                { icon: CheckSquare,  label: 'My Tasks',      to: '/tasks' },
-                { icon: Zap,          label: 'Sprint Board',  to: '/sprints' },
-              ].map(({ icon: Icon, label, to }) => (
-                <Link key={to} to={to} className="dash-quick-btn">
-                  <Icon size={13} color="#2563EB" />
-                  {label}
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+      <Carousel slides={slides} />
     </div>
   );
 }
