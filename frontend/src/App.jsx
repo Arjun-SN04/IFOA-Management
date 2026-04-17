@@ -20,23 +20,49 @@ import DailyTasksPage from './pages/daily-tasks/DailyTasksPage'
 import AnnouncementsPage from './pages/announcements/AnnouncementsPage'
 import ReportsPage from './pages/reports/ReportsPage'
 import UsersPage from './pages/admin/UsersPage'
+import TeamsPage from './pages/admin/TeamsPage'
 import ProfilePage from './pages/profile/ProfilePage'
 
-function ProtectedRoute({ children, adminOnly = false }) {
-  const { user, loading, isManagerOrAdmin } = useAuth()
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <div className="flex flex-col items-center gap-3">
-        <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-slate-500 text-sm font-medium">Loading...</p>
+// Loading spinner shown while auth state is being resolved
+function AuthLoader() {
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F8FAFC' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+        <div style={{ width: 36, height: 36, border: '3px solid #3B82F6', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+        <p style={{ color: '#64748B', fontSize: 13, fontWeight: 500 }}>Loading…</p>
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
+}
+
+// Route: any authenticated user
+function ProtectedRoute({ children }) {
+  const { user, loading } = useAuth()
+  if (loading) return <AuthLoader />
   if (!user) return <Navigate to="/" replace />
-  if (adminOnly && !isManagerOrAdmin) return <Navigate to="/dashboard" replace />
   return children
 }
 
+// Route: Management + Admin only (managers + admins — not team_lead, not employee)
+function ManagementRoute({ children }) {
+  const { user, loading, isManagerOrAdmin } = useAuth()
+  if (loading) return <AuthLoader />
+  if (!user) return <Navigate to="/" replace />
+  if (!isManagerOrAdmin) return <Navigate to="/dashboard" replace />
+  return children
+}
+
+// Route: Admin only
+function AdminRoute({ children }) {
+  const { user, loading, isAdmin } = useAuth()
+  if (loading) return <AuthLoader />
+  if (!user) return <Navigate to="/" replace />
+  if (!isAdmin) return <Navigate to="/dashboard" replace />
+  return children
+}
+
+// Route: Guest only (not logged in)
 function GuestRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) return null
@@ -48,26 +74,32 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public landing page — exact match only */}
+        {/* Public landing page */}
         <Route index element={<LandingPage />} />
 
-        {/* Guest routes */}
-        <Route path="login" element={<GuestRoute><Login /></GuestRoute>} />
+        {/* Guest routes (unauthenticated only) */}
+        <Route path="login"    element={<GuestRoute><Login /></GuestRoute>} />
         <Route path="register" element={<GuestRoute><Register /></GuestRoute>} />
 
         {/* Protected app routes under layout */}
         <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-          <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="projects" element={<ProjectsPage />} />
+          {/* All authenticated users */}
+          <Route path="dashboard"    element={<DashboardPage />} />
+          <Route path="projects"     element={<ProjectsPage />} />
           <Route path="projects/:id" element={<ProjectDetailPage />} />
-          <Route path="tasks" element={<TasksPage />} />
-          <Route path="sprints" element={<SprintsPage />} />
-          <Route path="leaves" element={<LeavesPage />} />
-          <Route path="daily-tasks" element={<DailyTasksPage />} />
-          <Route path="announcements" element={<AnnouncementsPage />} />
-          <Route path="reports" element={<ProtectedRoute adminOnly><ReportsPage /></ProtectedRoute>} />
-          <Route path="admin/users" element={<ProtectedRoute adminOnly><UsersPage /></ProtectedRoute>} />
-          <Route path="profile" element={<ProfilePage />} />
+          <Route path="tasks"        element={<TasksPage />} />
+          <Route path="sprints"      element={<SprintsPage />} />
+          <Route path="leaves"       element={<LeavesPage />} />
+          <Route path="daily-tasks"  element={<DailyTasksPage />} />
+          <Route path="announcements"element={<AnnouncementsPage />} />
+          <Route path="profile"      element={<ProfilePage />} />
+
+          {/* Management + Admin: reports, teams */}
+          <Route path="reports"      element={<ManagementRoute><ReportsPage /></ManagementRoute>} />
+          <Route path="admin/teams"  element={<ManagementRoute><TeamsPage /></ManagementRoute>} />
+
+          {/* Admin only: user management */}
+          <Route path="admin/users"  element={<AdminRoute><UsersPage /></AdminRoute>} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

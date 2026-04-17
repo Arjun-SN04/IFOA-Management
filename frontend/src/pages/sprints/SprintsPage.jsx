@@ -20,11 +20,11 @@ const STATUS_V = {
 };
 
 const BOARD_COLS = [
+  { key: 'backlog',     label: 'Backlog',     fill: '#64748B', icon: AlertTriangle, border: '#CBD5E1' },
   { key: 'todo',        label: 'To Do',       fill: '#7c3aed', icon: Circle,        border: '#c4b5fd' },
   { key: 'in-progress', label: 'In Progress', fill: '#3b82f6', icon: Clock,         border: '#93c5fd' },
   { key: 'in-review',   label: 'In Review',   fill: '#f59e0b', icon: Eye,           border: '#fcd34d' },
   { key: 'done',        label: 'Done',        fill: '#10b981', icon: CheckCircle2,  border: '#6ee7b7' },
-  { key: 'blocked',     label: 'Blocked',     fill: '#ef4444', icon: XCircle,       border: '#fca5a5' },
 ];
 
 const TASK_STATUS_META = {
@@ -33,7 +33,6 @@ const TASK_STATUS_META = {
   'in-progress':{ label: 'In Progress', icon: Clock,         color: '#3b82f6' },
   'in-review':  { label: 'In Review',   icon: Eye,           color: '#f59e0b' },
   done:         { label: 'Done',        icon: CheckCircle2,  color: '#10b981' },
-  blocked:      { label: 'Blocked',     icon: XCircle,       color: '#ef4444' },
   cancelled:    { label: 'Cancelled',   icon: X,             color: '#94a3b8' },
 };
 
@@ -120,13 +119,13 @@ function SprintKanbanBoard({ tasks, onStatusChange, isManagerOrAdmin }) {
                   <p style={{ margin: '0 0 7px', fontSize: 12, fontWeight: 600, color: '#0F172A', lineHeight: 1.4 }}>{task.title}</p>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <PriorityChip priority={task.priority} />
-                    {task.assignee && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <div style={{ width: 20, height: 20, borderRadius: 999, background: '#3b82f6', color: '#fff', fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {(task.assignee.name || 'U').charAt(0).toUpperCase()}
-                        </div>
-                        <span style={{ fontSize: 10, color: '#64748B' }}>{task.assignee.name.split(' ')[0]}</span>
-                      </div>
+                    {task.assignee?.name && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <div style={{ width: 20, height: 20, borderRadius: 999, background: '#3b82f6', color: '#fff', fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {task.assignee.name.charAt(0).toUpperCase()}
+                    </div>
+                    <span style={{ fontSize: 10, color: '#64748B' }}>{task.assignee.name.split(' ')[0]}</span>
+                    </div>
                     )}
                   </div>
                 </motion.div>
@@ -408,8 +407,8 @@ function ActiveSprintPanel({ sprint, tasks, allTasks, isManagerOrAdmin, isAdmin,
             </div>
           )}
 
-          {/* Backlog for this project (admin can add tasks to sprint) */}
-          {isManagerOrAdmin && backlogTasks.length > 0 && (
+          {/* Backlog for this project */}
+          {backlogTasks.length > 0 && (
             <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid #F1F5F9' }}>
               <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                 Backlog — {backlogTasks.length} task{backlogTasks.length !== 1 ? 's' : ''} not in any sprint
@@ -594,21 +593,26 @@ function ActiveSprintPanelWrapper({ sprint, tasks, allTasks, plannedSprints, isM
           )}
 
           {/* Backlog for this project */}
-          {isManagerOrAdmin && backlogTasks.length > 0 && (
+          {backlogTasks.length > 0 && (
             <div style={{ marginTop: 22, paddingTop: 18, borderTop: '1px solid #F1F5F9' }}>
               <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                Backlog — {backlogTasks.length} unassigned task{backlogTasks.length !== 1 ? 's' : ''}
+                Backlog — {backlogTasks.length} task{backlogTasks.length !== 1 ? 's' : ''} not in any sprint
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 {backlogTasks.map(task => (
                   <div key={task._id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', background: '#F8FAFC', borderRadius: 10, border: '1px solid #E2E8F0' }}>
                     <TaskStatusIcon status={task.status} />
                     <span style={{ fontSize: 12, fontWeight: 600, color: '#0F172A', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</span>
+                    {task.assignee?.name && (
+                      <span style={{ fontSize: 11, color: '#64748B', background: '#F1F5F9', padding: '2px 7px', borderRadius: 6 }}>{task.assignee.name}</span>
+                    )}
                     <PriorityChip priority={task.priority} />
-                    <button onClick={() => onAssignTask(task._id, sprint._id)} disabled={assigning === task._id}
-                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 7, border: '1px solid #BFDBFE', background: '#EFF6FF', color: '#2563EB', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
-                      {assigning === task._id ? <Spinner size="xs" /> : <ArrowRight size={11} />} Add to Sprint
-                    </button>
+                    {isManagerOrAdmin && (
+                      <button onClick={() => onAssignTask(task._id, sprint._id)} disabled={assigning === task._id}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 7, border: '1px solid #BFDBFE', background: '#EFF6FF', color: '#2563EB', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+                        {assigning === task._id ? <Spinner size="xs" /> : <ArrowRight size={11} />} Add to Sprint
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -805,9 +809,8 @@ export default function SprintsPage() {
     Promise.all([
       sprintAPI.getAll(),
       projectAPI.getAll().catch(() => ({ data: { data: [] } })),
-      isManagerOrAdmin
-        ? taskAPI.getAll().catch(() => ({ data: { data: [] } }))
-        : taskAPI.getMy().catch(() => ({ data: { data: [] } })),
+      // All roles fetch all tasks so backlog (unassigned sprint) is visible
+      taskAPI.getAll().catch(() => ({ data: { data: [] } })),
     ]).then(([sRes, pRes, tRes]) => {
       setSprints(resolveSprints(sRes));
       setProjects(resolveProjects(pRes));
@@ -818,7 +821,7 @@ export default function SprintsPage() {
 
   const reloadAll = async () => {
     try {
-      const [sRes, tRes] = await Promise.all([sprintAPI.getAll(), isManagerOrAdmin ? taskAPI.getAll() : taskAPI.getMy()]);
+      const [sRes, tRes] = await Promise.all([sprintAPI.getAll(), taskAPI.getAll()]);
       setSprints(resolveSprints(sRes));
       setAllTasks(resolveTasks(tRes));
     } catch {}

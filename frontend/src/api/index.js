@@ -34,6 +34,8 @@ export const projectAPI = {
   addMember: (id, data) => API.post(`/projects/${id}/members`, data),
   removeMember: (id, userId) => API.delete(`/projects/${id}/members/${userId}`),
   getStats: (id) => API.get(`/projects/${id}/stats`),
+  assignTeam: (id, teamId) => API.post(`/projects/${id}/teams`, { teamId }),
+  removeTeam: (id, teamId) => API.delete(`/projects/${id}/teams/${teamId}`),
 };
 
 export const taskAPI = {
@@ -68,7 +70,6 @@ export const sprintAPI = {
   update: (id, data) => API.put(`/sprints/${id}`, data),
   delete: (id) => API.delete(`/sprints/${id}`),
   start: (id) => API.patch(`/sprints/${id}/start`),
-  // body may include { nextSprintId } to roll incomplete tasks to next sprint (Jira-style)
   complete: (id, body = {}) => API.patch(`/sprints/${id}/complete`, body),
   getBoard: (id) => API.get(`/sprints/${id}/board`),
 };
@@ -115,4 +116,20 @@ export const dailyTaskAPI = {
   adminToggle: (userId, isRequired) => API.patch(`/daily-tasks/admin/settings/${userId}`, { isRequired }),
   adminBulkToggle: (isRequired) => API.post('/daily-tasks/admin/settings/bulk', { isRequired }),
   adminSetSelected: (userIds, isRequired) => API.post('/daily-tasks/admin/settings/selected', { userIds, isRequired }),
+};
+
+export const teamAPI = {
+  create: (data) => API.post('/teams', data),
+  getAll: () => API.get('/teams'),
+  getById: (id) => API.get(`/teams/${id}`),
+  update: (id, data) => API.put(`/teams/${id}`, data),
+  delete: (id) => API.delete(`/teams/${id}`),
+  addMember: (id, userId) => API.post(`/teams/${id}/members`, { userId }),
+  removeMember: (id, userId) => API.delete(`/teams/${id}/members/${userId}`),
+  switchMember: (data) => API.post('/teams/switch-member', data),
+  assignProject: (id, projectId) => API.post(`/teams/${id}/projects`, { projectId }),
+  removeProject: (id, projectId) => API.delete(`/teams/${id}/projects/${projectId}`),
+  changeLead: (id, newLeadId) => API.patch(`/teams/${id}/lead`, { newLeadId }),
+  getEligibleMembers: () => API.get('/teams/eligible-members'),
+  getDashboard: (id) => API.get(`/teams/${id}/dashboard`),
 };

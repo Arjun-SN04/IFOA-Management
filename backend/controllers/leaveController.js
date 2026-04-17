@@ -76,7 +76,7 @@ exports.adminCreateLeave = async (req, res) => {
 };
 
 // @desc  Apply for leave
-// @route POST /api/leaves
+// @route POST /api/leaves/apply
 exports.applyLeave = async (req, res) => {
   try {
     await runMonthlyResetIfDue();
@@ -105,8 +105,8 @@ exports.applyLeave = async (req, res) => {
 
     const leave = await Leave.create({ employee: req.user.id, startDate, endDate, totalDays, reason, isHalfDay, halfDaySession, handoverNote, emergencyContact });
 
-    // Notify managers/admins
-    const managers = await User.find({ role: { $in: ['admin', 'manager'] }, isActive: true });
+    // Notify managers/admins/team_leads
+    const managers = await User.find({ role: { $in: ['admin', 'manager', 'team_lead'] }, isActive: true });
     await Promise.all(
       managers.map((m) =>
         createAndEmit({
@@ -127,16 +127,23 @@ exports.applyLeave = async (req, res) => {
   }
 };
 
-// @desc  Get leaves (admin/manager sees all, employee sees own)
+// @desc  Get leaves (admin/manager/team_lead sees all, employee sees own)
 // @route GET /api/leaves
 exports.getLeaves = async (req, res) => {
   try {
     await runMonthlyResetIfDue();
 
-    const { status, employee, page = 1, limit = 20 } = req.query;
+    const { status, employee, page = 1, limit = 500 } = req.query;
     const query = {};
-    if (req.user.role === 'employee') query.employee = req.user.id;
-    else if (employee) query.employee = employee;
+
+    // Employees only see their own leaves
+    if (req.user.role === 'employee') {
+      query.employee = req.user.id;
+    } else if (employee) {
+      // Elevated roles can filter by employee
+      query.employee = employee;
+    }
+    // status filter — if provided, filter; otherwise show ALL statuses (including pending)
     if (status) query.status = status;
 
     const leaves = await Leave.find(query)
@@ -235,15 +242,23 @@ exports.getLeaveBalance = async (req, res) => {
   }
 };
 
-// @desc  Get leave calendar (approved leaves for calendar view)
+// @desc  Get leave calendar (all statuses for admin/manager/team_lead, only own for employee)
 // @route GET /api/leaves/calendar
 exports.getLeaveCalendar = async (req, res) => {
   try {
     await runMonthlyResetIfDue();
 
-    const leaves = await Leave.find({ status: 'approved' })
+    const query = {};
+    // Employees only see their own leaves in calendar; elevated roles see ALL leaves ALL statuses
+    if (req.user.role === 'employee') {
+      query.employee = req.user.id;
+    }
+    // No status filter — include pending, approved, rejected, cancelled
+
+    const leaves = await Leave.find(query)
       .populate('employee', 'name department')
-      .select('employee startDate endDate totalDays');
+      .select('employee startDate endDate totalDays status reason')
+      .sort({ startDate: 1 });
     res.json({ success: true, leaves });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

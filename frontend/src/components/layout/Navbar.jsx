@@ -69,17 +69,26 @@ const ADMIN_ITEMS = [
 
 export default function Navbar() {
   const { user, logout, isManagerOrAdmin } = useAuth();
-  const { unreadCount, notifications, markRead, markAllRead } = useNotifications();
+  const { unreadCount, notifications, markRead, markAllRead, bellRing } = useNotifications();
   const navigate = useNavigate();
 
   const [showNotifs,  setShowNotifs]  = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [mobileOpen,  setMobileOpen]  = useState(false);
+  const [isRinging,   setIsRinging]   = useState(false);
 
   const notifRef   = useRef();
   const profileRef = useRef();
   useOutsideClick(notifRef,   () => setShowNotifs(false));
   useOutsideClick(profileRef, () => setShowProfile(false));
+
+  // Trigger bell ring whenever bellRing counter increments
+  useEffect(() => {
+    if (!bellRing) return;
+    setIsRinging(true);
+    const t = setTimeout(() => setIsRinging(false), 900);
+    return () => clearTimeout(t);
+  }, [bellRing]);
 
   const handleLogout = () => {
     logout();
@@ -188,7 +197,10 @@ export default function Navbar() {
                 onClick={() => { setShowNotifs(s => !s); setShowProfile(false); }}
                 className="relative w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-gray-100"
                 style={{ color: 'var(--text-muted)' }}>
-                <Bell className="w-4.5 h-4.5" />
+                <Bell
+                  style={{ width: 18, height: 18 }}
+                  className={isRinging ? 'bell-ring' : ''}
+                />
                 {unreadCount > 0 && (
                   <motion.span
                     initial={{ scale: 0 }}

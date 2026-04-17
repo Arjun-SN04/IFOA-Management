@@ -19,14 +19,33 @@ exports.protect = async (req, res, next) => {
   }
 };
 
+// Admin only — full system control
 exports.adminOnly = (req, res, next) => {
   if (req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Admin access required' });
   next();
 };
 
-exports.managerOrAdmin = (req, res, next) => {
+// Management (manager) + Admin — can create projects, manage teams, assign team leads
+// Does NOT include team_lead
+exports.managementOnly = (req, res, next) => {
   if (!['admin', 'manager'].includes(req.user.role)) {
+    return res.status(403).json({ success: false, message: 'Management or Admin access required' });
+  }
+  next();
+};
+
+// Manager + Admin + Team Lead — broad elevated access (backward compat)
+exports.managerOrAdmin = (req, res, next) => {
+  if (!['admin', 'manager', 'team_lead'].includes(req.user.role)) {
     return res.status(403).json({ success: false, message: 'Manager or Admin access required' });
+  }
+  next();
+};
+
+// Team lead or above — can create/assign tasks within their team
+exports.teamLeadOrAbove = (req, res, next) => {
+  if (!['admin', 'manager', 'team_lead'].includes(req.user.role)) {
+    return res.status(403).json({ success: false, message: 'Team Lead access required' });
   }
   next();
 };

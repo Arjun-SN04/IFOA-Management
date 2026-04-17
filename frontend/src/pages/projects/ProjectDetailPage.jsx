@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { projectAPI, taskAPI, userAPI } from '../../api';
+import { projectAPI, taskAPI, userAPI, teamAPI } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import {
   Card, Button, Modal, Input, Textarea, Select,
@@ -9,7 +9,7 @@ import {
 import {
   Plus, ArrowLeft, CheckSquare, Users as UsersIcon,
   Circle, Clock, Eye, CheckCircle2, XCircle, RefreshCw,
-  Pencil, Trash2, AlertTriangle
+  Pencil, Trash2, AlertTriangle, Users2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -61,14 +61,96 @@ function StatusBreakdown({ tasks }) {
   );
 }
 
+// ── Team Selector (multi-select pill UI for manager) ───────────────────────
+// Assigns task to ALL members of the selected team(s), not just the lead
+function TeamSelector({ projectTeams, selectedTeamIds, onChange }) {
+  const toggle = (teamId) => {
+    if (selectedTeamIds.includes(teamId)) {
+      onChange(selectedTeamIds.filter(id => id !== teamId));
+    } else {
+      onChange([...selectedTeamIds, teamId]);
+    }
+  };
+
+  if (!projectTeams || projectTeams.length === 0) {
+    return (
+      <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+        <AlertTriangle className="w-4 h-4 shrink-0" />
+        No teams are assigned to this project yet. Ask an admin to assign teams first.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide">
+        Assign to Team(s){' '}
+        <span className="text-slate-400 font-normal normal-case">(all team members will be assigned)</span>
+      </label>
+      <div className="flex flex-wrap gap-2">
+        {projectTeams.map(team => {
+          const selected = selectedTeamIds.includes(String(team._id));
+          const memberCount = (team.members?.length || 0) + (team.teamLead ? 1 : 0);
+          return (
+            <button
+              key={team._id}
+              type="button"
+              onClick={() => toggle(String(team._id))}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-all
+                ${selected
+                  ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+                  : 'border-slate-200 bg-white text-slate-700 hover:border-blue-400 hover:bg-blue-50'
+                }`}
+            >
+              <span
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{ background: team.color || '#3B82F6' }}
+              />
+              {team.name}
+              <span className={`text-xs ${selected ? 'text-blue-200' : 'text-slate-400'}`}>
+                · {memberCount} member{memberCount !== 1 ? 's' : ''}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Summary of who will receive the task */}
+      {selectedTeamIds.length > 0 && (
+        <div className="mt-2 p-2.5 bg-blue-50 border border-blue-100 rounded-lg">
+          <p className="text-xs font-semibold text-blue-700 mb-1.5">Task will be assigned to all members of:</p>
+          <div className="flex flex-wrap gap-2">
+            {selectedTeamIds.map(tid => {
+              const team = projectTeams.find(t => String(t._id) === tid);
+              if (!team) return null;
+              const memberCount = (team.members?.length || 0) + (team.teamLead ? 1 : 0);
+              return (
+                <div key={tid} className="inline-flex items-center gap-1.5 px-2 py-1 bg-white border border-blue-200 rounded-lg text-xs">
+                  <span className="w-2 h-2 rounded-full" style={{ background: team.color || '#3B82F6' }} />
+                  <span className="font-medium text-slate-800">{team.name}</span>
+                  <span className="text-slate-400">({memberCount} member{memberCount !== 1 ? 's' : ''})</span>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-xs text-blue-500 mt-1.5">
+            Each team member will receive their own copy of this task.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 export default function ProjectDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { isManagerOrAdmin, user } = useAuth();
+  const { isManagerOrAdmin, isAdmin, isManagement, user } = useAuth();
   const [project, setProject]   = useState(null);
   const [tasks, setTasks]       = useState([]);
   const [allUsers, setAllUsers] = useState([]);
+  const [projectTeams, setProjectTeams] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab]           = useState('overview');
@@ -76,6 +158,7 @@ export default function ProjectDetailPage() {
   // Task add
   const [showAddTask, setShowAddTask] = useState(false);
   const [taskForm, setTaskForm] = useState({ title: '', description: '', priority: 'medium', status: 'todo', dueDate: '', assignee: '', type: 'task', parent: '' });
+  const [selectedTeamIds, setSelectedTeamIds] = useState([]);
   const [saving, setSaving]     = useState(false);
 
   // Member management
@@ -91,6 +174,9 @@ export default function ProjectDetailPage() {
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
   const [deleting, setDeleting] = useState(false);
 
+  // Delete task
+  const [deletingTaskId, setDeletingTaskId] = useState(null);
+
   const loadData = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     try {
@@ -99,9 +185,25 @@ export default function ProjectDetailPage() {
         taskAPI.getAll({ project: id }).catch(() => ({ data: { data: [] } })),
         userAPI.getAll().catch(() => ({ data: { data: [] } })),
       ]);
-      setProject(pRes.data.project || pRes.data.data);
+      const proj = pRes.data.project || pRes.data.data;
+      setProject(proj);
       setTasks(tRes.data.tasks || tRes.data.data || []);
       setAllUsers(uRes.data.users || uRes.data.data || []);
+
+      // Load teams for this project (populated with members + teamLead)
+      if (proj?.teams?.length) {
+        try {
+          const allTeamsRes = await teamAPI.getAll();
+          const allTeams = allTeamsRes.data.teams || allTeamsRes.data.data || [];
+          const projTeamIds = (proj.teams || []).map(t => String(t._id || t));
+          const filtered = allTeams.filter(t => projTeamIds.includes(String(t._id)));
+          setProjectTeams(filtered);
+        } catch {
+          setProjectTeams([]);
+        }
+      } else {
+        setProjectTeams([]);
+      }
     } catch {
       navigate('/projects');
     } finally {
@@ -113,22 +215,52 @@ export default function ProjectDetailPage() {
   useEffect(() => { loadData(); }, [id]);
 
   const isProjectLead = project && String(project.lead?._id || project.lead) === String(user?._id || user?.id);
-  // Admin/manager can fully manage; project lead can add/remove members and tasks
   const canManageProject = isManagerOrAdmin || isProjectLead;
-  // Only admin can edit or delete the project itself
   const canEditProject = isManagerOrAdmin;
+  const canDeleteTask = isManagerOrAdmin; // both admin and manager can delete tasks
+
+  // Manager-only (not admin)
+  const isManagerOnly = isManagement && !isAdmin;
 
   const handleCreateTask = async () => {
     setSaving(true);
     try {
-      const res = await taskAPI.create({ ...taskForm, project: id });
-      const newTask = res.data.data || res.data.task;
-      if (newTask) setTasks(t => [newTask, ...t]);
+      if (isManagerOnly && selectedTeamIds.length > 0) {
+        // Assign to ALL members of each selected team via assignToTeam flag
+        let firstTask = null;
+        for (const teamId of selectedTeamIds) {
+          const res = await taskAPI.create({
+            ...taskForm,
+            project: id,
+            team: teamId,
+            assignToTeam: true,
+          });
+          if (!firstTask) firstTask = res.data.task || res.data.data;
+        }
+        // Reload tasks to show all the new per-member tasks
+        const tRes = await taskAPI.getAll({ project: id }).catch(() => ({ data: { data: [] } }));
+        setTasks(tRes.data.tasks || tRes.data.data || []);
+        toast.success(`Task assigned to all members of ${selectedTeamIds.length} team(s)`);
+      } else {
+        // Admin or direct assignee path
+        const res = await taskAPI.create({ ...taskForm, project: id });
+        const newTask = res.data.data || res.data.task;
+        if (newTask) setTasks(t => [newTask, ...t]);
+        // Handle bulk (assign-to-all) response
+        if (res.data.tasks?.length > 1) {
+          setTasks(prev => [...res.data.tasks, ...prev]);
+        }
+        toast.success('Task created');
+      }
+
       setShowAddTask(false);
       setTaskForm({ title: '', description: '', priority: 'medium', status: 'todo', dueDate: '', assignee: '', type: 'task', parent: '' });
-      toast.success('Task created');
-    } catch (e) { toast.error(e.response?.data?.message || 'Failed to create task'); }
-    finally { setSaving(false); }
+      setSelectedTeamIds([]);
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to create task');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleStatusChange = async (taskId, newStatus) => {
@@ -136,6 +268,21 @@ export default function ProjectDetailPage() {
       await taskAPI.updateStatus(taskId, newStatus);
       setTasks(prev => prev.map(t => t._id === taskId ? { ...t, status: newStatus } : t));
     } catch (e) { console.error('Status update failed', e); }
+  };
+
+  // Delete a task — available to both admin and manager
+  const handleDeleteTask = async (taskId) => {
+    if (!window.confirm('Delete this task permanently? This cannot be undone.')) return;
+    setDeletingTaskId(taskId);
+    try {
+      await taskAPI.delete(taskId);
+      setTasks(prev => prev.filter(t => t._id !== taskId));
+      toast.success('Task deleted');
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to delete task');
+    } finally {
+      setDeletingTaskId(null);
+    }
   };
 
   const set = k => e => setTaskForm(p => ({ ...p, [k]: e.target.value }));
@@ -209,6 +356,12 @@ export default function ProjectDetailPage() {
     }
   };
 
+  const openAddTask = () => {
+    setTaskForm({ title: '', description: '', priority: 'medium', status: 'todo', dueDate: '', assignee: '', type: 'task', parent: '' });
+    setSelectedTeamIds([]);
+    setShowAddTask(true);
+  };
+
   if (loading) return <div className="flex items-center justify-center h-64"><Spinner size="lg" /></div>;
   if (!project) return null;
 
@@ -262,7 +415,6 @@ export default function ProjectDetailPage() {
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
 
-          {/* Edit Project — admin/manager only */}
           {canEditProject && (
             <button
               onClick={openEdit}
@@ -272,7 +424,6 @@ export default function ProjectDetailPage() {
             </button>
           )}
 
-          {/* Delete Project — admin/manager only */}
           {canEditProject && (
             <button
               onClick={() => { setShowDeleteModal(true); setDeleteConfirmName(''); }}
@@ -282,9 +433,8 @@ export default function ProjectDetailPage() {
             </button>
           )}
 
-          {/* Add Task — admin/manager/lead */}
           {canManageProject && (
-            <Button onClick={() => setShowAddTask(true)}>
+            <Button onClick={openAddTask}>
               <Plus className="w-4 h-4" />
               Add Task
             </Button>
@@ -292,7 +442,7 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      {/* ── Summary stats ─────────────────────────────────────────────────── */}
+      {/* ── Summary stats ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: 'Total Tasks',   value: tasks.length, color: 'text-slate-800' },
@@ -307,7 +457,7 @@ export default function ProjectDetailPage() {
         ))}
       </div>
 
-      {/* ── Progress bar ──────────────────────────────────────────────────── */}
+      {/* ── Progress bar ── */}
       <Card className="p-5">
         <div className="flex justify-between text-sm mb-2">
           <span className="font-semibold text-slate-700">Overall Progress</span>
@@ -331,7 +481,7 @@ export default function ProjectDetailPage() {
         )}
       </Card>
 
-      {/* ── Tabs ─────────────────────────────────────────────────────────── */}
+      {/* ── Tabs ── */}
       <div className="border-b border-slate-200">
         <div className="flex gap-6">
           {['overview', 'tasks', 'members'].map(t => (
@@ -358,7 +508,7 @@ export default function ProjectDetailPage() {
               title="No tasks yet"
               description="Add tasks to this project to get started"
               action={canManageProject && (
-                <Button onClick={() => setShowAddTask(true)}>
+                <Button onClick={openAddTask}>
                   <Plus className="w-4 h-4" /> Add First Task
                 </Button>
               )}
@@ -373,6 +523,7 @@ export default function ProjectDetailPage() {
                     <th className="text-center px-5 py-3">Priority</th>
                     <th className="text-center px-5 py-3">Status</th>
                     {canManageProject && <th className="text-center px-5 py-3">Update Status</th>}
+                    {canDeleteTask && <th className="text-center px-5 py-3">Delete</th>}
                     <th className="text-right px-5 py-3 hidden md:table-cell">Due</th>
                   </tr>
                 </thead>
@@ -384,6 +535,13 @@ export default function ProjectDetailPage() {
                           <p className="font-medium text-slate-900">{task.title}</p>
                           {task.description && (
                             <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{task.description}</p>
+                          )}
+                          {/* Show team badge if task was assigned via a team */}
+                          {task.team?.name && (
+                            <span className="inline-flex items-center gap-1 mt-1 text-xs px-1.5 py-0.5 rounded-md font-medium"
+                              style={{ background: (task.team.color || '#3B82F6') + '18', color: task.team.color || '#3B82F6' }}>
+                              {task.team.name}
+                            </span>
                           )}
                         </div>
                       </td>
@@ -413,11 +571,24 @@ export default function ProjectDetailPage() {
                           <select
                             value={task.status}
                             onChange={e => handleStatusChange(task._id, e.target.value)}
-                            className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-300 cursor-pointer min-w-27.5">
+                            className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-300 cursor-pointer min-w-[110px]">
                             {COLUMNS.map(c => (
                               <option key={c.key} value={c.key}>{c.label}</option>
                             ))}
                           </select>
+                        </td>
+                      )}
+                      {canDeleteTask && (
+                        <td className="px-5 py-3.5 text-center">
+                          <button
+                            onClick={() => handleDeleteTask(task._id)}
+                            disabled={deletingTaskId === task._id}
+                            className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
+                            title="Delete task">
+                            {deletingTaskId === task._id
+                              ? <Spinner size="xs" />
+                              : <Trash2 className="w-3.5 h-3.5" />}
+                          </button>
                         </td>
                       )}
                       <td className="px-5 py-3.5 text-right text-xs text-slate-400 hidden md:table-cell">
@@ -437,7 +608,6 @@ export default function ProjectDetailPage() {
       {/* ── Members Tab ── */}
       {tab === 'members' && (
         <div className="space-y-4">
-          {/* Add member: admin/manager OR project lead */}
           {canManageProject && (
             <Card className="p-4">
               <p className="text-sm font-semibold text-slate-900 mb-2">Add Member</p>
@@ -458,7 +628,6 @@ export default function ProjectDetailPage() {
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-            {/* Lead card */}
             <Card className="p-4 border-blue-200 bg-blue-50/40">
               <div className="flex items-center gap-3">
                 <Avatar name={project.lead?.name || '?'} size="md" />
@@ -513,6 +682,7 @@ export default function ProjectDetailPage() {
               ['Status',     project.status?.replace('-', ' ')],
               ['Category',   project.category],
               ['Members',    `${project.members?.length || 0} member(s)`],
+              ['Teams',      `${project.teams?.length || 0} team(s)`],
             ].map(([k, v]) => (
               <div key={k} className="flex justify-between text-sm border-b border-slate-50 pb-2 last:border-0 last:pb-0">
                 <span className="text-slate-500">{k}</span>
@@ -545,10 +715,34 @@ export default function ProjectDetailPage() {
               })}
             </div>
           </Card>
+
+          {/* Teams assigned to project */}
+          {projectTeams.length > 0 && (
+            <Card className="p-5 md:col-span-2">
+              <h3 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                <Users2 className="w-4 h-4 text-blue-600" />
+                Teams on this Project
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {projectTeams.map(team => (
+                  <div key={team._id} className="flex items-center gap-3 p-3 border border-slate-100 rounded-xl bg-slate-50">
+                    <span className="w-3 h-3 rounded-full shrink-0" style={{ background: team.color || '#3B82F6' }} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-900 truncate">{team.name}</p>
+                      {team.teamLead?.name && (
+                        <p className="text-xs text-slate-500">Lead: {team.teamLead.name}</p>
+                      )}
+                      <p className="text-xs text-slate-400">{team.members?.length || 0} member(s)</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
         </div>
       )}
 
-      {/* ── Add Task Modal ── */}
+      {/* ══ Add Task Modal ══════════════════════════════════════════════════ */}
       <Modal open={showAddTask} onClose={() => setShowAddTask(false)} title="Add Task to Project">
         <div className="space-y-4">
           <Input label="Title" value={taskForm.title} onChange={set('title')} placeholder="Task title" required />
@@ -570,20 +764,40 @@ export default function ProjectDetailPage() {
               <option value="high">High</option>
               <option value="critical">Critical</option>
             </Select>
-            <Select label="Assignee" value={taskForm.assignee} onChange={set('assignee')}>
-              <option value="">Unassigned</option>
-              {allUsers.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
-            </Select>
+            {/* Admin sees full user list; Manager uses team picker */}
+            {!isManagerOnly && (
+              <Select label="Assignee" value={taskForm.assignee} onChange={set('assignee')}>
+                <option value="">Unassigned</option>
+                {allUsers.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
+              </Select>
+            )}
           </div>
+
+          {/* Team picker for manager — assigns to ALL team members */}
+          {isManagerOnly && (
+            <TeamSelector
+              projectTeams={projectTeams}
+              selectedTeamIds={selectedTeamIds}
+              onChange={setSelectedTeamIds}
+            />
+          )}
+
           <Input label="Due Date" type="date" value={taskForm.dueDate} onChange={set('dueDate')} />
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="secondary" onClick={() => setShowAddTask(false)}>Cancel</Button>
-            <Button onClick={handleCreateTask} loading={saving} disabled={!taskForm.title}>Add Task</Button>
+            <Button
+              onClick={handleCreateTask}
+              loading={saving}
+              disabled={!taskForm.title || (isManagerOnly && selectedTeamIds.length === 0)}>
+              {isManagerOnly && selectedTeamIds.length > 0
+                ? `Assign to ${selectedTeamIds.length} Team(s)`
+                : 'Add Task'}
+            </Button>
           </div>
         </div>
       </Modal>
 
-      {/* ── Edit Project Modal (admin/manager only) ── */}
+      {/* ── Edit Project Modal ── */}
       <Modal open={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Project" size="lg">
         <div className="space-y-4">
           <Input
@@ -633,7 +847,7 @@ export default function ProjectDetailPage() {
         </div>
       </Modal>
 
-      {/* ── Delete Project Confirmation Modal (admin/manager only) ── */}
+      {/* ── Delete Project Confirmation Modal ── */}
       <Modal open={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="Delete Project" size="sm">
         <div className="space-y-4">
           <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">

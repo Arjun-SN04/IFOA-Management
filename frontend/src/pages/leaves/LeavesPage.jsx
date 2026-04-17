@@ -422,7 +422,7 @@ export default function LeavesPage() {
     setLoading(true);
     try {
       const calls = [leaveAPI.getMy().catch(() => ({ data: { leaves: [] } }))];
-      if (isManagerOrAdmin) calls.push(leaveAPI.getAll().catch(() => ({ data: { leaves: [] } })));
+      if (isManagerOrAdmin) calls.push(leaveAPI.getAll({ limit: 500 }).catch(() => ({ data: { leaves: [] } })));
       if (isAdmin) calls.push(leaveAPI.getResetSettings().catch(() => null));
       if (isAdmin) calls.push(import('../../api').then(m => m.userAPI.getAll()).catch(() => ({ data: { users: [] } })));
       const [myRes, allRes, resetRes, usersRes] = await Promise.all(calls);
@@ -527,9 +527,9 @@ export default function LeavesPage() {
 
   const tabs = [
     ...(!isAdmin ? [{ key: 'my', label: 'My Leaves' }] : []),
-    ...(!isAdmin ? [{ key: 'calendar', label: 'My Calendar', icon: CalendarRange }] : []),
+    ...(!isAdmin ? [{ key: 'my-calendar', label: 'My Calendar', icon: CalendarRange }] : []),
     ...(isManagerOrAdmin ? [{ key: 'team', label: 'Leave Dashboard' }] : []),
-    ...(isManagerOrAdmin ? [{ key: 'calendar', label: 'Team Calendar', icon: CalendarRange }] : []),
+    ...(isManagerOrAdmin ? [{ key: 'team-calendar', label: 'Team Calendar', icon: CalendarRange }] : []),
     ...(isAdmin ? [{ key: 'reset', label: 'Reset Schedule', icon: RotateCcw }] : []),
   ];
 
@@ -631,12 +631,12 @@ export default function LeavesPage() {
             <LeaveList leaves={teamLeaves} showUser onReview={setReviewModal} />
           </motion.div>
         )}
-        {tab === 'calendar' && isManagerOrAdmin && (
-          <motion.div key="calendar" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+        {tab === 'team-calendar' && isManagerOrAdmin && (
+          <motion.div key="team-calendar" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
             <LeaveCalendar leaves={myLeaves} allLeaves={teamLeaves} />
           </motion.div>
         )}
-        {tab === 'calendar' && !isManagerOrAdmin && (
+        {tab === 'my-calendar' && !isManagerOrAdmin && (
           <motion.div key="my-calendar" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
             <LeaveCalendar
               leaves={myLeaves}

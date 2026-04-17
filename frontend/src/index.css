@@ -55,6 +55,26 @@ body {
 ::-webkit-scrollbar-thumb { background: rgba(27,79,216,0.2); border-radius: 100px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(27,79,216,0.35); }
 
+/* Notification bell ring animation */
+@keyframes bell-ring {
+  0%   { transform: rotate(0deg); }
+  10%  { transform: rotate(20deg); }
+  20%  { transform: rotate(-18deg); }
+  30%  { transform: rotate(16deg); }
+  40%  { transform: rotate(-14deg); }
+  50%  { transform: rotate(10deg); }
+  60%  { transform: rotate(-8deg); }
+  70%  { transform: rotate(5deg); }
+  80%  { transform: rotate(-3deg); }
+  90%  { transform: rotate(1deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.bell-ring {
+  animation: bell-ring 0.8s ease-in-out;
+  transform-origin: top center;
+}
+
 /* Kanban horizontal scrollbar — neutral slate */
 .kanban-scroll::-webkit-scrollbar { height: 5px; width: 5px; }
 .kanban-scroll::-webkit-scrollbar-track { background: #F1F5F9; border-radius: 100px; }

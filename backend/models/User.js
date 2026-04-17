@@ -5,7 +5,7 @@ const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   email: { type: String, required: true, unique: true, lowercase: true },
   password: { type: String, required: true, minlength: 6 },
-  role: { type: String, enum: ['admin', 'manager', 'employee'], default: 'employee' },
+  role: { type: String, enum: ['admin', 'manager', 'team_lead', 'employee'], default: 'employee' },
   department: { type: String, trim: true },
   designation: { type: String, trim: true },
   phone: { type: String },
@@ -29,6 +29,7 @@ const userSchema = new mongoose.Schema({
   }],
   skills: [{ type: String }],
   manager: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  team: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
   resetPasswordToken: String,
   resetPasswordExpire: Date,
 }, { timestamps: true });

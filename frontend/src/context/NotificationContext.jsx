@@ -18,6 +18,7 @@ export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications]   = useState([]);
   const [unreadCount, setUnreadCount]       = useState(0);
   const [taskEvents, setTaskEvents]         = useState(null); // latest task socket event
+  const [bellRing, setBellRing]             = useState(0);   // increment to trigger ring
   const socketRef = useRef(null);
 
   // ── Initial load from REST ──────────────────────────────────────────────────
@@ -59,6 +60,7 @@ export const NotificationProvider = ({ children }) => {
     socket.on('notification:new', (notif) => {
       setNotifications(prev => [notif, ...prev]);
       setUnreadCount(prev => prev + 1);
+      setBellRing(prev => prev + 1); // trigger ring animation
 
       // Show toast popup
       toast(notif.message || notif.title, {
@@ -111,6 +113,7 @@ export const NotificationProvider = ({ children }) => {
       notifications,
       unreadCount,
       taskEvents,
+      bellRing,
       fetchNotifications,
       markRead,
       markAllRead,

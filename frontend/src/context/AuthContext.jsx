@@ -32,12 +32,37 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
-  const isAdmin = user?.role === 'admin';
-  const isManager = user?.role === 'manager';
-  const isManagerOrAdmin = isAdmin || isManager;
+  // ---- Role booleans (internal DB roles) ----
+  const isAdmin       = user?.role === 'admin';
+  const isManagement  = user?.role === 'manager';   // displayed as "Management"
+  const isTeamLead    = user?.role === 'team_lead'; // user with extra assignment powers
+  const isUser        = user?.role === 'employee';  // displayed as "User"
+
+  // Convenience groupings
+  const isManagerOrAdmin    = isAdmin || isManagement;           // Management + Admin (no team_lead)
+  const isTeamLeadOrAbove   = isAdmin || isManagement || isTeamLead; // Everyone elevated
+  const isElevated          = isTeamLeadOrAbove;                 // Alias — can assign tasks
+
+  // Role label for display
+  const roleLabel = (() => {
+    if (isAdmin)      return 'Admin';
+    if (isManagement) return 'Management';
+    if (isTeamLead)   return 'Team Lead';
+    return 'User';
+  })();
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, logout, loading, isAdmin, isManager, isManagerOrAdmin }}>
+    <AuthContext.Provider value={{
+      user, setUser, login, logout, loading,
+      isAdmin,
+      isManagement,   // = manager role
+      isTeamLead,
+      isUser,         // = employee role
+      isManagerOrAdmin,      // management + admin
+      isTeamLeadOrAbove,     // team_lead + management + admin
+      isElevated,            // alias for isTeamLeadOrAbove
+      roleLabel,
+    }}>
       {children}
     </AuthContext.Provider>
   );

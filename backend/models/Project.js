@@ -10,6 +10,7 @@ const projectSchema = new mongoose.Schema({
   endDate: { type: Date },
   lead: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   members: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  teams: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Team' }], // multiple teams can work on one project
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   category: { type: String, enum: ['software', 'marketing', 'operations', 'hr', 'finance', 'other'], default: 'software' },
   repository: { type: String }, // GitHub/GitLab link
@@ -18,3 +19,4 @@ const projectSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 module.exports = mongoose.model('Project', projectSchema);
+

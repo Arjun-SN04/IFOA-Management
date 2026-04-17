@@ -4,14 +4,14 @@ const {
   createTask, getTasks, getTaskById, updateTask,
   deleteTask, updateTaskStatus, assignTask, logTime, getMyTasks, updateTaskSprint
 } = require('../controllers/taskController');
-const { protect, adminOnly } = require('../middleware/authMiddleware');
+const { protect, managerOrAdmin } = require('../middleware/authMiddleware');
 
 router.post('/', protect, createTask);
 router.get('/', protect, getTasks);
 router.get('/my', protect, getMyTasks);
 router.get('/:id', protect, getTaskById);
 router.put('/:id', protect, updateTask);
-router.delete('/:id', protect, adminOnly, deleteTask);
+router.delete('/:id', protect, managerOrAdmin, deleteTask);
 router.patch('/:id/status', protect, updateTaskStatus);
 router.patch('/:id/assign',    protect, assignTask);
 router.patch('/:id/sprint',    protect, updateTaskSprint);
