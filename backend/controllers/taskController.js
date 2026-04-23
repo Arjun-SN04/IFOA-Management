@@ -6,7 +6,8 @@ const Team = require('../models/Team');
 const mongoose = require('mongoose');
 const { getIO } = require('../socket');
 
-// Helper to generate task key safely (e.g. PROJ-12)
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 const generateTaskKey = async (projectId) => {
   const project = await Project.findById(projectId).select('key name');
   if (!project) throw new Error('Project not found');
@@ -15,12 +16,9 @@ const generateTaskKey = async (projectId) => {
   return `${keyBase}-${count + 1}`;
 };
 
-// Helper: push a notification via DB + WebSocket
 const pushNotification = async ({ recipient, sender, type, title, message, link }) => {
   const notif = await Notification.create({ recipient, sender, type, title, message, link });
-  try {
-    getIO().to(`user:${recipient}`).emit('notification:new', notif);
-  } catch { /* socket may not be up in tests */ }
+  try { getIO().to(`user:${recipient}`).emit('notification:new', notif); } catch {}
   return notif;
 };
 
@@ -37,300 +35,268 @@ const createTaskWithRetry = async (payload) => {
   throw new Error('Unable to generate unique task key');
 };
 
-// Role hierarchy helpers
-const isAdmin       = (user) => user.role === 'admin';
-const isManagement  = (user) => user.role === 'manager';
-const isTeamLead    = (user) => user.role === 'team_lead';
-const isEmployee    = (user) => user.role === 'employee';
+// Role helpers
+const isAdmin      = (u) => u.role === 'admin';
+const isManager    = (u) => u.role === 'manager';
+const isHR         = (u) => u.role === 'hr';
+const isTeamLead   = (u) => u.role === 'team_lead';
+const isEmployee   = (u) => u.role === 'employee';
+// Elevated = can assign tasks to others
+const isElevated   = (u) => ['admin', 'manager', 'team_lead'].includes(u.role);
+// Management = admin + manager (not HR — HR cannot create/assign projects/teams)
+const isManagement = (u) => ['admin', 'manager'].includes(u.role);
 
-// Safely collect team member IDs even when legacy team docs are missing members arrays
-const collectTeamMemberIds = (teams = []) => {
-  return [...new Set(teams.flatMap((t) => (Array.isArray(t.members) ? t.members : []).map(String)))];
+const isValidObjectId = (v) => mongoose.Types.ObjectId.isValid(v);
+
+const collectTeamMemberIds = (teams = []) =>
+  [...new Set(teams.flatMap(t => (Array.isArray(t.members) ? t.members : []).map(String)))];
+
+const getUserTeams = (userId) =>
+  Team.find({ $or: [{ teamLead: userId }, { members: userId }] }).select('_id members teamLead');
+
+const areSameTeam = async (uid1, uid2) => {
+  const [t1, t2] = await Promise.all([getUserTeams(uid1), getUserTeams(uid2)]);
+  const set1 = new Set(t1.map(t => String(t._id)));
+  return t2.some(t => set1.has(String(t._id)));
 };
 
-const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
+const populateTask = (query) =>
+  query
+    .populate('assignee', 'name email avatar role')
+    .populate('claimedBy', 'name email avatar role')
+    .populate('reporter', 'name email')
+    .populate('project', 'name key')
+    .populate('sprint', 'name status')
+    .populate('parent', 'title taskKey type')
+    .populate('team', 'name color');
 
-// Can assign tasks to others (team lead, manager, admin)
-const canAssignToOthers = (user) => ['admin', 'manager', 'team_lead'].includes(user.role);
-
-// Get the team(s) a user belongs to
-const getUserTeams = async (userId) => {
-  return Team.find({ $or: [{ teamLead: userId }, { members: userId }] }).select('_id members teamLead');
+// ── Broadcast to a team room (all members + team lead) ───────────────────────
+const broadcastToTeam = async (teamId, event, payload) => {
+  try {
+    const io = getIO();
+    const team = await Team.findById(teamId).select('members teamLead');
+    if (!team) return;
+    const ids = [...new Set([
+      ...(team.members || []).map(String),
+      team.teamLead ? String(team.teamLead) : null,
+    ].filter(Boolean))];
+    ids.forEach(uid => io.to(`user:${uid}`).emit(event, payload));
+    io.to('admin').emit(event, payload);
+  } catch {}
 };
 
-// Check if two users are in the same team
-const areSameTeam = async (userId1, userId2) => {
-  const teams1 = await getUserTeams(userId1);
-  const teams2 = await getUserTeams(userId2);
-  const teamIds1 = new Set(teams1.map(t => String(t._id)));
-  return teams2.some(t => teamIds1.has(String(t._id)));
-};
-
-// @desc  Create task
+// ── CREATE TASK ───────────────────────────────────────────────────────────────
 // @route POST /api/tasks
-// Access: All authenticated users
-// - Admin/Management: can assign to anyone, assign to all, assign to whole team
-// - Team Lead: can assign to their team members only
-// - User (Employee): can assign to themselves OR to same-team members
 exports.createTask = async (req, res) => {
   try {
     const user = req.user;
-    const normalizedBody = {
-      ...req.body,
-      assignee: req.body.assignee || undefined,
-      team: req.body.team || undefined,
-      sprint: req.body.sprint || undefined,
-      parent: req.body.parent || undefined,
-    };
-    const isElevated = canAssignToOthers(user);
-    const assignToAll = isElevated && (!!req.body.assignToAll || normalizedBody.assignee === '__all__');
-    // NEW: assign to every member of a specific team
-    const assignToTeam = isElevated && !!req.body.assignToTeam && !!normalizedBody.team;
+    const body = { ...req.body };
 
-    let assignee = normalizedBody.assignee;
-    let teamId = normalizedBody.team || null;
+    // Clean empty strings
+    ['assignee', 'team', 'sprint', 'parent', 'dueDate'].forEach(k => {
+      if (!body[k]) delete body[k];
+    });
 
-    if (isEmployee(user)) {
-      // Employees can self-assign OR assign to same-team members
-      if (assignee && assignee !== String(user.id) && assignee !== '__all__') {
-        const sameTeam = await areSameTeam(String(user.id), assignee);
-        if (!sameTeam) {
-          assignee = user.id; // force self-assign if not same team
-        }
-      }
-    } else if (isTeamLead(user)) {
-      // Team leads can only assign within their team
-      if (assignee && assignee !== String(user.id) && assignee !== '__all__') {
-        const myTeams = await getUserTeams(user.id);
-        const myMemberIds = collectTeamMemberIds(myTeams);
-        if (!myMemberIds.includes(String(assignee))) {
-          return res.status(403).json({ success: false, message: 'Team leads can only assign tasks to their team members' });
-        }
-        // Automatically set team from team lead's team
-        if (!teamId && myTeams.length > 0) {
-          teamId = String(myTeams[0]._id);
-        }
-      }
-    }
-
-    // ── ASSIGN TO ENTIRE TEAM (all members + team lead) ──────────────────────
-    if (assignToTeam) {
-      const teamDoc = await Team.findById(teamId)
+    // ── ASSIGN TO ENTIRE TEAM as a SHARED task ────────────────────────────────
+    // Only manager/admin can do this
+    if (body.assignToTeam && body.team && isManagement(user)) {
+      const teamDoc = await Team.findById(body.team)
         .populate('members', '_id name')
         .populate('teamLead', '_id name');
-      if (!teamDoc) {
-        return res.status(404).json({ success: false, message: 'Team not found' });
-      }
+      if (!teamDoc) return res.status(404).json({ success: false, message: 'Team not found' });
 
-      // Collect unique member IDs: all members + team lead
       const memberIds = [
         ...new Set([
           ...(teamDoc.members || []).map(m => String(m._id || m)),
           teamDoc.teamLead ? String(teamDoc.teamLead._id || teamDoc.teamLead) : null,
         ].filter(Boolean))
       ];
+      if (!memberIds.length)
+        return res.status(400).json({ success: false, message: 'Team has no members' });
 
-      if (!memberIds.length) {
-        return res.status(400).json({ success: false, message: 'Team has no members to assign to' });
-      }
+      // Create ONE shared task (isTeamTask: true, no assignee, no claimedBy)
+      const sharedTask = await createTaskWithRetry({
+        title: body.title,
+        description: body.description,
+        project: body.project,
+        sprint: body.sprint,
+        team: body.team,
+        type: body.type || 'task',
+        status: 'backlog',
+        priority: body.priority || 'medium',
+        dueDate: body.dueDate,
+        parent: body.parent,
+        storyPoints: body.storyPoints,
+        reporter: user.id,
+        assignedByRole: user.role,
+        isTeamTask: true,
+        claimedBy: null,
+        claimedAt: null,
+      });
+
+      // Notify every team member
+      await Promise.all(memberIds.map(memberId =>
+        pushNotification({
+          recipient: memberId,
+          sender: user.id,
+          type: 'task_assigned',
+          title: 'New Team Task Assigned',
+          message: `A new task was assigned to your team: ${sharedTask.title}`,
+          link: `/tasks?taskId=${sharedTask._id}`,
+        })
+      ));
+
+      await populateTask(Task.findById(sharedTask._id)).then(t => {
+        broadcastToTeam(body.team, 'task:created', t);
+      });
+
+      const populated = await populateTask(Task.findById(sharedTask._id));
+      return res.status(201).json({ success: true, data: populated, task: populated });
+    }
+
+    // ── ASSIGN TO ALL EMPLOYEES ───────────────────────────────────────────────
+    if ((body.assignToAll || body.assignee === '__all__') && isManagement(user)) {
+      const recipients = await User.find({ role: 'employee', isActive: true }).select('_id');
+      if (!recipients.length)
+        return res.status(400).json({ success: false, message: 'No active employees found' });
 
       const tasks = [];
-      for (const memberId of memberIds) {
-        const task = await createTaskWithRetry({
-          ...normalizedBody,
-          assignee: memberId,
-          reporter: user.id,
-          team: teamId,
-          assignedByRole: user.role,
-          assignToTeam: undefined,
-          assignToAll: undefined,
+      for (const r of recipients) {
+        const t = await createTaskWithRetry({
+          ...body, assignee: r._id, reporter: user.id, assignedByRole: user.role,
+          assignToAll: undefined, assignee: r._id,
         });
-        tasks.push(task);
+        tasks.push(t);
       }
 
       await Promise.all(tasks.map(t =>
         pushNotification({
-          recipient: t.assignee,
-          sender: user.id,
-          type: 'task_assigned',
-          title: 'New Task Assigned',
-          message: `You have been assigned: ${t.title}`,
+          recipient: t.assignee, sender: user.id, type: 'task_assigned',
+          title: 'New Task Assigned', message: `You have been assigned: ${t.title}`,
           link: `/tasks?taskId=${t._id}`,
         })
       ));
 
-      const populated = await Task.find({ _id: { $in: tasks.map(t => t._id) } })
-        .populate('assignee', 'name email avatar role')
-        .populate('reporter', 'name email')
-        .populate('project', 'name key')
-        .populate('team', 'name color')
-        .sort({ createdAt: -1 });
-
-      try { getIO().to('admin').emit('task:created', populated[0]); } catch {}
-      return res.status(201).json({ success: true, data: populated[0], task: populated[0], tasks: populated });
-    }
-
-    // ── ASSIGN TO ALL EMPLOYEES ───────────────────────────────────────────────
-    if (assignToAll) {
-      const recipients = await User.find({ role: 'employee', isActive: true }).select('_id');
-      if (!recipients.length) {
-        return res.status(400).json({ success: false, message: 'No active employees available for assign-to-all' });
-      }
-
-      const tasks = [];
-      for (const recipient of recipients) {
-        const task = await createTaskWithRetry({
-          ...normalizedBody,
-          assignee: recipient._id,
-          reporter: user.id,
-          team: teamId || undefined,
-          assignedByRole: user.role,
-          assignToAll: undefined,
-        });
-        tasks.push(task);
-      }
-
-      await Promise.all(
-        tasks.map((createdTask) =>
-          pushNotification({
-            recipient: createdTask.assignee,
-            sender: user.id,
-            type: 'task_assigned',
-            title: 'New Task Assigned',
-            message: `You have been assigned task: ${createdTask.title}`,
-            link: `/tasks?taskId=${createdTask._id}`,
-          })
-        )
-      );
-
-      const populated = await Task.find({ _id: { $in: tasks.map((t) => t._id) } })
-        .populate('assignee', 'name email avatar role')
-        .populate('reporter', 'name email')
-        .populate('project', 'name key')
-        .populate('team', 'name color')
-        .sort({ createdAt: -1 });
-
+      const populated = await populateTask(Task.find({ _id: { $in: tasks.map(t => t._id) } }));
       try { getIO().to('admin').emit('task:created', populated[0]); } catch {}
       return res.status(201).json({ success: true, data: populated[0], task: populated[0], tasks: populated });
     }
 
     // ── SINGLE TASK ───────────────────────────────────────────────────────────
+    let { assignee } = body;
+
+    // Employee: can only self-assign or assign to same-team member
+    if (isEmployee(user)) {
+      if (assignee && assignee !== String(user.id)) {
+        const same = await areSameTeam(String(user.id), assignee);
+        if (!same) assignee = user.id;
+      }
+      if (!assignee) assignee = user.id;
+    }
+
+    // Team lead: can only assign within their team
+    if (isTeamLead(user) && assignee && assignee !== String(user.id)) {
+      const myTeams = await getUserTeams(user.id);
+      const memberIds = collectTeamMemberIds(myTeams);
+      if (!memberIds.includes(String(assignee))) {
+        return res.status(403).json({ success: false, message: 'Team leads can only assign tasks to their team members' });
+      }
+    }
+
+    // HR: can create tasks but cannot assign to teams as shared tasks
+    if (isHR(user) && assignee === '__all__') {
+      return res.status(403).json({ success: false, message: 'HR cannot assign tasks to all employees' });
+    }
+
     const task = await createTaskWithRetry({
-      ...normalizedBody,
+      ...body,
       assignee: assignee || undefined,
       reporter: user.id,
-      team: teamId || undefined,
       assignedByRole: user.role,
+      isTeamTask: false,
       assignToAll: undefined,
       assignToTeam: undefined,
     });
 
-    // Notify assignee if different from creator
+    // Notify assignee
     if (task.assignee && String(task.assignee) !== String(user.id)) {
       await pushNotification({
-        recipient: task.assignee,
-        sender:    user.id,
-        type:      'task_assigned',
-        title:     'New Task Assigned',
-        message:   `You have been assigned task: ${task.title}`,
-        link:      `/tasks?taskId=${task._id}`,
+        recipient: task.assignee, sender: user.id, type: 'task_assigned',
+        title: 'New Task Assigned', message: `You have been assigned: ${task.title}`,
+        link: `/tasks?taskId=${task._id}`,
       });
     }
 
-    // Notify management/team lead when employee raises a ticket
-    if (isEmployee(user)) {
-      const managers = await User.find({ role: { $in: ['admin', 'manager', 'team_lead'] }, isActive: true }).select('_id');
+    // Notify management when employee/team_lead raises a ticket
+    if (isEmployee(user) || isTeamLead(user)) {
+      const managers = await User.find({ role: { $in: ['admin', 'manager', 'hr', 'team_lead'] }, isActive: true }).select('_id');
       await Promise.all(managers.map(m =>
         pushNotification({
-          recipient: m._id,
-          sender: user.id,
-          type: 'task_assigned',
-          title: 'New Ticket Raised',
-          message: `${user.name} raised a ticket: ${task.title}`,
+          recipient: m._id, sender: user.id, type: 'task_assigned',
+          title: 'New Ticket Raised', message: `${user.name} raised a ticket: ${task.title}`,
           link: `/tasks?taskId=${task._id}`,
         })
       ));
     }
 
-    await task.populate([
-      { path: 'assignee', select: 'name email avatar role' },
-      { path: 'reporter', select: 'name email' },
-      { path: 'project',  select: 'name key' },
-      { path: 'team',     select: 'name color' },
-    ]);
-
-    try { getIO().to('admin').emit('task:created', task); } catch {}
-
-    res.status(201).json({ success: true, data: task, task });
+    const populated = await populateTask(Task.findById(task._id));
+    try { getIO().to('admin').emit('task:created', populated); } catch {}
+    res.status(201).json({ success: true, data: populated, task: populated });
   } catch (err) {
-    if (err.name === 'ValidationError' || err.name === 'CastError') {
+    if (err.name === 'ValidationError' || err.name === 'CastError')
       return res.status(400).json({ success: false, message: err.message });
-    }
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// @desc  Get tasks (with filters, scoped by role)
+// ── GET TASKS ─────────────────────────────────────────────────────────────────
 // @route GET /api/tasks
-// - Admin/Management: see ALL tasks across all projects
-// - Team Lead: see tasks for their team's members only
-// - User (Employee): see only tasks assigned to them
 exports.getTasks = async (req, res) => {
   try {
     const { project, sprint, assignee, status, type, priority, search, page = 1, limit = 100 } = req.query;
-    const pageNum = Math.max(1, Number.parseInt(page, 10) || 1);
-    const limitNum = Math.min(500, Math.max(1, Number.parseInt(limit, 10) || 100));
+    const pageNum  = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(500, Math.max(1, parseInt(limit, 10) || 100));
     const query = {};
-    if (project && isValidObjectId(project))  query.project  = project;
-    if (sprint && isValidObjectId(sprint))    query.sprint   = sprint;
+
+    if (project && isValidObjectId(project))   query.project  = project;
+    if (sprint && isValidObjectId(sprint))     query.sprint   = sprint;
     if (assignee && isValidObjectId(assignee)) query.assignee = assignee;
     if (status)   query.status   = status;
     if (type)     query.type     = type;
     if (priority) query.priority = priority;
     if (search)   query.title    = { $regex: search, $options: 'i' };
 
+    const { team: teamFilter } = req.query;
+    if (teamFilter && isValidObjectId(teamFilter)) query.team = teamFilter;
+
     const user = req.user;
 
     if (isEmployee(user)) {
-      // Users see ONLY tasks assigned to them or reported by them
+      const myTeams = await getUserTeams(user.id);
+      const myTeamIds = myTeams.map(t => String(t._id));
       query.$or = [
-        { assignee: user.id },
-        { reporter: user.id },
+        { assignee: user.id, isTeamTask: false },
+        { reporter: user.id, isTeamTask: false },
+        { isTeamTask: true, team: { $in: myTeamIds }, $or: [{ claimedBy: null }, { claimedBy: user.id }] },
       ];
     } else if (isTeamLead(user)) {
-      // Team leads see all tasks assigned to their team members
       const myTeams = await getUserTeams(user.id);
+      const myTeamIds = myTeams.map(t => String(t._id));
       const myMemberIds = collectTeamMemberIds(myTeams);
-      if (myMemberIds.length > 0) {
-        const projectFilter = project ? [project] : undefined;
-        if (projectFilter) {
-          query.project = { $in: projectFilter };
-          query.$or = [
-            { assignee: { $in: myMemberIds } },
-            { reporter: user.id },
-          ];
-        } else {
-          query.$or = [
-            { assignee: { $in: myMemberIds } },
-            { reporter: user.id },
-          ];
-        }
-      } else {
-        query.$or = [{ assignee: user.id }, { reporter: user.id }];
-      }
+      query.$or = [
+        { assignee: { $in: myMemberIds }, isTeamTask: false },
+        { reporter: user.id },
+        { isTeamTask: true, team: { $in: myTeamIds } },
+      ];
     }
-    // admins and managers see everything — no extra filter
+    // HR, admin, manager see everything
 
-    const tasks = await Task.find(query)
-      .populate('assignee', 'name email avatar role')
-      .populate('reporter', 'name email')
-      .populate('project',  'name key')
-      .populate('sprint',   'name status')
-      .populate('parent',   'title taskKey type')
-      .populate('team',     'name color')
-      .skip((pageNum - 1) * limitNum)
-      .limit(limitNum)
-      .sort({ order: 1, createdAt: -1 });
+    const tasks = await populateTask(
+      Task.find(query)
+        .skip((pageNum - 1) * limitNum)
+        .limit(limitNum)
+        .sort({ order: 1, createdAt: -1 })
+    );
 
     const total = await Task.countDocuments(query);
     res.json({ success: true, total, data: tasks, tasks });
@@ -339,18 +305,87 @@ exports.getTasks = async (req, res) => {
   }
 };
 
-// @desc  Get single task
+// ── GET MY TASKS (personal board) ────────────────────────────────────────────
+// @route GET /api/tasks/my
+exports.getMyTasks = async (req, res) => {
+  try {
+    const user = req.user;
+    const { status } = req.query;
+    const myTeams = await getUserTeams(user.id);
+    const myTeamIds = myTeams.map(t => String(t._id));
+
+    // Only return tasks where I am the ASSIGNEE (not just reporter).
+    // This ensures tasks assigned to teammates do NOT show in the assigner's board.
+    // Team tasks: show unclaimed pool tasks + tasks I claimed myself.
+    const query = {
+      $or: [
+        { assignee: user.id, isTeamTask: false },
+        { isTeamTask: true, team: { $in: myTeamIds }, $or: [{ claimedBy: null }, { claimedBy: user.id }] },
+      ]
+    };
+    if (status) query.status = status;
+
+    const tasks = await populateTask(
+      Task.find(query).sort({ priority: -1, dueDate: 1 })
+    );
+    res.json({ success: true, data: tasks, tasks });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ── GET ASSIGNABLE USERS FOR TASK CREATION ─────────────────────────────────
+// @route GET /api/tasks/assignable-users
+exports.getAssignableUsers = async (req, res) => {
+  try {
+    const user = req.user;
+
+    if (isManagement(user) || isHR(user)) {
+      const users = await User.find({
+        role: { $in: ['employee', 'team_lead'] },
+        isActive: true,
+      })
+        .select('name email avatar role department')
+        .sort({ name: 1 });
+      return res.json({ success: true, users, data: users });
+    }
+
+    const myTeams = await Team.find({ $or: [{ teamLead: user.id }, { members: user.id }] })
+      .select('members teamLead');
+
+    const ids = new Set([String(user.id)]);
+    myTeams.forEach((team) => {
+      (team.members || []).forEach((memberId) => ids.add(String(memberId)));
+      if (team.teamLead) ids.add(String(team.teamLead));
+    });
+
+    const users = await User.find({
+      _id: { $in: Array.from(ids) },
+      role: { $in: ['employee', 'team_lead'] },
+      isActive: true,
+    })
+      .select('name email avatar role department')
+      .sort({ name: 1 });
+
+    res.json({ success: true, users, data: users });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ── GET SINGLE TASK ───────────────────────────────────────────────────────────
 // @route GET /api/tasks/:id
 exports.getTaskById = async (req, res) => {
   try {
     const task = await Task.findById(req.params.id)
       .populate('assignee', 'name email avatar department role')
+      .populate('claimedBy', 'name email avatar role')
       .populate('reporter', 'name email avatar')
       .populate('watchers', 'name email')
-      .populate('project',  'name key')
-      .populate('sprint',   'name status startDate endDate')
-      .populate('parent',   'title taskKey')
-      .populate('team',     'name color');
+      .populate('project', 'name key')
+      .populate('sprint', 'name status startDate endDate')
+      .populate('parent', 'title taskKey')
+      .populate('team', 'name color');
     if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
     res.json({ success: true, task });
   } catch (err) {
@@ -358,7 +393,7 @@ exports.getTaskById = async (req, res) => {
   }
 };
 
-// @desc  Update task
+// ── UPDATE TASK ───────────────────────────────────────────────────────────────
 // @route PUT /api/tasks/:id
 exports.updateTask = async (req, res) => {
   try {
@@ -368,44 +403,41 @@ exports.updateTask = async (req, res) => {
     const user = req.user;
 
     if (isEmployee(user)) {
-      const isOwner = String(oldTask.assignee) === String(user.id) || String(oldTask.reporter) === String(user.id);
+      const isOwner = String(oldTask.assignee) === String(user.id)
+        || String(oldTask.reporter) === String(user.id)
+        || String(oldTask.claimedBy) === String(user.id);
       if (!isOwner) return res.status(403).json({ success: false, message: 'Not authorized to update this task' });
-      const allowedFields = ['status', 'loggedHours'];
+      const allowed = ['status', 'loggedHours'];
       const filtered = {};
-      allowedFields.forEach(f => { if (req.body[f] !== undefined) filtered[f] = req.body[f]; });
+      allowed.forEach(f => { if (req.body[f] !== undefined) filtered[f] = req.body[f]; });
       req.body = filtered;
     } else if (isTeamLead(user)) {
       if (req.body.assignee && req.body.assignee !== String(oldTask.assignee)) {
         const myTeams = await getUserTeams(user.id);
-        const myMemberIds = collectTeamMemberIds(myTeams);
-        if (!myMemberIds.includes(String(req.body.assignee))) {
-          return res.status(403).json({ success: false, message: 'Team leads can only assign within their team' });
-        }
+        const ids = collectTeamMemberIds(myTeams);
+        if (!ids.includes(String(req.body.assignee)))
+          return res.status(403).json({ success: false, message: 'Team leads can only reassign within their team' });
       }
     }
 
     if (req.body.status === 'done' && oldTask.status !== 'done')   req.body.completedDate = new Date();
     if (req.body.status && req.body.status !== 'done' && oldTask.status === 'done') req.body.completedDate = null;
 
-    const task = await Task.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true })
-      .populate('assignee', 'name email avatar role')
-      .populate('reporter', 'name email')
-      .populate('project',  'name key')
-      .populate('team',     'name color');
+    const task = await populateTask(
+      Task.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true })
+    );
 
-    if (req.body.assignee && req.body.assignee !== oldTask.assignee?.toString()) {
+    if (req.body.assignee && req.body.assignee !== String(oldTask.assignee)) {
       await pushNotification({
-        recipient: req.body.assignee,
-        sender:    user.id,
-        type:      'task_assigned',
-        title:     'Task Assigned to You',
-        message:   `Task "${task.title}" has been assigned to you`,
-        link:      `/tasks?taskId=${task._id}`,
+        recipient: req.body.assignee, sender: user.id, type: 'task_assigned',
+        title: 'Task Assigned to You', message: `"${task.title}" has been assigned to you`,
+        link: `/tasks?taskId=${task._id}`,
       });
     }
 
     try { getIO().to('admin').emit('task:updated', task); } catch {}
-    if (task.assignee) {
+    if (task.team) broadcastToTeam(String(task.team._id || task.team), 'task:updated', task);
+    else if (task.assignee) {
       try { getIO().to(`user:${task.assignee._id}`).emit('task:updated', task); } catch {}
     }
 
@@ -415,27 +447,107 @@ exports.updateTask = async (req, res) => {
   }
 };
 
-// @desc  Update task status (drag & drop / quick update)
+// ── UPDATE TASK STATUS (drag & drop / manual) ─────────────────────────────────
 // @route PATCH /api/tasks/:id/status
+//
+// Status pipeline: backlog → todo → in-progress → in-review → done
+// RULE: Non-admin/non-manager users can only move tasks ONE step at a time
+//       (one forward or one backward). Admin and Manager can jump freely.
+const STATUS_ORDER = ['backlog', 'todo', 'in-progress', 'in-review', 'done'];
+
+const isAdjacentStatus = (from, to) => {
+  const fromIdx = STATUS_ORDER.indexOf(from);
+  const toIdx   = STATUS_ORDER.indexOf(to);
+  if (fromIdx === -1 || toIdx === -1) return false;
+  return Math.abs(toIdx - fromIdx) === 1;
+};
+
 exports.updateTaskStatus = async (req, res) => {
   try {
     const { status, order } = req.body;
-
-    const existing = await Task.findById(req.params.id);
+    const existing = await Task.findById(req.params.id).populate('team', '_id name');
     if (!existing) return res.status(404).json({ success: false, message: 'Task not found' });
 
     const user = req.user;
 
-    if (isEmployee(user)) {
-      const isOwner = String(existing.assignee) === String(user.id) || String(existing.reporter) === String(user.id);
-      if (!isOwner) return res.status(403).json({ success: false, message: 'Not authorized' });
-    } else if (isTeamLead(user)) {
+    // ── STEP-BY-STEP ENFORCEMENT ──────────────────────────────────────────────
+    // Admin and Manager can jump freely; everyone else must move one step at a time.
+    if (!isManagement(user) && status !== existing.status) {
+      if (!isAdjacentStatus(existing.status, status)) {
+        const fromLabel = existing.status.replace(/-/g, ' ');
+        const toLabel   = status.replace(/-/g, ' ');
+        return res.status(400).json({
+          success: false,
+          message: `Tasks must move one step at a time. Cannot move from "${fromLabel}" to "${toLabel}" directly.`,
+        });
+      }
+    }
+
+    // ── SHARED TEAM TASK CLAIM LOGIC ──────────────────────────────────────────
+    if (existing.isTeamTask) {
       const myTeams = await getUserTeams(user.id);
-      const myMemberIds = collectTeamMemberIds(myTeams);
-      const isOwner = String(existing.assignee) === String(user.id) ||
-                      String(existing.reporter) === String(user.id) ||
-                      myMemberIds.includes(String(existing.assignee));
-      if (!isOwner) return res.status(403).json({ success: false, message: 'Not authorized' });
+      const myTeamIds = myTeams.map(t => String(t._id));
+      const taskTeamId = String(existing.team?._id || existing.team || '');
+      const isMember = myTeamIds.includes(taskTeamId) || isManagement(user) || isHR(user);
+
+      if (!isMember)
+        return res.status(403).json({ success: false, message: 'You are not a member of this task\'s team' });
+
+      // Moving from backlog → any active status = CLAIM the task
+      if (existing.status === 'backlog' && status !== 'backlog') {
+        if (existing.claimedBy && String(existing.claimedBy) !== String(user.id) && !isManagement(user)) {
+          return res.status(409).json({
+            success: false,
+            message: 'This task has already been claimed by another team member',
+          });
+        }
+
+        const update = { status, claimedBy: user.id, claimedAt: new Date() };
+        if (order !== undefined) update.order = order;
+        if (status === 'done') update.completedDate = new Date();
+
+        const task = await populateTask(
+          Task.findByIdAndUpdate(req.params.id, update, { new: true })
+        );
+
+        const teamId = String(task.team?._id || task.team);
+        broadcastToTeam(teamId, 'task:claimed', { task, claimedBy: user.id });
+
+        const teamDoc = await Team.findById(teamId).select('members teamLead');
+        const othersToNotify = [
+          ...(teamDoc?.members || []).map(String),
+          teamDoc?.teamLead ? String(teamDoc.teamLead) : null,
+        ].filter(id => id && id !== String(user.id));
+
+        await Promise.all(othersToNotify.map(uid =>
+          pushNotification({
+            recipient: uid, sender: user.id, type: 'task_assigned',
+            title: 'Team Task Claimed',
+            message: `${user.name} has picked up: "${task.title}"`,
+            link: `/tasks?taskId=${task._id}`,
+          })
+        ));
+
+        return res.json({ success: true, task, claimed: true });
+      }
+
+      if (existing.claimedBy && String(existing.claimedBy) !== String(user.id) && !isManagement(user)) {
+        return res.status(403).json({ success: false, message: 'Only the team member who claimed this task can update its status' });
+      }
+    } else {
+      // Personal task auth
+      if (isEmployee(user)) {
+        const isOwner = String(existing.assignee) === String(user.id)
+          || String(existing.reporter) === String(user.id);
+        if (!isOwner) return res.status(403).json({ success: false, message: 'Not authorized' });
+      } else if (isTeamLead(user)) {
+        const myTeams = await getUserTeams(user.id);
+        const ids = collectTeamMemberIds(myTeams);
+        const isOwner = String(existing.assignee) === String(user.id)
+          || String(existing.reporter) === String(user.id)
+          || ids.includes(String(existing.assignee));
+        if (!isOwner) return res.status(403).json({ success: false, message: 'Not authorized' });
+      }
     }
 
     const update = { status };
@@ -443,14 +555,14 @@ exports.updateTaskStatus = async (req, res) => {
     if (status === 'done') update.completedDate = new Date();
     if (status !== 'done') update.completedDate = null;
 
-    const task = await Task.findByIdAndUpdate(req.params.id, update, { new: true })
-      .populate('assignee', 'name email avatar role')
-      .populate('project',  'name key')
-      .populate('team',     'name color');
+    const task = await populateTask(
+      Task.findByIdAndUpdate(req.params.id, update, { new: true })
+    );
 
     const payload = { task, statusChanged: true };
     try { getIO().to('admin').emit('task:statusChanged', payload); } catch {}
-    if (task.assignee) {
+    if (task.team) broadcastToTeam(String(task.team._id || task.team), 'task:statusChanged', payload);
+    else if (task.assignee) {
       try { getIO().to(`user:${task.assignee._id}`).emit('task:statusChanged', payload); } catch {}
     }
 
@@ -460,30 +572,48 @@ exports.updateTaskStatus = async (req, res) => {
   }
 };
 
-// @desc  Delete task
+// ── DELETE TASK ───────────────────────────────────────────────────────────────
 // @route DELETE /api/tasks/:id
-// Access: Admin + Manager
 exports.deleteTask = async (req, res) => {
   try {
-    // Allow admin AND manager to delete tasks
-    if (!['admin', 'manager'].includes(req.user.role)) {
-      return res.status(403).json({ success: false, message: 'Only managers and admins can delete tasks' });
-    }
-    const task = await Task.findByIdAndDelete(req.params.id);
+    const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
-    try { getIO().to('admin').emit('task:deleted', { taskId: req.params.id }); } catch {}
-    res.json({ success: true, message: 'Task deleted' });
+
+    const user = req.user;
+
+    // Managers and admins can delete anything
+    if (['admin', 'manager'].includes(user.role)) {
+      await Task.findByIdAndDelete(req.params.id);
+      try { getIO().to('admin').emit('task:deleted', { taskId: req.params.id }); } catch {}
+      if (task.team) broadcastToTeam(String(task.team), 'task:deleted', { taskId: req.params.id });
+      return res.json({ success: true, message: 'Task deleted' });
+    }
+
+    // Employees/team leads can delete their own personal (non-team) tasks
+    if (!task.isTeamTask) {
+      const isOwner = String(task.assignee) === String(user.id)
+        || String(task.reporter) === String(user.id);
+      if (!isOwner) {
+        return res.status(403).json({ success: false, message: 'You can only delete tasks you created or are assigned to' });
+      }
+      await Task.findByIdAndDelete(req.params.id);
+      try { getIO().to(`user:${user.id}`).emit('task:deleted', { taskId: req.params.id }); } catch {}
+      return res.json({ success: true, message: 'Task deleted' });
+    }
+
+    return res.status(403).json({ success: false, message: 'Team tasks can only be deleted by managers or admins' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// @desc  Log time on task
+
+// ── LOG TIME ──────────────────────────────────────────────────────────────────
 // @route POST /api/tasks/:id/log-time
 exports.logTime = async (req, res) => {
   try {
     const { hours } = req.body;
-    if (!hours || hours <= 0) return res.status(400).json({ success: false, message: 'Hours must be a positive number' });
+    if (!hours || hours <= 0) return res.status(400).json({ success: false, message: 'Hours must be positive' });
     const task = await Task.findByIdAndUpdate(req.params.id, { $inc: { loggedHours: hours } }, { new: true });
     if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
     res.json({ success: true, task });
@@ -492,129 +622,41 @@ exports.logTime = async (req, res) => {
   }
 };
 
-// @desc  My tasks — ALL statuses (for current user's personal board)
-// @route GET /api/tasks/my
-exports.getMyTasks = async (req, res) => {
-  try {
-    const { status } = req.query;
-    const query = {
-      $or: [
-        { assignee: req.user.id },
-        { reporter: req.user.id },
-      ]
-    };
-    if (status) query.status = status;
-
-    const tasks = await Task.find(query)
-      .populate('project', 'name key')
-      .populate('sprint',  'name')
-      .populate('parent',  'title taskKey type')
-      .populate('team',    'name color')
-      .sort({ priority: -1, dueDate: 1 });
-
-    res.json({ success: true, data: tasks, tasks });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-// @desc  Assign task
+// ── ASSIGN TASK ───────────────────────────────────────────────────────────────
 // @route PATCH /api/tasks/:id/assign
 exports.assignTask = async (req, res) => {
   try {
     const user = req.user;
-    const { assignee, assignToAll } = req.body;
+    const { assignee } = req.body;
     const baseTask = await Task.findById(req.params.id);
     if (!baseTask) return res.status(404).json({ success: false, message: 'Task not found' });
 
     if (isEmployee(user)) {
-      if (!assignee) return res.status(400).json({ success: false, message: 'assignee is required' });
-      const sameTeam = await areSameTeam(String(user.id), String(assignee));
-      if (!sameTeam) {
-        return res.status(403).json({ success: false, message: 'You can only assign tasks to your team members' });
-      }
+      const same = await areSameTeam(String(user.id), String(assignee));
+      if (!same) return res.status(403).json({ success: false, message: 'You can only assign tasks to your team members' });
     }
 
-    if (isTeamLead(user)) {
-      if (assignee && assignee !== '__all__') {
-        const myTeams = await getUserTeams(user.id);
-        const myMemberIds = collectTeamMemberIds(myTeams);
-        if (!myMemberIds.includes(String(assignee))) {
-          return res.status(403).json({ success: false, message: 'Team leads can only assign tasks within their team' });
-        }
-      }
+    if (isHR(user)) {
+      return res.status(403).json({ success: false, message: 'HR cannot reassign tasks' });
     }
 
-    if ((assignToAll || assignee === '__all__') && !['admin', 'manager'].includes(user.role)) {
-      return res.status(403).json({ success: false, message: 'Only Management or Admin can assign to all employees' });
+    if (isTeamLead(user) && assignee && assignee !== '__all__') {
+      const myTeams = await getUserTeams(user.id);
+      const ids = collectTeamMemberIds(myTeams);
+      if (!ids.includes(String(assignee)))
+        return res.status(403).json({ success: false, message: 'Team leads can only assign within their team' });
     }
 
-    if (assignToAll || assignee === '__all__') {
-      const recipients = await User.find({ role: 'employee', isActive: true }).select('_id');
-      if (!recipients.length) {
-        return res.status(400).json({ success: false, message: 'No active employees available for assign-to-all' });
-      }
-
-      const clones = [];
-      for (const recipient of recipients) {
-        if (String(baseTask.assignee || '') === String(recipient._id)) continue;
-        const clone = await createTaskWithRetry({
-          title: baseTask.title,
-          description: baseTask.description,
-          project: baseTask.project,
-          sprint: baseTask.sprint,
-          team: baseTask.team,
-          type: baseTask.type,
-          status: baseTask.status,
-          priority: baseTask.priority,
-          dueDate: baseTask.dueDate,
-          parent: baseTask.parent,
-          reporter: user.id,
-          assignee: recipient._id,
-          assignedByRole: user.role,
-        });
-        clones.push(clone);
-      }
-
-      await Promise.all(
-        clones.map((clone) =>
-          pushNotification({
-            recipient: clone.assignee,
-            sender: user.id,
-            type: 'task_assigned',
-            title: 'Task Assigned to You',
-            message: `Task "${clone.title}" has been assigned to you`,
-            link: `/tasks?taskId=${clone._id}`,
-          })
-        )
-      );
-
-      const populated = await Task.find({ _id: { $in: clones.map((c) => c._id) } })
-        .populate('assignee', 'name email avatar role')
-        .populate('project', 'name key')
-        .populate('team', 'name color')
-        .sort({ createdAt: -1 });
-
-      try { getIO().to('admin').emit('task:updated', baseTask); } catch {}
-      return res.json({ success: true, task: baseTask, tasks: populated, message: 'Assigned to all employees' });
-    }
-
-    const task = await Task.findByIdAndUpdate(
-      req.params.id,
-      { assignee, assignedByRole: user.role },
-      { new: true }
-    ).populate('assignee', 'name email avatar role')
-     .populate('team', 'name color');
+    const task = await populateTask(
+      Task.findByIdAndUpdate(req.params.id, { assignee, assignedByRole: user.role }, { new: true })
+    );
     if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
 
-    if (assignee && assignee !== user.id.toString()) {
+    if (assignee && assignee !== String(user.id)) {
       await pushNotification({
-        recipient: assignee,
-        sender:    user.id,
-        type:      'task_assigned',
-        title:     'Task Assigned to You',
-        message:   `Task "${task.title}" has been assigned to you`,
-        link:      `/tasks?taskId=${task._id}`,
+        recipient: assignee, sender: user.id, type: 'task_assigned',
+        title: 'Task Assigned to You', message: `"${task.title}" has been assigned to you`,
+        link: `/tasks?taskId=${task._id}`,
       });
     }
 
@@ -625,20 +667,14 @@ exports.assignTask = async (req, res) => {
   }
 };
 
-// @desc  Assign or remove task from sprint
+// ── UPDATE SPRINT ─────────────────────────────────────────────────────────────
 // @route PATCH /api/tasks/:id/sprint
 exports.updateTaskSprint = async (req, res) => {
   try {
     const { sprintId } = req.body;
-    const task = await Task.findByIdAndUpdate(
-      req.params.id,
-      { sprint: sprintId || null },
-      { new: true }
-    )
-      .populate('assignee', 'name email avatar role')
-      .populate('project',  'name key')
-      .populate('sprint',   'name status')
-      .populate('team',     'name color');
+    const task = await populateTask(
+      Task.findByIdAndUpdate(req.params.id, { sprint: sprintId || null }, { new: true })
+    );
     if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
     try { getIO().to('admin').emit('task:updated', task); } catch {}
     res.json({ success: true, task });

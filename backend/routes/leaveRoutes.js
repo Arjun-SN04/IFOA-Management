@@ -1,32 +1,35 @@
 const express = require('express');
 const router = express.Router();
 const {
-	applyLeave,
-	getLeaves,
-	reviewLeave,
-	cancelLeave,
-	getLeaveBalance,
-	getLeaveCalendar,
-	getLeaveResetSettings,
-	updateLeaveResetSettings,
-	adminCreateLeave,
+  applyLeave,
+  getLeaves,
+  reviewLeave,
+  cancelLeave,
+  getLeaveBalance,
+  getLeaveCalendar,
+  getLeaveResetSettings,
+  updateLeaveResetSettings,
+  adminCreateLeave,
+  getMyLeaves,
 } = require('../controllers/leaveController');
-const { protect, managerOrAdmin, adminOnly } = require('../middleware/authMiddleware');
+const { protect, hrOrAbove, adminOnly } = require('../middleware/authMiddleware');
 
-// FIX: static named routes before wildcard /:id routes
-router.post('/admin/create', protect, adminOnly, adminCreateLeave);
-router.post('/apply', protect, applyLeave);
-router.get('/my', protect, getLeaves);          // employee's own leaves
-router.get('/balance', protect, getLeaveBalance);
-router.get('/calendar', protect, getLeaveCalendar);
-router.get('/reset-settings', protect, managerOrAdmin, getLeaveResetSettings);
+// Static named routes before wildcard /:id routes
+router.post('/admin/create', protect, hrOrAbove, adminCreateLeave);   // HR + manager + admin can add leave manually
+router.post('/apply',        protect, applyLeave);                    // any authenticated user
+router.get('/balance',       protect, getLeaveBalance);
+router.get('/calendar',      protect, getLeaveCalendar);
+router.get('/reset-settings', protect, hrOrAbove, getLeaveResetSettings);
 router.put('/reset-settings', protect, adminOnly, updateLeaveResetSettings);
 
-// Admin/manager — all leaves
-router.get('/', protect, managerOrAdmin, getLeaves);
+// /api/leaves/my — always returns current user's own leaves
+router.get('/my', protect, getMyLeaves);
+
+// HR + manager + admin — view all leaves
+router.get('/', protect, hrOrAbove, getLeaves);
 
 // Wildcard /:id routes last
-router.put('/:id/review', protect, managerOrAdmin, reviewLeave);
-router.put('/:id/cancel', protect, cancelLeave);
+router.put('/:id/review', protect, hrOrAbove, reviewLeave);           // HR can approve/reject leaves
+router.put('/:id/cancel', protect, cancelLeave);                      // employee cancels own pending leave
 
 module.exports = router;

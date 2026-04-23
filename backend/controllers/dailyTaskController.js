@@ -22,23 +22,14 @@ async function pruneOldEntries() {
 
 // ── Employee: submit today's tasks ────────────────────────────────────────────
 // POST /api/daily-tasks/submit
+// Any employee can submit, regardless of isRequired setting
 exports.submitDailyTasks = async (req, res) => {
   try {
     await pruneOldEntries();
 
-    const setting = await DailyTaskSettings.findOne({ employee: req.user.id, isRequired: true });
-    if (!setting) {
-      return res.status(403).json({
-        success: false,
-        message: 'Daily task submission is not enabled for your account.',
-      });
-    }
-
     const { tasks, notes } = req.body;
     const cleanedTasks = Array.isArray(tasks)
-      ? tasks
-        .map(t => (typeof t === 'string' ? t.trim() : ''))
-        .filter(Boolean)
+      ? tasks.map(t => (typeof t === 'string' ? t.trim() : '')).filter(Boolean)
       : [];
 
     if (cleanedTasks.length === 0) {
@@ -72,33 +63,34 @@ exports.getMyToday = async (req, res) => {
   }
 };
 
-// ── Employee: check if they are required to submit ────────────────────────────
+// ── Employee: check if they are required to submit + today's status ───────────
 // GET /api/daily-tasks/my-status
 exports.getMyStatus = async (req, res) => {
   try {
     const setting = await DailyTaskSettings.findOne({ employee: req.user.id, isRequired: true });
     const today = startOfDay(new Date());
-    const todayEntry = setting
-      ? await DailyTaskEntry.findOne({ employee: req.user.id, date: today })
-      : null;
+    const todayEntry = await DailyTaskEntry.findOne({ employee: req.user.id, date: today });
 
-    res.json({ success: true, isRequired: !!setting, submittedToday: !!todayEntry });
+    res.json({
+      success: true,
+      isRequired: !!setting,
+      submittedToday: !!todayEntry,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// ── Admin: get all entries for current day ───────────────────────────────────
+// ── Management: get all entries for today ────────────────────────────────────
 // GET /api/daily-tasks/admin/all
 exports.adminGetAllEntries = async (req, res) => {
   try {
     await pruneOldEntries();
-
     const today = startOfDay(new Date());
 
     const entries = await DailyTaskEntry.find({ date: { $gte: today } })
       .populate('employee', 'name email department designation avatar employeeId')
-      .sort({ date: -1, submittedAt: -1 });
+      .sort({ submittedAt: -1 });
 
     res.json({ success: true, entries });
   } catch (err) {
@@ -106,12 +98,13 @@ exports.adminGetAllEntries = async (req, res) => {
   }
 };
 
-// ── Admin: get which employees are required to submit ─────────────────────────
+// ── Management: get all employees with their isRequired flag ─────────────────
 // GET /api/daily-tasks/admin/settings
 exports.adminGetSettings = async (req, res) => {
   try {
     const [allUsers, settings] = await Promise.all([
-      User.find({ isActive: true, role: 'employee' }).select('name email department designation avatar employeeId'),
+      User.find({ isActive: true, role: { $in: ['employee', 'team_lead'] } })
+        .select('name email department designation avatar employeeId role'),
       DailyTaskSettings.find({ isRequired: true }).select('employee'),
     ]);
     const requiredIds = new Set(settings.map(s => s.employee.toString()));
@@ -122,7 +115,7 @@ exports.adminGetSettings = async (req, res) => {
   }
 };
 
-// ── Admin: toggle requirement for a single employee ───────────────────────────
+// ── Management: toggle requirement for a single employee ─────────────────────
 // PATCH /api/daily-tasks/admin/settings/:userId
 exports.adminToggleEmployee = async (req, res) => {
   try {
@@ -145,12 +138,12 @@ exports.adminToggleEmployee = async (req, res) => {
   }
 };
 
-// ── Admin: enable/disable for ALL employees at once ───────────────────────────
+// ── Management: enable/disable for ALL employees at once ─────────────────────
 // POST /api/daily-tasks/admin/settings/bulk
 exports.adminBulkToggle = async (req, res) => {
   try {
     const { isRequired } = req.body;
-    const employees = await User.find({ isActive: true, role: 'employee' }).select('_id');
+    const employees = await User.find({ isActive: true, role: { $in: ['employee', 'team_lead'] } }).select('_id');
     const ids = employees.map(u => u._id);
 
     if (isRequired) {
@@ -172,32 +165,26 @@ exports.adminBulkToggle = async (req, res) => {
   }
 };
 
-// ── Admin: enable/disable for selected employees ─────────────────────────────
+// ── Management: enable/disable for selected employees ────────────────────────
 // POST /api/daily-tasks/admin/settings/selected
 exports.adminSetSelected = async (req, res) => {
   try {
     const { userIds, isRequired = true } = req.body;
 
     if (!Array.isArray(userIds) || userIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide at least one employee.',
-      });
+      return res.status(400).json({ success: false, message: 'Please provide at least one employee.' });
     }
 
     const employees = await User.find({
       _id: { $in: userIds },
-      role: 'employee',
+      role: { $in: ['employee', 'team_lead'] },
       isActive: true,
     }).select('_id');
 
     const validIds = employees.map(u => u._id);
 
     if (!validIds.length) {
-      return res.status(404).json({
-        success: false,
-        message: 'No active employees found for the selected users.',
-      });
+      return res.status(404).json({ success: false, message: 'No active employees found for the selected users.' });
     }
 
     if (isRequired) {

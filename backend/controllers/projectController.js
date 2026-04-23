@@ -6,7 +6,11 @@ const { createAndEmit } = require('./notificationController');
 
 const uniqueRecipients = (ids = [], excludeId) => {
   const exclude = excludeId ? String(excludeId) : null;
-  return [...new Set(ids.map((id) => String(id)).filter((id) => id && id !== exclude))];
+  return [...new Set(ids.map((id) => {
+    // Handle populated objects or raw strings/ObjectIds
+    if (id && typeof id === 'object' && id._id) return String(id._id);
+    return id ? String(id) : null;
+  }).filter((id) => id && id !== exclude))];
 };
 
 const canManageProject = (user, project) => {
@@ -169,7 +173,11 @@ exports.updateProject = async (req, res) => {
       .populate('teams', 'name color');
     if (!project) return res.status(404).json({ success: false, message: 'Project not found' });
 
-    const recipients = uniqueRecipients([project.lead?._id || project.lead, ...(project.members || [])], req.user.id);
+    // Safely extract plain string IDs from potentially-populated documents
+    const leadId = project.lead?._id ? String(project.lead._id) : (project.lead ? String(project.lead) : null);
+    const memberIds = (project.members || []).map(m => m?._id ? String(m._id) : String(m)).filter(Boolean);
+    const recipients = uniqueRecipients([leadId, ...memberIds].filter(Boolean), req.user.id);
+
     if (recipients.length) {
       await Promise.all(
         recipients.map((recipient) =>
@@ -180,7 +188,7 @@ exports.updateProject = async (req, res) => {
             title: 'Project Updated',
             message: `Project "${project.name}" was updated`,
             link: `/projects/${project._id}`,
-          })
+          }).catch(() => {}) // don't let notification failure break the response
         )
       );
     }
@@ -221,7 +229,7 @@ exports.addMember = async (req, res) => {
         title: 'Added to Project',
         message: `You were added to project: ${project.name}`,
         link: `/projects/${project._id}`,
-      });
+      }).catch(() => {});
     }
 
     res.json({ success: true, project });

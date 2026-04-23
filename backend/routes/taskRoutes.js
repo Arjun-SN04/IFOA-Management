@@ -2,13 +2,14 @@ const express = require('express');
 const router = express.Router();
 const {
   createTask, getTasks, getTaskById, updateTask,
-  deleteTask, updateTaskStatus, assignTask, logTime, getMyTasks, updateTaskSprint
+  deleteTask, updateTaskStatus, assignTask, logTime, getMyTasks, updateTaskSprint, getAssignableUsers
 } = require('../controllers/taskController');
 const { protect, managerOrAdmin } = require('../middleware/authMiddleware');
 
 router.post('/', protect, createTask);
 router.get('/', protect, getTasks);
 router.get('/my', protect, getMyTasks);
+router.get('/assignable-users', protect, getAssignableUsers);
 router.get('/:id', protect, getTaskById);
 router.put('/:id', protect, updateTask);
 router.delete('/:id', protect, managerOrAdmin, deleteTask);

@@ -5,14 +5,14 @@ const {
   updateProject, archiveProject, addMember, removeMember, getProjectStats,
   assignTeamToProject, removeTeamFromProject,
 } = require('../controllers/projectController');
-const { protect, adminOnly, managementOnly, managerOrAdmin } = require('../middleware/authMiddleware');
+const { protect, adminOnly, managementOnly, managerOrAdmin, hrOrAdminForDelete } = require('../middleware/authMiddleware');
 
 // Project CRUD — management + admin can create/update projects
 router.post('/',     protect, managementOnly, createProject);
 router.get('/',      protect, getProjects);
 router.get('/:id',   protect, getProjectById);
-router.put('/:id',   protect, managementOnly, updateProject);     // edit project — management only
-router.delete('/:id',protect, adminOnly, archiveProject);          // delete — admin only
+router.put('/:id',   protect, managementOnly, updateProject);          // edit project — management only
+router.delete('/:id',protect, hrOrAdminForDelete, archiveProject);     // delete — HR + admin + manager
 
 // Member management
 router.post('/:id/members',              protect, managementOnly, addMember);

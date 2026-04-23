@@ -10,7 +10,7 @@ import {
   CheckSquare, Zap, Megaphone, BarChart3, Users, Menu, X, ChevronDown, ClipboardList,
   MessageSquare, Briefcase, AlertTriangle
 } from 'lucide-react';
-import IFOAWhite from '../../assets/IFOA_white.png';
+import IFOAIndia from '../../assets/IFOA_INDIA.png';
 
 function normalizeNotificationLink(link = '') {
   if (!link) return '/dashboard';
@@ -133,7 +133,7 @@ export default function Navbar() {
           {/* Logo */}
           <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5, delay: 0.1 }}>
             <Link to="/" className="flex items-center shrink-0">
-              <img src={IFOAWhite} alt="IFOA" className="h-12 w-auto object-contain" />
+              <img src={IFOAIndia} alt="IFOA" className="h-12 w-auto object-contain" />
             </Link>
           </motion.div>
 

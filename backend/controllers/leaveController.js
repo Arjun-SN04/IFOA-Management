@@ -7,6 +7,25 @@ function getMonthKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
+function resolveLeaveStatus(leaveDoc) {
+  const managerStatus = leaveDoc?.managerDecision?.status || 'pending';
+  const hrStatus = leaveDoc?.hrDecision?.status || 'pending';
+  const flow = leaveDoc?.approvalFlow || 'employee_request';
+
+  if (managerStatus === 'rejected' || hrStatus === 'rejected') return 'rejected';
+  if (flow === 'manager_request') {
+    return hrStatus === 'approved' ? 'approved' : 'pending';
+  }
+  if (hrStatus === 'approved') return 'approved';
+  return 'pending';
+}
+
+function getReviewActorRole(role) {
+  if (role === 'manager') return 'manager';
+  if (role === 'hr' || role === 'admin') return 'hr';
+  return null;
+}
+
 async function runMonthlyResetIfDue() {
   let settings = await LeaveSettings.findOne();
   if (!settings) {
@@ -51,9 +70,22 @@ exports.adminCreateLeave = async (req, res) => {
       totalDays,
       reason,
       status,
+      approvalFlow: 'admin_created',
       reviewedBy: req.user.id,
       reviewedAt: new Date(),
       reviewComment: 'Manually added by admin',
+      managerDecision: {
+        status: status === 'pending' ? 'pending' : status,
+        reviewedBy: req.user.id,
+        reviewedAt: new Date(),
+        reviewComment: 'Manually added by admin',
+      },
+      hrDecision: {
+        status: status === 'pending' ? 'pending' : status,
+        reviewedBy: req.user.id,
+        reviewedAt: new Date(),
+        reviewComment: 'Manually added by admin',
+      },
     });
 
     await leave.populate('employee', 'name email department employeeId');
@@ -103,14 +135,36 @@ exports.applyLeave = async (req, res) => {
     });
     if (overlap) return res.status(400).json({ success: false, message: 'You already have a leave request for overlapping dates' });
 
-    const leave = await Leave.create({ employee: req.user.id, startDate, endDate, totalDays, reason, isHalfDay, halfDaySession, handoverNote, emergencyContact });
+    const isManagerRequest = user?.role === 'manager';
+    const approvalFlow = isManagerRequest ? 'manager_request' : 'employee_request';
+    const leave = await Leave.create({
+      employee: req.user.id,
+      startDate,
+      endDate,
+      totalDays,
+      reason,
+      isHalfDay,
+      halfDaySession,
+      handoverNote,
+      emergencyContact,
+      approvalFlow,
+      managerDecision: {
+        status: isManagerRequest ? 'approved' : 'pending',
+      },
+      hrDecision: {
+        status: 'pending',
+      },
+    });
 
-    // Notify managers/admins/team_leads
-    const managers = await User.find({ role: { $in: ['admin', 'manager', 'team_lead'] }, isActive: true });
+    // Employee requests notify manager + HR. Manager requests notify HR/Admin only.
+    const reviewers = await User.find({
+      role: { $in: isManagerRequest ? ['hr', 'admin'] : ['manager', 'hr', 'admin'] },
+      isActive: true,
+    });
     await Promise.all(
-      managers.map((m) =>
+      reviewers.map((reviewer) =>
         createAndEmit({
-          recipient: m._id,
+          recipient: reviewer._id,
           sender: req.user.id,
           type: 'leave_applied',
           title: 'New Leave Request',
@@ -133,12 +187,15 @@ exports.getLeaves = async (req, res) => {
   try {
     await runMonthlyResetIfDue();
 
-    const { status, employee, page = 1, limit = 500 } = req.query;
+    const { status, employee, page = 1, limit = 500, scope } = req.query;
     const query = {};
 
     // Employees only see their own leaves
     if (req.user.role === 'employee') {
       query.employee = req.user.id;
+    } else if (scope === 'employees' && ['manager', 'hr', 'admin'].includes(req.user.role)) {
+      const employeeUsers = await User.find({ role: 'employee', isActive: true }).select('_id');
+      query.employee = { $in: employeeUsers.map((u) => u._id) };
     } else if (employee) {
       // Elevated roles can filter by employee
       query.employee = employee;
@@ -147,8 +204,10 @@ exports.getLeaves = async (req, res) => {
     if (status) query.status = status;
 
     const leaves = await Leave.find(query)
-      .populate('employee', 'name email department designation employeeId avatar')
+      .populate('employee', 'name email department designation employeeId avatar role')
       .populate('reviewedBy', 'name email')
+      .populate('managerDecision.reviewedBy', 'name email role')
+      .populate('hrDecision.reviewedBy', 'name email role')
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(Number(limit));
@@ -164,8 +223,10 @@ exports.getLeaves = async (req, res) => {
 exports.getLeaveById = async (req, res) => {
   try {
     const leave = await Leave.findById(req.params.id)
-      .populate('employee', 'name email department designation leaveBalance')
-      .populate('reviewedBy', 'name email');
+      .populate('employee', 'name email department designation leaveBalance role')
+      .populate('reviewedBy', 'name email')
+      .populate('managerDecision.reviewedBy', 'name email role')
+      .populate('hrDecision.reviewedBy', 'name email role');
     if (!leave) return res.status(404).json({ success: false, message: 'Leave request not found' });
     res.json({ success: true, leave });
   } catch (err) {
@@ -180,13 +241,48 @@ exports.reviewLeave = async (req, res) => {
     await runMonthlyResetIfDue();
 
     const { status, reviewComment } = req.body;
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'status must be approved or rejected' });
+    }
     const leave = await Leave.findById(req.params.id).populate('employee');
     if (!leave) return res.status(404).json({ success: false, message: 'Leave not found' });
-    if (leave.status !== 'pending') return res.status(400).json({ success: false, message: 'Leave already reviewed' });
 
-    leave.status = status;
+    if (leave.status === 'cancelled') {
+      return res.status(400).json({ success: false, message: 'Cancelled leave cannot be reviewed' });
+    }
+    if (leave.status !== 'pending') {
+      return res.status(400).json({ success: false, message: 'Leave already finalized' });
+    }
+
+    const actorRole = getReviewActorRole(req.user.role);
+    if (!actorRole) {
+      return res.status(403).json({ success: false, message: 'Not authorized to review leave' });
+    }
+
+    if (leave.approvalFlow === 'manager_request' && actorRole === 'manager') {
+      return res.status(403).json({ success: false, message: 'Manager leave requests can only be reviewed by HR/Admin' });
+    }
+
+    const now = new Date();
+    if (actorRole === 'manager') {
+      leave.managerDecision = {
+        status,
+        reviewedBy: req.user.id,
+        reviewedAt: now,
+        reviewComment,
+      };
+    } else {
+      leave.hrDecision = {
+        status,
+        reviewedBy: req.user.id,
+        reviewedAt: now,
+        reviewComment,
+      };
+    }
+
+    leave.status = resolveLeaveStatus(leave);
     leave.reviewedBy = req.user.id;
-    leave.reviewedAt = new Date();
+    leave.reviewedAt = now;
     leave.reviewComment = reviewComment;
     await leave.save();
 
@@ -194,13 +290,19 @@ exports.reviewLeave = async (req, res) => {
     await createAndEmit({
       recipient: leave.employee._id,
       sender: req.user.id,
-      type: status === 'approved' ? 'leave_approved' : 'leave_rejected',
-      title: `Leave ${status.charAt(0).toUpperCase() + status.slice(1)}`,
-      message: `Your leave request has been ${status}${reviewComment ? ': ' + reviewComment : ''}`,
+      type: leave.status === 'approved' ? 'leave_approved' : leave.status === 'rejected' ? 'leave_rejected' : 'leave_applied',
+      title: leave.status === 'pending'
+        ? 'Leave Review Updated'
+        : `Leave ${leave.status.charAt(0).toUpperCase() + leave.status.slice(1)}`,
+      message: leave.status === 'pending'
+        ? `Your leave request is still pending final approval${reviewComment ? ': ' + reviewComment : ''}`
+        : `Your leave request has been ${leave.status}${reviewComment ? ': ' + reviewComment : ''}`,
       link: '/leaves',
     });
 
     await leave.populate('reviewedBy', 'name email');
+    await leave.populate('managerDecision.reviewedBy', 'name email role');
+    await leave.populate('hrDecision.reviewedBy', 'name email role');
     res.json({ success: true, leave });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -248,18 +350,41 @@ exports.getLeaveCalendar = async (req, res) => {
   try {
     await runMonthlyResetIfDue();
 
+    const { scope } = req.query;
     const query = {};
     // Employees only see their own leaves in calendar; elevated roles see ALL leaves ALL statuses
     if (req.user.role === 'employee') {
       query.employee = req.user.id;
+    } else if (scope === 'employees' && ['manager', 'hr', 'admin'].includes(req.user.role)) {
+      const employeeUsers = await User.find({ role: 'employee', isActive: true }).select('_id');
+      query.employee = { $in: employeeUsers.map((u) => u._id) };
     }
     // No status filter — include pending, approved, rejected, cancelled
 
     const leaves = await Leave.find(query)
-      .populate('employee', 'name department')
+      .populate('employee', 'name department role')
       .select('employee startDate endDate totalDays status reason')
       .sort({ startDate: 1 });
     res.json({ success: true, leaves });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// @desc  Get leaves for current user only
+// @route GET /api/leaves/my
+exports.getMyLeaves = async (req, res) => {
+  try {
+    await runMonthlyResetIfDue();
+
+    const leaves = await Leave.find({ employee: req.user.id })
+      .populate('employee', 'name email department designation employeeId avatar role')
+      .populate('reviewedBy', 'name email')
+      .populate('managerDecision.reviewedBy', 'name email role')
+      .populate('hrDecision.reviewedBy', 'name email role')
+      .sort({ createdAt: -1 });
+
+    res.json({ success: true, total: leaves.length, leaves });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

@@ -28,6 +28,7 @@ app.use('/api/announcements', require('./routes/announcementRoutes'));
 app.use('/api/reports',       require('./routes/reportRoutes'));
 app.use('/api/daily-tasks',   require('./routes/dailyTaskRoutes'));
 app.use('/api/teams',         require('./routes/teamRoutes'));
+app.use('/api/nocs',          require('./routes/nocRoutes'));
 
 // Health check
 app.get('/', (req, res) => res.json({ message: 'IFOA Management API Running ✅' }));
@@ -46,4 +47,12 @@ const server = http.createServer(app);
 initSocket(server);
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT} with WebSocket support`));
+server.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT} with WebSocket support`);
+
+  // ── Scheduled announcement publisher (runs every 60 seconds) ──
+  const { processScheduledAnnouncements } = require('./controllers/announcementController');
+  setInterval(processScheduledAnnouncements, 60 * 1000);
+  // Run once immediately on startup to catch any that fired while server was down
+  processScheduledAnnouncements();
+});

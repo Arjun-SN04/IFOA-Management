@@ -19,8 +19,8 @@ const NAV_LINKS = [
   { to: '/sprints', label: 'Sprints' },
   { to: '/leaves', label: 'Leaves' },
   { to: '/announcements', label: 'Announcements' },
-  { to: '/reports', label: 'Reports', adminOnly: true },
-  { to: '/admin/users', label: 'Users', adminOnly: true },
+  { to: '/reports', label: 'Reports', managementOnly: true },
+  { to: '/admin/users', label: 'Users', managementOnly: true },
   { to: '/profile', label: 'Profile' },
 ];
 
@@ -37,7 +37,7 @@ function normalizeNotificationLink(link = '') {
 
 export default function DashboardTopbar() {
   const navigate = useNavigate();
-  const { user, isManagerOrAdmin } = useAuth();
+  const { user, isHROrAbove } = useAuth();
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
 
   const [query, setQuery] = useState('');
@@ -61,8 +61,8 @@ export default function DashboardTopbar() {
   }, []);
 
   const visibleLinks = useMemo(() => {
-    return NAV_LINKS.filter((item) => !item.adminOnly || isManagerOrAdmin);
-  }, [isManagerOrAdmin]);
+    return NAV_LINKS.filter((item) => !item.managementOnly || isHROrAbove);
+  }, [isHROrAbove]);
 
   const searchHits = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -206,7 +206,7 @@ export default function DashboardTopbar() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <Link to="/tasks"    style={btnBase}><Plus size={13} /> New Task</Link>
           <Link to="/projects" style={btnBase}><FolderKanban size={13} /> Projects</Link>
-          {isManagerOrAdmin && (
+          {isHROrAbove && (
             <Link to="/reports" style={btnBase}><FileText size={13} /> Reports</Link>
           )}
 

@@ -1,25 +1,34 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { LogIn } from 'lucide-react';
-import IFOAWhite from '../../assets/IFOA_white.png';
+import { LogIn, Clock } from 'lucide-react';
+import IFOAIndia from '../../assets/IFOA_INDIA.png';
 
 export default function Login() {
+  const LOGO_SHIFT_X_PX = -10;
   const navigate = useNavigate();
   const { login } = useAuth();
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
+  const [pendingApproval, setPendingApproval] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setPendingApproval(false);
     setLoading(true);
     try {
       await login(form);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid credentials');
+      const data = err.response?.data;
+      if (data?.pending) {
+        // Account exists but not yet approved
+        setPendingApproval(true);
+      } else {
+        setError(data?.message || 'Invalid credentials');
+      }
     } finally {
       setLoading(false);
     }
@@ -32,9 +41,9 @@ export default function Login() {
       <div className="w-full max-w-sm animate-fadeInUp">
         {/* Logo */}
         <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center justify-center mx-auto mb-4 no-underline">
-            <div className="h-12 px-4 rounded-xl flex items-center justify-center">
-              <img src={IFOAWhite} alt="IFOA" className="h-20 w-auto object-contain" />
+          <Link to="/" style={{ transform: `translateX(${LOGO_SHIFT_X_PX}px)` }} className="inline-flex items-center justify-center mx-auto mb-4 no-underline">
+            <div className="px-2 rounded-xl flex items-center justify-center">
+              <img src={IFOAIndia} alt="IFOA" className="h-14 w-auto object-contain mx-auto" />
             </div>
           </Link>
           <h1 className="text-xl font-bold text-slate-900">Welcome back</h1>
@@ -46,6 +55,19 @@ export default function Login() {
           {error && (
             <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
               {error}
+            </div>
+          )}
+
+          {/* Pending approval notice */}
+          {pendingApproval && (
+            <div style={{ padding: '12px 14px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+              <Clock size={15} style={{ color: '#D97706', flexShrink: 0, marginTop: 1 }} />
+              <div>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#92400E' }}>Account Pending Approval</p>
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#92400E', lineHeight: 1.5 }}>
+                  Your account is awaiting approval from an admin, manager, or HR. You'll be able to log in once approved.
+                </p>
+              </div>
             </div>
           )}
 

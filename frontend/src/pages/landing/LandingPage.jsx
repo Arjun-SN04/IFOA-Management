@@ -8,8 +8,7 @@ import {
   ArrowRight, Users, Shield, Clock, TrendingUp, Layers, Activity,
   Bell, GitBranch, Star, Plane, Globe, MapPin, ChevronRight, Quote,
 } from 'lucide-react';
-import IFOAWhite from '../../assets/IFOA_white.png';
-import IFOABlank from '../../assets/IFOA_blank.png';
+import IFOAIndia from '../../assets/IFOA_INDIA.png';
 import HeroSectionImg from '../../assets/herosection_img.png';
 
 /* ─── DATA ─────────────────────────────────────────────────────────────── */
@@ -163,11 +162,10 @@ export default function LandingPage() {
         className="fixed inset-x-0 top-0 z-50 bg-white/98 border-b border-gray-100 shadow-sm backdrop-blur-md"
       >
         <div className="mx-auto flex w-full max-w-none items-center justify-between px-5 sm:px-10 lg:px-16 xl:px-24 py-3">
-          <Link to="/" className="flex shrink-0 items-end gap-3 no-underline">
-            <img src={IFOAWhite} alt="IFOA" className="h-10 w-auto object-contain mb-0.5" />
-            <div className="flex flex-col justify-end pb-0.5">
-              <div className="serif text-base font-bold tracking-wide text-slate-900 leading-none">IFOA</div>
-              <div className="text-[9px] uppercase tracking-[0.14em] text-gray-400 mt-0.5">Management Platform</div>
+          <Link to="/" className="flex shrink-0 items-center gap-3 no-underline">
+            <img src={IFOAIndia} alt="IFOA" className="h-8 w-auto object-contain" />
+            <div className="flex items-center">
+              <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-gray-500 leading-none">Management Platform</div>
             </div>
           </Link>
 
@@ -575,7 +573,7 @@ export default function LandingPage() {
       <footer className="bg-[#02060F] px-8 py-10">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-6">
           <div className="flex items-center gap-3">
-            <img src={IFOABlank} alt="IFOA" className="h-8 w-auto opacity-50" />
+            <img src={IFOAIndia} alt="IFOA" className="h-8 w-auto opacity-50" />
             <span className="text-sm text-white/30">IFOA Management Platform</span>
           </div>
           <div className="flex gap-6">

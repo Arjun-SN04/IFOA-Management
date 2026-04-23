@@ -8,9 +8,10 @@ import { Button, Modal, Input, Spinner } from '../../components/ui';
 import {
   Plus, Users, UserCheck, Briefcase, Trash2,
   ChevronDown, ChevronRight, Edit2, ArrowRightLeft,
-  Star, Crown, Shield, LayoutGrid, Activity,
+  Crown, Shield, LayoutGrid, Activity,
   CheckCircle2, Clock, AlertTriangle, Eye, RefreshCw,
-  ArrowRight, X, CheckSquare, Circle
+  ArrowRight, X, CheckSquare, Circle, Tag, Kanban,
+  Diamond,
 } from 'lucide-react';
 
 const TEAM_COLORS = [
@@ -22,8 +23,23 @@ const TEAM_COLORS = [
 const ROLE_META = {
   admin:     { label: 'Admin',      color: '#7C3AED', bg: '#F5F3FF', icon: Crown },
   manager:   { label: 'Management', color: '#2563EB', bg: '#EFF6FF', icon: Shield },
-  team_lead: { label: 'Team Lead',  color: '#059669', bg: '#ECFDF5', icon: Star },
+  team_lead: { label: 'Team Lead',  color: '#059669', bg: '#ECFDF5', icon: Diamond },
   employee:  { label: 'User',       color: '#64748B', bg: '#F8FAFC', icon: Users },
+};
+
+const KANBAN_COLS = [
+  { key: 'backlog',      label: 'Backlog',      fill: '#94a3b8', icon: AlertTriangle },
+  { key: 'todo',         label: 'To Do',        fill: '#7c3aed', icon: Circle },
+  { key: 'in-progress',  label: 'In Progress',  fill: '#3b82f6', icon: Clock },
+  { key: 'in-review',    label: 'In Review',    fill: '#f59e0b', icon: Eye },
+  { key: 'done',         label: 'Done',         fill: '#10b981', icon: CheckCircle2 },
+];
+
+const PRIORITY_META = {
+  low:      { color: '#16a34a', bg: '#f0fdf4' },
+  medium:   { color: '#d97706', bg: '#fffbeb' },
+  high:     { color: '#ea580c', bg: '#fff7ed' },
+  critical: { color: '#dc2626', bg: '#fef2f2' },
 };
 
 function RoleBadge({ role }) {
@@ -49,8 +65,140 @@ function MemberAvatar({ name, color, size = 32 }) {
   );
 }
 
+// ── Team Kanban Board Modal ────────────────────────────────────────────────────
+function TeamKanbanModal({ team, onClose }) {
+  const [tasks, setTasks]       = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const TEAM_VIEW_KEY = 'team-board';
+  const [memberFilter, setMemberFilter] = useState(TEAM_VIEW_KEY);
+
+  const load = useCallback(async (target = TEAM_VIEW_KEY, isRefresh = false) => {
+    if (isRefresh) setRefreshing(true); else setLoading(true);
+    try {
+      const res = target === TEAM_VIEW_KEY
+        ? await taskAPI.getAll({ team: team._id })
+        : await taskAPI.getAll({ assignee: target });
+
+      const loaded = res.data.tasks || res.data.data || [];
+      const scoped = target === TEAM_VIEW_KEY
+        ? loaded
+        : loaded.filter(t => !t.isTeamTask && String(t.assignee?._id || t.assignee) === String(target));
+
+      setTasks(scoped);
+    } catch {
+      toast.error('Failed to load team board');
+    } finally { setLoading(false); setRefreshing(false); }
+  }, [team._id]);
+
+  useEffect(() => { load(memberFilter); }, [load, memberFilter]);
+
+  const allMembers = [
+    ...(team.teamLead ? [team.teamLead] : []),
+    ...(team.members || []).filter(m => String(m._id) !== String(team.teamLead?._id)),
+  ];
+
+  const selectedMember = allMembers.find(m => String(m._id) === String(memberFilter));
+
+  return (
+    <Modal open={true} onClose={onClose} title={`Team Board — ${team.name}`} size="xl">
+      {loading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0', gap: 12 }}>
+          <Spinner size="lg" />
+          <p style={{ fontSize: 13, color: '#94A3B8' }}>Loading board…</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 10, height: 10, borderRadius: 999, background: team.color || '#3B82F6' }} />
+              <span style={{ fontSize: 12, color: '#64748B', fontWeight: 600 }}>
+                {memberFilter === TEAM_VIEW_KEY
+                  ? `${tasks.length} tasks in team board`
+                  : `${tasks.length} personal tasks for ${selectedMember?.name || 'member'}`}
+              </span>
+            </div>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                <button onClick={() => setMemberFilter(TEAM_VIEW_KEY)}
+                  style={{ padding: '5px 12px', borderRadius: 8, border: `1px solid ${memberFilter === TEAM_VIEW_KEY ? '#2563EB' : '#E2E8F0'}`, background: memberFilter === TEAM_VIEW_KEY ? '#EFF6FF' : '#fff', color: memberFilter === TEAM_VIEW_KEY ? '#2563EB' : '#64748B', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                  Team Board
+                </button>
+                {allMembers.map(m => (
+                  <button key={m._id} onClick={() => setMemberFilter(String(m._id))}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 8, border: `1px solid ${memberFilter === String(m._id) ? '#2563EB' : '#E2E8F0'}`, background: memberFilter === String(m._id) ? '#EFF6FF' : '#fff', color: memberFilter === String(m._id) ? '#2563EB' : '#64748B', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                    <MemberAvatar name={m.name} size={16} />
+                    {m.name?.split(' ')[0]}
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => load(memberFilter, true)} disabled={refreshing}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, border: '1px solid #E2E8F0', background: '#fff', color: '#475569', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} /> Refresh
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, scrollbarWidth: 'thin' }}>
+            {KANBAN_COLS.map(col => {
+              const colTasks = tasks.filter(t => t.status === col.key);
+              const Icon = col.icon;
+              return (
+                <div key={col.key} style={{ flexShrink: 0, width: 240 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: '#fff', border: '1px solid #E2E8F0', borderLeft: `3px solid ${col.fill}` }}>
+                    <Icon size={12} style={{ color: col.fill, flexShrink: 0 }} />
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '.07em', flex: 1 }}>{col.label}</span>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', background: col.fill, padding: '0px 6px', borderRadius: 999 }}>{colTasks.length}</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minHeight: 60 }}>
+                    {colTasks.length === 0 ? (
+                      <div style={{ border: '1px dashed #CBD5E1', borderRadius: 10, height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <p style={{ fontSize: 10, color: '#CBD5E1' }}>Empty</p>
+                      </div>
+                    ) : colTasks.map(task => {
+                      const pm = PRIORITY_META[task.priority] || PRIORITY_META.medium;
+                      const assigneeName = task.assignee?.name;
+                      return (
+                        <motion.div key={task._id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                          style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 10, padding: '10px 12px', boxShadow: '0 1px 3px rgba(15,23,42,.04)' }}>
+                          <p style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 600, color: '#0F172A', lineHeight: 1.4 }}>{task.title}</p>
+                          {task.project?.name && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+                              <Tag size={9} style={{ color: '#94A3B8' }} />
+                              <span style={{ fontSize: 10, color: '#94A3B8' }}>{task.project.name}</span>
+                            </div>
+                          )}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                            <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 5, background: pm.bg, color: pm.color, textTransform: 'capitalize' }}>
+                              {task.priority}
+                            </span>
+                            {assigneeName && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <MemberAvatar name={assigneeName} size={18} />
+                                <span style={{ fontSize: 10, color: '#64748B' }}>{assigneeName.split(' ')[0]}</span>
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Button variant="secondary" onClick={onClose}>Close</Button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 // ── Live Team Dashboard Modal ─────────────────────────────────────────────────
-function TeamDashboardModal({ team, onClose, onAssignTask, projects }) {
+function TeamDashboardModal({ team, onClose, onAssignTask }) {
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -65,14 +213,18 @@ function TeamDashboardModal({ team, onClose, onAssignTask, projects }) {
     } finally { setLoading(false); setRefreshing(false); }
   }, [team._id]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    setDashboard(null);
+    setLoading(true);
+    load();
+  }, [team._id]);
 
   const STATUS_CONFIG = {
-    backlog:      { label: 'Backlog',     color: '#94A3B8', bg: '#F8FAFC' },
-    todo:         { label: 'To Do',       color: '#7C3AED', bg: '#F5F3FF' },
-    'in-progress':{ label: 'In Progress', color: '#2563EB', bg: '#EFF6FF' },
-    'in-review':  { label: 'In Review',   color: '#D97706', bg: '#FFFBEB' },
-    done:         { label: 'Done',        color: '#059669', bg: '#ECFDF5' },
+    backlog:       { label: 'Backlog',     color: '#94A3B8', bg: '#F8FAFC' },
+    todo:          { label: 'To Do',       color: '#7C3AED', bg: '#F5F3FF' },
+    'in-progress': { label: 'In Progress', color: '#2563EB', bg: '#EFF6FF' },
+    'in-review':   { label: 'In Review',   color: '#D97706', bg: '#FFFBEB' },
+    done:          { label: 'Done',        color: '#059669', bg: '#ECFDF5' },
   };
 
   return (
@@ -84,7 +236,6 @@ function TeamDashboardModal({ team, onClose, onAssignTask, projects }) {
         </div>
       ) : dashboard ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Header actions */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ width: 10, height: 10, borderRadius: 999, background: team.color || '#3B82F6' }} />
@@ -98,7 +249,6 @@ function TeamDashboardModal({ team, onClose, onAssignTask, projects }) {
             </button>
           </div>
 
-          {/* Task Stats */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 10 }}>
             {[
               { label: 'Total',       value: dashboard.taskStats?.total || 0,      color: '#2563EB', bg: '#EFF6FF', icon: CheckSquare },
@@ -120,25 +270,23 @@ function TeamDashboardModal({ team, onClose, onAssignTask, projects }) {
             })}
           </div>
 
-          {/* Assign task to team lead button */}
-          <div style={{ background: '#F0FDF4', border: '1px solid #A7F3D0', borderRadius: 14, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-            <div>
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#065F46' }}>Assign New Task to Team Lead</p>
-              <p style={{ margin: '2px 0 0', fontSize: 11, color: '#059669' }}>
-                {dashboard.team?.teamLead?.name
-                  ? `Tasks assigned to ${dashboard.team.teamLead.name} who will distribute to team members`
-                  : 'No team lead assigned yet — assign a team lead first'}
-              </p>
+          {onAssignTask && (
+            <div style={{ background: '#F0FDF4', border: '1px solid #A7F3D0', borderRadius: 14, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#065F46' }}>Assign New Task to Team Lead</p>
+                <p style={{ margin: '2px 0 0', fontSize: 11, color: '#059669' }}>
+                  {dashboard.team?.teamLead?.name
+                    ? `Tasks assigned to ${dashboard.team.teamLead.name}`
+                    : 'No team lead assigned yet'}
+                </p>
+              </div>
+              <button onClick={() => onAssignTask(dashboard.team)} disabled={!dashboard.team?.teamLead}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, border: 'none', background: dashboard.team?.teamLead ? '#059669' : '#D1FAE5', color: dashboard.team?.teamLead ? '#fff' : '#6EE7B7', fontSize: 13, fontWeight: 700, cursor: dashboard.team?.teamLead ? 'pointer' : 'not-allowed' }}>
+                <Plus size={14} /> Assign Task to Team Lead
+              </button>
             </div>
-            <button
-              onClick={() => onAssignTask(dashboard.team)}
-              disabled={!dashboard.team?.teamLead}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, border: 'none', background: dashboard.team?.teamLead ? '#059669' : '#D1FAE5', color: dashboard.team?.teamLead ? '#fff' : '#6EE7B7', fontSize: 13, fontWeight: 700, cursor: dashboard.team?.teamLead ? 'pointer' : 'not-allowed' }}>
-              <Plus size={14} /> Assign Task to Team Lead
-            </button>
-          </div>
+          )}
 
-          {/* Per-member breakdown */}
           <div>
             <p style={{ margin: '0 0 12px', fontSize: 11, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Member Breakdown</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -152,7 +300,11 @@ function TeamDashboardModal({ team, onClose, onAssignTask, projects }) {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0F172A' }}>{ms.member?.name}</p>
-                          {isLead && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 999, background: '#ECFDF5', color: '#059669', border: '1px solid #A7F3D0' }}>Team Lead</span>}
+                          {isLead && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 999, background: '#ECFDF5', color: '#059669', border: '1px solid #A7F3D0' }}>
+                              <Diamond size={8} /> Team Lead
+                            </span>
+                          )}
                         </div>
                         <p style={{ margin: '1px 0 0', fontSize: 11, color: '#94A3B8' }}>{ms.member?.department || ms.member?.email}</p>
                       </div>
@@ -161,17 +313,15 @@ function TeamDashboardModal({ team, onClose, onAssignTask, projects }) {
                         <span style={{ fontSize: 13, fontWeight: 800, color: pct === 100 ? '#059669' : '#2563EB' }}>{pct}%</span>
                       </div>
                     </div>
-                    {/* Progress bar */}
                     <div style={{ height: 5, background: '#F1F5F9', borderRadius: 999, overflow: 'hidden', marginBottom: 8 }}>
                       <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? '#059669' : '#3B82F6', borderRadius: 999, transition: 'width 0.5s' }} />
                     </div>
-                    {/* Task chips */}
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {[
-                        { key: 'todo',       label: 'To Do',  val: ms.todo,       color: '#7C3AED', bg: '#F5F3FF' },
+                        { key: 'todo', label: 'To Do', val: ms.todo, color: '#7C3AED', bg: '#F5F3FF' },
                         { key: 'inProgress', label: 'Active', val: ms.inProgress, color: '#2563EB', bg: '#EFF6FF' },
-                        { key: 'done',       label: 'Done',   val: ms.done,       color: '#059669', bg: '#ECFDF5' },
-                        { key: 'overdue',    label: 'Overdue',val: ms.overdue,    color: '#DC2626', bg: '#FEF2F2' },
+                        { key: 'done', label: 'Done', val: ms.done, color: '#059669', bg: '#ECFDF5' },
+                        { key: 'overdue', label: 'Overdue', val: ms.overdue, color: '#DC2626', bg: '#FEF2F2' },
                       ].filter(c => c.val > 0).map(c => (
                         <span key={c.key} style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 6, background: c.bg, color: c.color }}>
                           {c.val} {c.label}
@@ -185,7 +335,6 @@ function TeamDashboardModal({ team, onClose, onAssignTask, projects }) {
             </div>
           </div>
 
-          {/* Recent tasks table */}
           {dashboard.tasks?.length > 0 && (
             <div>
               <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>All Team Tasks</p>
@@ -229,13 +378,10 @@ function TeamDashboardModal({ team, onClose, onAssignTask, projects }) {
   );
 }
 
-// ── Assign Task to Team Lead Modal ────────────────────────────────────────────
+// ── Assign Task Modal ─────────────────────────────────────────────────────────
 function AssignTaskModal({ team, projects, onClose, onSaved }) {
   const { user } = useAuth();
-  const [form, setForm] = useState({
-    title: '', description: '', priority: 'medium', type: 'task',
-    project: '', dueDate: '', status: 'todo',
-  });
+  const [form, setForm] = useState({ title: '', description: '', priority: 'medium', type: 'task', project: '', dueDate: '', status: 'backlog' });
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async () => {
@@ -243,19 +389,11 @@ function AssignTaskModal({ team, projects, onClose, onSaved }) {
     setSaving(true);
     try {
       const leadId = team.teamLead?._id || team.teamLead;
-      await taskAPI.create({
-        ...form,
-        assignee: leadId,
-        team: team._id,
-        reporter: user?.id || user?._id,
-        assignedByRole: user?.role,
-      });
+      await taskAPI.create({ ...form, assignee: leadId, team: team._id, reporter: user?.id || user?._id, assignedByRole: user?.role });
       toast.success(`Task assigned to ${team.teamLead?.name || 'team lead'}`);
-      onSaved();
-      onClose();
-    } catch (e) {
-      toast.error(e.response?.data?.message || 'Failed to assign task');
-    } finally { setSaving(false); }
+      onSaved(); onClose();
+    } catch (e) { toast.error(e.response?.data?.message || 'Failed to assign task'); }
+    finally { setSaving(false); }
   };
 
   const set = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
@@ -263,24 +401,14 @@ function AssignTaskModal({ team, projects, onClose, onSaved }) {
   return (
     <Modal open={true} onClose={onClose} title={`Assign Task → ${team.name}`} size="md">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {/* Info banner */}
         <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 12, padding: '12px 14px' }}>
           <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#065F46' }}>Assigning to Team Lead: {team.teamLead?.name}</p>
-          <p style={{ margin: '3px 0 0', fontSize: 11, color: '#059669' }}>
-            The team lead will receive this task and can assign subtasks to team members.
-          </p>
+          <p style={{ margin: '3px 0 0', fontSize: 11, color: '#059669' }}>The team lead will receive this task and can assign subtasks to team members.</p>
         </div>
-
-        {/* Task type */}
         <div>
           <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Task Type</label>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {[
-              { key: 'task',  label: 'Task',     color: '#0891b2', bg: '#ecfeff' },
-              { key: 'bug',   label: 'Bug',      color: '#DC2626', bg: '#FEF2F2' },
-              { key: 'story', label: 'Story',    color: '#2563EB', bg: '#EFF6FF' },
-              { key: 'epic',  label: 'Epic',     color: '#7C3AED', bg: '#F5F3FF' },
-            ].map(t => (
+            {[{ key: 'task', label: 'Task', color: '#0891b2', bg: '#ecfeff' }, { key: 'bug', label: 'Bug', color: '#DC2626', bg: '#FEF2F2' }, { key: 'story', label: 'Story', color: '#2563EB', bg: '#EFF6FF' }, { key: 'epic', label: 'Epic', color: '#7C3AED', bg: '#F5F3FF' }].map(t => (
               <button key={t.key} onClick={() => setForm(f => ({ ...f, type: t.key }))}
                 style={{ padding: '5px 12px', borderRadius: 8, border: `1px solid ${form.type === t.key ? t.color : '#E2E8F0'}`, background: form.type === t.key ? t.bg : '#fff', color: form.type === t.key ? t.color : '#64748B', fontSize: 12, fontWeight: form.type === t.key ? 800 : 600, cursor: 'pointer' }}>
                 {t.label}
@@ -288,31 +416,23 @@ function AssignTaskModal({ team, projects, onClose, onSaved }) {
             ))}
           </div>
         </div>
-
         <div>
           <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Title <span style={{ color: '#EF4444' }}>*</span></label>
           <input value={form.title} onChange={set('title')} placeholder="Task title…"
             style={{ width: '100%', padding: '10px 14px', border: '1px solid #E2E8F0', borderRadius: 10, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
         </div>
-
         <div>
           <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Description</label>
           <textarea value={form.description} onChange={set('description')} rows={3} placeholder="Optional details…"
             style={{ width: '100%', padding: '10px 14px', border: '1px solid #E2E8F0', borderRadius: 10, fontSize: 13, resize: 'none', outline: 'none', boxSizing: 'border-box' }} />
         </div>
-
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div>
             <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Project <span style={{ color: '#EF4444' }}>*</span></label>
             <select value={form.project} onChange={set('project')}
               style={{ width: '100%', padding: '10px 14px', border: '1px solid #E2E8F0', borderRadius: 10, fontSize: 13, outline: 'none', background: '#fff', boxSizing: 'border-box' }}>
               <option value="">Select project…</option>
-              {(team.projects || []).map(p => (
-                <option key={p._id || p} value={p._id || p}>{p.name || p}</option>
-              ))}
-              {(!team.projects || team.projects.length === 0) && projects.map(p => (
-                <option key={p._id} value={p._id}>{p.name}</option>
-              ))}
+              {projects.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
             </select>
           </div>
           <div>
@@ -326,13 +446,11 @@ function AssignTaskModal({ team, projects, onClose, onSaved }) {
             </select>
           </div>
         </div>
-
         <div>
           <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Due Date</label>
           <input type="date" value={form.dueDate} onChange={set('dueDate')}
             style={{ width: '100%', padding: '10px 14px', border: '1px solid #E2E8F0', borderRadius: 10, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
         </div>
-
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, paddingTop: 4 }}>
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
           <Button onClick={handleSubmit} loading={saving} disabled={!form.title || !form.project}>
@@ -344,122 +462,194 @@ function AssignTaskModal({ team, projects, onClose, onSaved }) {
   );
 }
 
-// ── Team Card ─────────────────────────────────────────────────────────────────
-function TeamCard({ team, onEdit, onDelete, onSwitchMember, onChangeLead, onViewDashboard, canManage }) {
-  const [expanded, setExpanded] = useState(false);
-  const navigate = useNavigate();
+// ── Team Card with 3D flip — fully self-contained, no shared state ─────────────
+function TeamCard({ team, onEdit, onDelete, onSwitchMember, onChangeLead, onViewBoard, onViewDashboard, canManage }) {
+  const [flipped, setFlipped] = useState(false);
 
   const lead = team.teamLead;
-  const members = (team.members || []).filter(m => String(m._id) !== String(lead?._id));
+  const teamColor = team.color || '#3B82F6';
+  const allMembers = (team.members || []);
+  const nonLeadMembers = allMembers.filter(m => String(m._id) !== String(lead?._id));
 
   return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-      style={{ background: '#fff', borderRadius: 18, border: '1px solid #E2E8F0', overflow: 'hidden', boxShadow: '0 2px 10px rgba(15,23,42,0.05)' }}>
-      <div style={{ height: 4, background: team.color || '#3B82F6' }} />
-      <div style={{ padding: '18px 20px' }}>
-        {/* Header row */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: (team.color || '#3B82F6') + '20', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Users size={16} style={{ color: team.color || '#3B82F6' }} />
+    <div style={{ perspective: '1200px', minHeight: 260 }}>
+      <div style={{
+        position: 'relative',
+        width: '100%',
+        minHeight: 260,
+        transformStyle: 'preserve-3d',
+        transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+        transition: 'transform 0.55s cubic-bezier(0.4,0.2,0.2,1)',
+      }}>
+
+        {/* ─── FRONT FACE ─── */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden',
+          background: '#fff', borderRadius: 16,
+          border: '1px solid #E2E8F0',
+          boxShadow: '0 2px 10px rgba(15,23,42,0.06)',
+          overflow: 'hidden',
+        }}>
+          {/* color bar */}
+          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, background: teamColor, borderRadius: '16px 0 0 16px' }} />
+
+          <div style={{ padding: '12px 14px 12px 18px', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{team.name}</h3>
+                {team.description && <p style={{ margin: '2px 0 0', fontSize: 11, color: '#94A3B8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{team.description}</p>}
               </div>
-              <div>
-                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#0F172A' }}>{team.name}</h3>
-                {team.description && <p style={{ margin: 0, fontSize: 11, color: '#94A3B8' }}>{team.description}</p>}
+              <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: '#64748B', background: '#F8FAFC', border: '1px solid #E2E8F0', padding: '3px 10px', borderRadius: 999 }}>
+                {allMembers.length} members
+              </span>
+            </div>
+
+            {/* Team Lead */}
+            {lead ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, padding: '7px 10px', marginBottom: 8 }}>
+                <MemberAvatar name={lead.name} size={32} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0F172A' }}>{lead.name}</p>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                    <Diamond size={10} style={{ color: teamColor }} />
+                    <span style={{ fontSize: 10, color: '#64748B', fontWeight: 600 }}>Team Lead</span>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-          {canManage && (
-            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-              {/* View Board — opens task board filtered to this team */}
-              <button
-                onClick={() => navigate(`/tasks?team=${team._id}`)}
-                style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid #BFDBFE', background: '#EFF6FF', cursor: 'pointer', color: '#2563EB', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600 }}>
-                <LayoutGrid size={12} /> View Board
-              </button>
-              <button onClick={() => onChangeLead(team)} title="Change Team Lead"
-                style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid #A7F3D0', background: '#ECFDF5', cursor: 'pointer', color: '#059669', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600 }}>
-                <Star size={12} /> Lead
-              </button>
-              <button onClick={() => onEdit(team)}
-                style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid #E2E8F0', background: '#F8FAFC', cursor: 'pointer', color: '#64748B', display: 'flex' }}>
-                <Edit2 size={13} />
-              </button>
-              <button onClick={() => onDelete(team)}
-                style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid #FCA5A5', background: '#FEF2F2', cursor: 'pointer', color: '#DC2626', display: 'flex' }}>
-                <Trash2 size={13} />
-              </button>
-            </div>
-          )}
-        </div>
+            ) : (
+              <div style={{ marginBottom: 8, padding: '7px 10px', borderRadius: 8, background: '#FFFBEB', border: '1px solid #FDE68A' }}>
+                <p style={{ margin: 0, fontSize: 12, color: '#92400E', fontWeight: 600 }}>⚠ No team lead assigned</p>
+              </div>
+            )}
 
-        {/* Team lead */}
-        {lead && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, padding: '10px 12px', borderRadius: 10, background: '#ECFDF5', border: '1px solid #A7F3D0' }}>
-            <Star size={13} style={{ color: '#059669', flexShrink: 0 }} />
-            <MemberAvatar name={lead.name} size={28} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#065F46' }}>{lead.name}</p>
-              <p style={{ margin: 0, fontSize: 10, color: '#059669' }}>Team Lead · {lead.email}</p>
-            </div>
-          </div>
-        )}
-        {!lead && (
-          <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10, background: '#FFFBEB', border: '1px solid #FDE68A' }}>
-            <p style={{ margin: 0, fontSize: 12, color: '#92400E', fontWeight: 600 }}>⚠ No team lead assigned</p>
-          </div>
-        )}
-
-        {/* Stats + expand */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Users size={12} style={{ color: '#64748B' }} />
-            <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>{team.members?.length || 0} members</span>
-          </div>
-          {team.projects?.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Briefcase size={12} style={{ color: '#64748B' }} />
-              <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>{team.projects.length} project{team.projects.length !== 1 ? 's' : ''}</span>
-            </div>
-          )}
-          <button onClick={() => setExpanded(v => !v)}
-            style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: '#2563EB', background: 'none', border: 'none', cursor: 'pointer' }}>
-            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            {expanded ? 'Hide' : 'View'} members
-          </button>
-        </div>
-
-        {/* Expanded members */}
-        <AnimatePresence>
-          {expanded && (
-            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} style={{ overflow: 'hidden' }}>
-              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {members.length === 0 ? (
-                  <p style={{ fontSize: 12, color: '#94A3B8', textAlign: 'center', padding: '10px 0' }}>No other members yet</p>
-                ) : members.map(member => (
-                  <div key={member._id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10, background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
-                    <MemberAvatar name={member.name} size={28} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#0F172A' }}>{member.name}</p>
-                      <p style={{ margin: 0, fontSize: 10, color: '#94A3B8' }}>{member.department || member.email}</p>
-                    </div>
-                    <RoleBadge role={member.role} />
-                    {canManage && (
-                      <button onClick={() => onSwitchMember(member, team)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, border: '1px solid #BFDBFE', background: '#EFF6FF', color: '#2563EB', fontSize: 10, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
-                        <ArrowRightLeft size={10} /> Move
-                      </button>
-                    )}
+            {/* Member pips */}
+            {nonLeadMembers.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+                {nonLeadMembers.slice(0, 4).map((m, i) => (
+                  <div key={m._id} title={m.name} style={{ marginLeft: i === 0 ? 0 : -8, zIndex: 4 - i }}>
+                    <MemberAvatar name={m.name} size={26} />
                   </div>
                 ))}
+                {nonLeadMembers.length > 4 && (
+                  <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 600, color: '#64748B' }}>+{nonLeadMembers.length - 4} more</span>
+                )}
               </div>
+            )}
+
+            {/* Action buttons */}
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}>
+              <button onClick={() => onViewBoard(team)}
+                style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid #BFDBFE', background: '#EFF6FF', cursor: 'pointer', color: '#2563EB', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700 }}>
+                <LayoutGrid size={11} /> Board
+              </button>
+              <button onClick={() => onViewDashboard(team)}
+                style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid #A7F3D0', background: '#ECFDF5', cursor: 'pointer', color: '#059669', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700 }}>
+                <Activity size={11} /> Dashboard
+              </button>
+              {canManage && (
+                <>
+                  <button onClick={() => onChangeLead(team)}
+                    style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid #FDE68A', background: '#FFFBEB', cursor: 'pointer', color: '#D97706', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600 }}>
+                    <Diamond size={11} /> Lead
+                  </button>
+                  <button onClick={() => onEdit(team)}
+                    style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid #E2E8F0', background: '#F8FAFC', cursor: 'pointer', color: '#64748B', display: 'flex', alignItems: 'center' }}>
+                    <Edit2 size={12} />
+                  </button>
+                  <button onClick={() => onDelete(team)}
+                    style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid #FCA5A5', background: '#FEF2F2', cursor: 'pointer', color: '#DC2626', display: 'flex', alignItems: 'center' }}>
+                    <Trash2 size={12} />
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Footer: projects + flip button */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 8, borderTop: '1px solid #F1F5F9', marginTop: 'auto' }}>
+              {team.projects?.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <Briefcase size={11} style={{ color: '#94A3B8' }} />
+                  <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>{team.projects.length} project{team.projects.length !== 1 ? 's' : ''}</span>
+                </div>
+              )}
+              <button onClick={() => setFlipped(true)}
+                style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: '#2563EB', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0' }}>
+                <Users size={13} /> View members
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ─── BACK FACE ─── */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden',
+          transform: 'rotateY(180deg)',
+          background: '#fff', borderRadius: 16,
+          border: `1px solid ${teamColor}40`,
+          boxShadow: '0 2px 10px rgba(15,23,42,0.06)',
+          overflow: 'hidden',
+        }}>
+          {/* color bar */}
+          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, background: teamColor }} />
+
+          <div style={{ padding: '14px 14px 14px 20px', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
+            {/* Back header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#0F172A' }}>{team.name}</h3>
+                <p style={{ margin: '2px 0 0', fontSize: 11, color: '#94A3B8' }}>{allMembers.length} member{allMembers.length !== 1 ? 's' : ''}</p>
+              </div>
+              <button onClick={() => setFlipped(false)}
+                style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: '#64748B', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, padding: '5px 10px', cursor: 'pointer' }}>
+                <ChevronRight size={13} style={{ transform: 'rotate(180deg)' }} /> Back
+              </button>
+            </div>
+
+            {/* Members list — scrollable */}
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 2 }}>
+              {/* Team lead first */}
+              {lead && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10, background: `${teamColor}10`, border: `1px solid ${teamColor}30` }}>
+                  <MemberAvatar name={lead.name} size={30} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#0F172A' }}>{lead.name}</p>
+                    <p style={{ margin: 0, fontSize: 10, color: '#64748B' }}>{lead.department || lead.email || ''}</p>
+                  </div>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: '#ECFDF5', color: '#059669', border: '1px solid #A7F3D0', flexShrink: 0 }}>
+                    <Diamond size={8} /> Lead
+                  </span>
+                </div>
+              )}
+
+              {/* Other members */}
+              {nonLeadMembers.length === 0 && !lead && (
+                <p style={{ fontSize: 12, color: '#94A3B8', textAlign: 'center', padding: '20px 0' }}>No members yet</p>
+              )}
+              {nonLeadMembers.map(member => (
+                <div key={member._id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10, background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                  <MemberAvatar name={member.name} size={28} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#0F172A' }}>{member.name}</p>
+                    <p style={{ margin: 0, fontSize: 10, color: '#94A3B8' }}>{member.department || member.email}</p>
+                  </div>
+                  <RoleBadge role={member.role} />
+                  {canManage && (
+                    <button onClick={() => onSwitchMember(member, team)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '3px 7px', borderRadius: 6, border: '1px solid #BFDBFE', background: '#EFF6FF', color: '#2563EB', fontSize: 10, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+                      <ArrowRightLeft size={9} /> Move
+                    </button>
+                  )}
+                </div>
+              ))}
 
               {/* Projects */}
               {team.projects?.length > 0 && (
-                <div style={{ marginTop: 10 }}>
-                  <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Projects</p>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <div style={{ marginTop: 4 }}>
+                  <p style={{ margin: '0 0 5px', fontSize: 10, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Projects</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                     {team.projects.map(p => (
                       <span key={p._id} style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 6, background: '#EFF6FF', color: '#2563EB', border: '1px solid #BFDBFE' }}>
                         {p.name}
@@ -468,18 +658,79 @@ function TeamCard({ team, onEdit, onDelete, onSwitchMember, onChangeLead, onView
                   </div>
                 </div>
               )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </div>
+          </div>
+        </div>
+
       </div>
-    </motion.div>
+    </div>
+  );
+}
+// ─── Assign Project to Team Modal ─────────────────────────────────────────────
+function AssignProjectToTeamModal({ team, projects, onClose, onSaved }) {
+  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const assignedProjectIds = (team.projects || []).map(p => String(p._id || p));
+  const availableProjects = projects.filter(p => !assignedProjectIds.includes(String(p._id)));
+
+  const handleAssign = async () => {
+    if (!selectedProjectId) return;
+    setSaving(true);
+    try {
+      await projectAPI.assignTeam(selectedProjectId, team._id);
+      toast.success('Project assigned to team successfully');
+      onSaved();
+      onClose();
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to assign project');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open={true} onClose={onClose} title={`Assign Project → ${team.name}`} size="sm">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 12, padding: '12px 14px' }}>
+          <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#1D4ED8' }}>
+            Assigning a project will add all team members to that project automatically.
+          </p>
+        </div>
+        <div>
+          <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>
+            Select Project
+          </label>
+          {availableProjects.length === 0 ? (
+            <p style={{ fontSize: 13, color: '#94A3B8', padding: '12px', background: '#F8FAFC', borderRadius: 10, border: '1px solid #E2E8F0', textAlign: 'center' }}>
+              All projects are already assigned to this team.
+            </p>
+          ) : (
+            <select value={selectedProjectId} onChange={e => setSelectedProjectId(e.target.value)}
+              style={{ width: '100%', padding: '10px 14px', border: '1px solid #E2E8F0', borderRadius: 10, fontSize: 13, outline: 'none', background: '#fff', boxSizing: 'border-box' }}>
+              <option value="">Select a project…</option>
+              {availableProjects.map(p => (
+                <option key={p._id} value={p._id}>{p.name}</option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleAssign} loading={saving} disabled={!selectedProjectId || availableProjects.length === 0}>
+            Assign Project
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
 export default function TeamsPage() {
-  const { isManagerOrAdmin } = useAuth();
+  const { isManagerOrAdmin, isHROrAbove } = useAuth();
   const canManage = isManagerOrAdmin;
+  const canViewDashboard = isHROrAbove;
 
   const [teams, setTeams]           = useState([]);
   const [eligibleUsers, setEligibleUsers] = useState([]);
@@ -493,12 +744,19 @@ export default function TeamsPage() {
   const [changeLeadModal, setChangeLeadModal] = useState(null);
   const [newLeadId, setNewLeadId] = useState('');
 
-  // Dashboard state
-  const [dashboardTeam, setDashboardTeam] = useState(null);
-  const [assignTaskTeam, setAssignTaskTeam] = useState(null);
+  const [kanbanTeam, setKanbanTeam]             = useState(null);
+  const [dashboardTeam, setDashboardTeam]       = useState(null);
+  const [assignTaskTeam, setAssignTaskTeam]     = useState(null);
+  const [assignProjectTeam, setAssignProjectTeam] = useState(null);
 
-  const [saving, setSaving]     = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  // Track expanded state per team — stringified _id as key to avoid ObjectId reference issues
+  // (kept for future use; cards now use internal flip state)
+
+  // Sort teams by name so array order always matches visual render order
+  const sortTeams = (arr) => [...arr].sort((a, b) => String(a.name).localeCompare(String(b.name)));
+
+  const [saving, setSaving]       = useState(false);
+  const [deleting, setDeleting]   = useState(false);
   const [switching, setSwitching] = useState(false);
   const [changingLead, setChangingLead] = useState(false);
 
@@ -514,7 +772,7 @@ export default function TeamsPage() {
         teamAPI.getEligibleMembers().catch(() => ({ data: { users: [] } })),
         projectAPI.getAll().catch(() => ({ data: { projects: [] } })),
       ]);
-      setTeams(tRes.data.teams || []);
+      setTeams(sortTeams(tRes.data.teams || []));
       setEligibleUsers(uRes.data.users || []);
       setProjects(pRes.data.projects || pRes.data.data || []);
     } finally { setLoading(false); }
@@ -528,11 +786,11 @@ export default function TeamsPage() {
     try {
       if (editingTeam) {
         const res = await teamAPI.update(editingTeam._id, form);
-        setTeams(prev => prev.map(t => t._id === editingTeam._id ? (res.data.team || res.data.data) : t));
+        setTeams(prev => sortTeams(prev.map(t => t._id === editingTeam._id ? (res.data.team || res.data.data) : t)));
         toast.success('Team updated!');
       } else {
         const res = await teamAPI.create(form);
-        setTeams(prev => [res.data.team || res.data.data, ...prev]);
+        setTeams(prev => sortTeams([res.data.team || res.data.data, ...prev]));
         toast.success('Team created!');
       }
       setShowCreate(false); setEditingTeam(null); setForm(emptyForm);
@@ -555,8 +813,7 @@ export default function TeamsPage() {
   const handleEdit = (team) => {
     setEditingTeam(team);
     setForm({
-      name: team.name,
-      description: team.description || '',
+      name: team.name, description: team.description || '',
       teamLead: team.teamLead?._id || '',
       members: (team.members || []).map(m => m._id || m),
       projects: (team.projects || []).map(p => p._id || p),
@@ -571,7 +828,7 @@ export default function TeamsPage() {
     try {
       const res = await teamAPI.changeLead(changeLeadModal._id, newLeadId);
       const updated = res.data.team;
-      setTeams(prev => prev.map(t => t._id === changeLeadModal._id ? updated : t));
+      setTeams(prev => sortTeams(prev.map(t => t._id === changeLeadModal._id ? updated : t)));
       toast.success(`Team lead changed to ${updated.teamLead?.name}!`);
       setChangeLeadModal(null); setNewLeadId('');
     } catch (e) { toast.error(e.response?.data?.message || 'Failed to change team lead'); }
@@ -582,11 +839,7 @@ export default function TeamsPage() {
     if (!switchModal || !switchToTeam) return;
     setSwitching(true);
     try {
-      await teamAPI.switchMember({
-        userId: switchModal.member._id,
-        fromTeamId: switchModal.fromTeam._id,
-        toTeamId: switchToTeam,
-      });
+      await teamAPI.switchMember({ userId: switchModal.member._id, fromTeamId: switchModal.fromTeam._id, toTeamId: switchToTeam });
       toast.success(`${switchModal.member.name} moved to new team!`);
       setSwitchModal(null); setSwitchToTeam('');
       await loadData();
@@ -594,19 +847,12 @@ export default function TeamsPage() {
     finally { setSwitching(false); }
   };
 
-  const toggleMember = (userId) => {
-    setForm(f => ({
-      ...f,
-      members: f.members.includes(userId) ? f.members.filter(id => id !== userId) : [...f.members, userId],
-    }));
-  };
-
-  const toggleProject = (projectId) => {
-    setForm(f => ({
-      ...f,
-      projects: f.projects.includes(projectId) ? f.projects.filter(id => id !== projectId) : [...f.projects, projectId],
-    }));
-  };
+  const toggleMember = (userId) => setForm(f => ({
+    ...f, members: f.members.includes(userId) ? f.members.filter(id => id !== userId) : [...f.members, userId],
+  }));
+  const toggleProject = (projectId) => setForm(f => ({
+    ...f, projects: f.projects.includes(projectId) ? f.projects.filter(id => id !== projectId) : [...f.projects, projectId],
+  }));
 
   if (loading) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 300, gap: 12 }}>
@@ -616,6 +862,34 @@ export default function TeamsPage() {
   );
 
   const otherTeams = switchModal ? teams.filter(t => t._id !== switchModal.fromTeam._id) : teams;
+
+  const getAssignedTeamNames = (userId) => {
+    const uid = String(userId);
+    return teams
+      .filter(t => String(t.teamLead?._id || t.teamLead || '') === uid
+        || (t.members || []).some(m => String(m._id || m) === uid))
+      .map(t => t.name);
+  };
+
+  const getEligibleBuckets = () => {
+    const decorated = eligibleUsers.map(u => {
+      const assignedTeams = getAssignedTeamNames(u._id);
+      return { ...u, assignedTeams };
+    });
+    return {
+      unassigned: decorated.filter(u => u.assignedTeams.length === 0),
+      assigned: decorated.filter(u => u.assignedTeams.length > 0),
+    };
+  };
+
+  const createBuckets = getEligibleBuckets();
+  const editBuckets = getEligibleBuckets();
+  const editTeamMemberOptions = editingTeam
+    ? [
+        ...(editingTeam.teamLead ? [editingTeam.teamLead] : []),
+        ...((editingTeam.members || []).filter(m => String(m._id || m) !== String(editingTeam.teamLead?._id || editingTeam.teamLead || ''))),
+      ].filter(m => (m._id || m) && (m.name || typeof m === 'object'))
+    : [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -642,10 +916,10 @@ export default function TeamsPage() {
       {/* ── Stats ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
         {[
-          { label: 'Total Teams',  value: teams.length,                                             color: '#2563EB', bg: '#EFF6FF', icon: Users },
-          { label: 'Team Leads',   value: eligibleUsers.filter(u => u.role === 'team_lead').length,  color: '#059669', bg: '#ECFDF5', icon: Star },
-          { label: 'Employees',    value: eligibleUsers.filter(u => u.role === 'employee').length,   color: '#7C3AED', bg: '#F5F3FF', icon: UserCheck },
-          { label: 'Projects',     value: projects.length,                                          color: '#F59E0B', bg: '#FFFBEB', icon: Briefcase },
+          { label: 'Total Teams', value: teams.length,                                            color: '#2563EB', bg: '#EFF6FF', icon: Users },
+          { label: 'Team Leads',  value: eligibleUsers.filter(u => u.role === 'team_lead').length, color: '#059669', bg: '#ECFDF5', icon: Diamond },
+          { label: 'Employees',   value: eligibleUsers.filter(u => u.role === 'employee').length,  color: '#7C3AED', bg: '#F5F3FF', icon: UserCheck },
+          { label: 'Projects',    value: projects.length,                                         color: '#F59E0B', bg: '#FFFBEB', icon: Briefcase },
         ].map((s, i) => {
           const Icon = s.icon;
           return (
@@ -678,13 +952,18 @@ export default function TeamsPage() {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
-          {teams.map(team => (
-            <TeamCard key={team._id} team={team} canManage={canManage}
+          {teams.map((team) => (
+            // key must be stable and unique — team._id from MongoDB is guaranteed
+            <TeamCard
+              key={String(team._id || team.name)}
+              team={team}
+              canManage={canManage}
               onEdit={handleEdit}
               onDelete={setDeleteConfirm}
               onSwitchMember={(member, fromTeam) => { setSwitchModal({ member, fromTeam }); setSwitchToTeam(''); }}
-              onChangeLead={(team) => { setChangeLeadModal(team); setNewLeadId(team.teamLead?._id || ''); }}
-              onViewDashboard={(team) => setDashboardTeam(team)}
+              onChangeLead={(t) => { setChangeLeadModal(t); setNewLeadId(t.teamLead?._id || ''); }}
+              onViewBoard={(t) => setKanbanTeam(t)}
+              onViewDashboard={(t) => setDashboardTeam(t)}
             />
           ))}
         </div>
@@ -694,11 +973,8 @@ export default function TeamsPage() {
       <Modal open={showCreate} onClose={() => { setShowCreate(false); setEditingTeam(null); setForm(emptyForm); }} title={editingTeam ? `Edit Team: ${editingTeam.name}` : 'Create Team'} size="lg">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 10, padding: '10px 14px' }}>
-            <p style={{ margin: 0, fontSize: 12, color: '#1D4ED8', fontWeight: 600 }}>
-              ℹ Only employees are shown in the dropdowns. Admins and managers cannot be added as team members.
-            </p>
+            <p style={{ margin: 0, fontSize: 12, color: '#1D4ED8', fontWeight: 600 }}>ℹ Only employees are shown. Admins and managers cannot be added as team members.</p>
           </div>
-
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <Input label="Team Name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Frontend Squad" required />
             <div>
@@ -711,13 +987,11 @@ export default function TeamsPage() {
               </div>
             </div>
           </div>
-
           <div>
             <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Description</label>
             <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} placeholder="Optional team description…"
               style={{ width: '100%', padding: '10px 14px', border: '1px solid #E2E8F0', borderRadius: 10, fontSize: 13, resize: 'none', outline: 'none', boxSizing: 'border-box' }} />
           </div>
-
           <div>
             <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>
               Team Lead <span style={{ fontSize: 10, color: '#94A3B8', fontWeight: 500, textTransform: 'none' }}>(employees only)</span>
@@ -725,58 +999,88 @@ export default function TeamsPage() {
             <select value={form.teamLead} onChange={e => setForm(f => ({ ...f, teamLead: e.target.value }))}
               style={{ width: '100%', padding: '10px 14px', border: '1px solid #E2E8F0', borderRadius: 10, fontSize: 13, outline: 'none', background: '#fff', boxSizing: 'border-box' }}>
               <option value="">Select team lead…</option>
-              {eligibleUsers.map(u => <option key={u._id} value={u._id}>{u.name} — {u.role === 'team_lead' ? 'Team Lead' : 'Employee'}</option>)}
+              {editingTeam ? (
+                editTeamMemberOptions.map(u => (
+                  <option key={u._id || u} value={u._id || u}>{u.name} — Current team member</option>
+                ))
+              ) : (
+                <>
+                  {createBuckets.unassigned.map(u => (
+                    <option key={u._id} value={u._id}>{u.name} — No team assigned</option>
+                  ))}
+                  {createBuckets.assigned.map(u => (
+                    <option key={u._id} value={u._id}>{u.name} — In team: {u.assignedTeams.join(', ')}</option>
+                  ))}
+                </>
+              )}
             </select>
-            {eligibleUsers.length === 0 && <p style={{ fontSize: 11, color: '#94A3B8', marginTop: 4 }}>No employees found. Create employee accounts first.</p>}
           </div>
-
           <div>
             <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
-              Members ({form.members.length} selected) <span style={{ fontSize: 10, color: '#94A3B8', fontWeight: 500, textTransform: 'none' }}>(employees only)</span>
+              Members ({form.members.length} selected)
             </label>
             {eligibleUsers.length === 0 ? (
               <p style={{ fontSize: 12, color: '#94A3B8', padding: '12px', background: '#F8FAFC', borderRadius: 10, border: '1px solid #E2E8F0' }}>No employees available</p>
             ) : (
               <div style={{ maxHeight: 220, overflowY: 'auto', border: '1px solid #E2E8F0', borderRadius: 12, padding: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {eligibleUsers.map(u => {
-                  const selected = form.members.includes(u._id);
-                  return (
-                    <div key={u._id} onClick={() => toggleMember(u._id)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', background: selected ? '#EFF6FF' : '#fff', border: `1px solid ${selected ? '#BFDBFE' : 'transparent'}` }}>
-                      <div style={{ width: 18, height: 18, borderRadius: 4, background: selected ? '#2563EB' : '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        {selected && <span style={{ color: '#fff', fontSize: 11, fontWeight: 900 }}>✓</span>}
+                {(() => {
+                  const buckets = editingTeam ? editBuckets : createBuckets;
+                  const rows = [
+                    ...buckets.unassigned.map(u => ({ ...u, groupLabel: 'No team assigned', showTeamInfo: false })),
+                    ...buckets.assigned.map(u => ({ ...u, groupLabel: 'Already assigned to a team', showTeamInfo: true })),
+                  ];
+                  let lastGroup = '';
+                  return rows.map(u => {
+                    const sel = form.members.includes(u._id);
+                    const groupHeader = u.groupLabel !== lastGroup;
+                    lastGroup = u.groupLabel;
+                    return (
+                      <div key={u._id}>
+                        {groupHeader && (
+                          <p style={{ margin: '6px 2px 4px', fontSize: 10, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '.07em' }}>
+                            {u.groupLabel}
+                          </p>
+                        )}
+                        <div onClick={() => toggleMember(u._id)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', background: sel ? '#EFF6FF' : '#fff', border: `1px solid ${sel ? '#BFDBFE' : 'transparent'}` }}>
+                          <div style={{ width: 18, height: 18, borderRadius: 4, background: sel ? '#2563EB' : '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            {sel && <span style={{ color: '#fff', fontSize: 11, fontWeight: 900 }}>✓</span>}
+                          </div>
+                          <MemberAvatar name={u.name} size={24} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#0F172A' }}>{u.name}</p>
+                            <p style={{ margin: 0, fontSize: 10, color: '#94A3B8' }}>
+                              {u.showTeamInfo
+                                ? `Current team: ${u.assignedTeams.join(', ')}`
+                                : (u.department || u.email)}
+                            </p>
+                          </div>
+                          <RoleBadge role={u.role} />
+                        </div>
                       </div>
-                      <MemberAvatar name={u.name} size={24} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#0F172A' }}>{u.name}</p>
-                        <p style={{ margin: 0, fontSize: 10, color: '#94A3B8' }}>{u.department || u.email}</p>
-                      </div>
-                      <RoleBadge role={u.role} />
-                    </div>
-                  );
-                })}
+                    );
+                  });
+                })()}
               </div>
             )}
           </div>
-
           <div>
             <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
               Assign Projects ({form.projects.length} selected)
             </label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {projects.map(p => {
-                const selected = form.projects.includes(p._id);
+                const sel = form.projects.includes(p._id);
                 return (
                   <button key={p._id} onClick={() => toggleProject(p._id)}
-                    style={{ padding: '5px 12px', borderRadius: 8, border: `1px solid ${selected ? '#2563EB' : '#E2E8F0'}`, background: selected ? '#EFF6FF' : '#fff', color: selected ? '#2563EB' : '#64748B', fontSize: 12, fontWeight: selected ? 700 : 500, cursor: 'pointer' }}>
+                    style={{ padding: '5px 12px', borderRadius: 8, border: `1px solid ${sel ? '#2563EB' : '#E2E8F0'}`, background: sel ? '#EFF6FF' : '#fff', color: sel ? '#2563EB' : '#64748B', fontSize: 12, fontWeight: sel ? 700 : 500, cursor: 'pointer' }}>
                     {p.name}
                   </button>
                 );
               })}
-              {projects.length === 0 && <p style={{ fontSize: 12, color: '#94A3B8' }}>No projects available. Create projects first.</p>}
+              {projects.length === 0 && <p style={{ fontSize: 12, color: '#94A3B8' }}>No projects available.</p>}
             </div>
           </div>
-
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, paddingTop: 4 }}>
             <Button variant="secondary" onClick={() => { setShowCreate(false); setEditingTeam(null); setForm(emptyForm); }}>Cancel</Button>
             <Button onClick={handleSave} loading={saving} disabled={!form.name}>{editingTeam ? 'Update Team' : 'Create Team'}</Button>
@@ -822,27 +1126,31 @@ export default function TeamsPage() {
               <p style={{ margin: 0, fontSize: 11, color: '#059669' }}>Current lead: {changeLeadModal.teamLead?.name || 'None'}</p>
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>
-                Select New Team Lead <span style={{ fontSize: 10, color: '#94A3B8', fontWeight: 500, textTransform: 'none' }}>(employees only)</span>
-              </label>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Select New Team Lead</label>
               <select value={newLeadId} onChange={e => setNewLeadId(e.target.value)}
                 style={{ width: '100%', padding: '10px 14px', border: '1px solid #E2E8F0', borderRadius: 10, fontSize: 13, outline: 'none', background: '#fff', boxSizing: 'border-box' }}>
                 <option value="">Select employee…</option>
-                {(changeLeadModal.members || []).filter(m => m._id && m.name).map(m => (
-                  <option key={m._id} value={m._id}>{m.name} (team member)</option>
-                ))}
-                {eligibleUsers.filter(u =>
-                  !(changeLeadModal.members || []).some(m => String(m._id || m) === String(u._id))
-                ).map(u => (
-                  <option key={u._id} value={u._id}>{u.name} — {u.role === 'team_lead' ? 'Team Lead' : 'Employee'}</option>
-                ))}
+                {(() => {
+                  const memberMap = new Map();
+                  (changeLeadModal.members || []).forEach(m => {
+                    const id = String(m._id || m || '');
+                    if (!id) return;
+                    memberMap.set(id, m.name ? { _id: id, name: m.name } : { _id: id, name: id });
+                  });
+                  const lead = changeLeadModal.teamLead;
+                  const leadId = String(lead?._id || lead || '');
+                  if (leadId) memberMap.set(leadId, { _id: leadId, name: lead?.name || leadId });
+                  return Array.from(memberMap.values()).map(m => (
+                    <option key={m._id} value={m._id}>{m.name} (team member)</option>
+                  ));
+                })()}
               </select>
-              <p style={{ margin: '6px 0 0', fontSize: 11, color: '#94A3B8' }}>The selected employee will be promoted to Team Lead role automatically.</p>
+              <p style={{ margin: '6px 0 0', fontSize: 11, color: '#94A3B8' }}>Only current team members are eligible for team lead.</p>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
               <Button variant="secondary" onClick={() => { setChangeLeadModal(null); setNewLeadId(''); }}>Cancel</Button>
               <Button onClick={handleChangeLead} loading={changingLead} disabled={!newLeadId || newLeadId === changeLeadModal.teamLead?._id}>
-                <Star size={13} /> Change Lead
+                <Diamond size={13} /> Change Lead
               </Button>
             </div>
           </div>
@@ -869,22 +1177,34 @@ export default function TeamsPage() {
         )}
       </Modal>
 
+      {/* ── Team Kanban Board Modal ── */}
+      {kanbanTeam && (
+        <TeamKanbanModal team={kanbanTeam} onClose={() => setKanbanTeam(null)} />
+      )}
+
       {/* ── Live Team Dashboard Modal ── */}
       {dashboardTeam && (
         <TeamDashboardModal
+          key={dashboardTeam._id}
           team={dashboardTeam}
-          projects={projects}
           onClose={() => setDashboardTeam(null)}
-          onAssignTask={(team) => { setDashboardTeam(null); setAssignTaskTeam(team); }}
+          onAssignTask={canManage ? (team) => { setDashboardTeam(null); setAssignTaskTeam(team); } : null}
         />
       )}
 
       {/* ── Assign Task to Team Lead Modal ── */}
       {assignTaskTeam && (
-        <AssignTaskModal
-          team={assignTaskTeam}
+        <AssignTaskModal team={assignTaskTeam} projects={projects}
+          onClose={() => setAssignTaskTeam(null)} onSaved={loadData}
+        />
+      )}
+
+      {/* ── Assign Project to Team Modal ── */}
+      {assignProjectTeam && (
+        <AssignProjectToTeamModal
+          team={assignProjectTeam}
           projects={projects}
-          onClose={() => setAssignTaskTeam(null)}
+          onClose={() => setAssignProjectTeam(null)}
           onSaved={loadData}
         />
       )}

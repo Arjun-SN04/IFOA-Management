@@ -2,18 +2,14 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import Layout from './components/layout/Layout'
 
-// Landing
 import LandingPage from './pages/landing/LandingPage'
-
-// Auth pages
 import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
-
-// App pages
 import DashboardPage from './pages/dashboard/DashboardPage'
 import ProjectsPage from './pages/projects/ProjectsPage'
 import ProjectDetailPage from './pages/projects/ProjectDetailPage'
 import TasksPage from './pages/tasks/TasksPage'
+import BacklogPage from './pages/tasks/BacklogPage'
 import SprintsPage from './pages/sprints/SprintsPage'
 import LeavesPage from './pages/leaves/LeavesPage'
 import DailyTasksPage from './pages/daily-tasks/DailyTasksPage'
@@ -23,7 +19,6 @@ import UsersPage from './pages/admin/UsersPage'
 import TeamsPage from './pages/admin/TeamsPage'
 import ProfilePage from './pages/profile/ProfilePage'
 
-// Loading spinner shown while auth state is being resolved
 function AuthLoader() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F8FAFC' }}>
@@ -36,7 +31,6 @@ function AuthLoader() {
   )
 }
 
-// Route: any authenticated user
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) return <AuthLoader />
@@ -44,16 +38,24 @@ function ProtectedRoute({ children }) {
   return children
 }
 
-// Route: Management + Admin only (managers + admins — not team_lead, not employee)
-function ManagementRoute({ children }) {
-  const { user, loading, isManagerOrAdmin } = useAuth()
+// My Board + Backlog — Employee + Team Lead only
+// HR and Manager are redirected to Team Board
+function EmployeeBoardRoute({ children }) {
+  const { user, loading, isHR, isManagerOrAdmin } = useAuth()
   if (loading) return <AuthLoader />
   if (!user) return <Navigate to="/" replace />
-  if (!isManagerOrAdmin) return <Navigate to="/dashboard" replace />
+  if (isHR || isManagerOrAdmin) return <Navigate to="/admin/teams" replace />
   return children
 }
 
-// Route: Admin only
+function HRRoute({ children }) {
+  const { user, loading, isHROrAbove } = useAuth()
+  if (loading) return <AuthLoader />
+  if (!user) return <Navigate to="/" replace />
+  if (!isHROrAbove) return <Navigate to="/dashboard" replace />
+  return children
+}
+
 function AdminRoute({ children }) {
   const { user, loading, isAdmin } = useAuth()
   if (loading) return <AuthLoader />
@@ -62,7 +64,6 @@ function AdminRoute({ children }) {
   return children
 }
 
-// Route: Guest only (not logged in)
 function GuestRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) return null
@@ -74,32 +75,29 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public landing page */}
         <Route index element={<LandingPage />} />
-
-        {/* Guest routes (unauthenticated only) */}
         <Route path="login"    element={<GuestRoute><Login /></GuestRoute>} />
         <Route path="register" element={<GuestRoute><Register /></GuestRoute>} />
 
-        {/* Protected app routes under layout */}
         <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           {/* All authenticated users */}
-          <Route path="dashboard"    element={<DashboardPage />} />
-          <Route path="projects"     element={<ProjectsPage />} />
-          <Route path="projects/:id" element={<ProjectDetailPage />} />
-          <Route path="tasks"        element={<TasksPage />} />
-          <Route path="sprints"      element={<SprintsPage />} />
-          <Route path="leaves"       element={<LeavesPage />} />
-          <Route path="daily-tasks"  element={<DailyTasksPage />} />
-          <Route path="announcements"element={<AnnouncementsPage />} />
-          <Route path="profile"      element={<ProfilePage />} />
+          <Route path="dashboard"     element={<DashboardPage />} />
+          <Route path="projects"      element={<ProjectsPage />} />
+          <Route path="projects/:id"  element={<ProjectDetailPage />} />
+          <Route path="sprints"       element={<SprintsPage />} />
+          <Route path="leaves"        element={<LeavesPage />} />
+          <Route path="daily-tasks"   element={<DailyTasksPage />} />
+          <Route path="announcements" element={<AnnouncementsPage />} />
+          <Route path="profile"       element={<ProfilePage />} />
 
-          {/* Management + Admin: reports, teams */}
-          <Route path="reports"      element={<ManagementRoute><ReportsPage /></ManagementRoute>} />
-          <Route path="admin/teams"  element={<ManagementRoute><TeamsPage /></ManagementRoute>} />
+          {/* Employee + Team Lead ONLY — HR/Manager redirect to /admin/teams */}
+          <Route path="tasks"   element={<EmployeeBoardRoute><TasksPage /></EmployeeBoardRoute>} />
+          <Route path="backlog" element={<EmployeeBoardRoute><BacklogPage /></EmployeeBoardRoute>} />
 
-          {/* Admin only: user management */}
-          <Route path="admin/users"  element={<AdminRoute><UsersPage /></AdminRoute>} />
+          {/* HR + Manager + Admin */}
+          <Route path="admin/teams"  element={<HRRoute><TeamsPage /></HRRoute>} />
+          <Route path="reports"      element={<HRRoute><ReportsPage /></HRRoute>} />
+          <Route path="admin/users"  element={<HRRoute><UsersPage /></HRRoute>} /> {/* HR + Manager + Admin */}
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

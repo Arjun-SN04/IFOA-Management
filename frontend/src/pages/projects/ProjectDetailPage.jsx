@@ -9,7 +9,7 @@ import {
 import {
   Plus, ArrowLeft, CheckSquare, Users as UsersIcon,
   Circle, Clock, Eye, CheckCircle2, XCircle, RefreshCw,
-  Pencil, Trash2, AlertTriangle, Users2
+  Pencil, Trash2, AlertTriangle, Users2, X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -62,7 +62,6 @@ function StatusBreakdown({ tasks }) {
 }
 
 // ── Team Selector (multi-select pill UI for manager) ───────────────────────
-// Assigns task to ALL members of the selected team(s), not just the lead
 function TeamSelector({ projectTeams, selectedTeamIds, onChange }) {
   const toggle = (teamId) => {
     if (selectedTeamIds.includes(teamId)) {
@@ -76,7 +75,7 @@ function TeamSelector({ projectTeams, selectedTeamIds, onChange }) {
     return (
       <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
         <AlertTriangle className="w-4 h-4 shrink-0" />
-        No teams are assigned to this project yet. Ask an admin to assign teams first.
+        No teams are assigned to this project yet. Add teams in the Edit Project panel first.
       </div>
     );
   }
@@ -90,7 +89,8 @@ function TeamSelector({ projectTeams, selectedTeamIds, onChange }) {
       <div className="flex flex-wrap gap-2">
         {projectTeams.map(team => {
           const selected = selectedTeamIds.includes(String(team._id));
-          const memberCount = (team.members?.length || 0) + (team.teamLead ? 1 : 0);
+          // members array from populated team may or may not include teamLead
+          const memberCount = team.members?.length || 0;
           return (
             <button
               key={team._id}
@@ -115,7 +115,6 @@ function TeamSelector({ projectTeams, selectedTeamIds, onChange }) {
         })}
       </div>
 
-      {/* Summary of who will receive the task */}
       {selectedTeamIds.length > 0 && (
         <div className="mt-2 p-2.5 bg-blue-50 border border-blue-100 rounded-lg">
           <p className="text-xs font-semibold text-blue-700 mb-1.5">Task will be assigned to all members of:</p>
@@ -123,7 +122,7 @@ function TeamSelector({ projectTeams, selectedTeamIds, onChange }) {
             {selectedTeamIds.map(tid => {
               const team = projectTeams.find(t => String(t._id) === tid);
               if (!team) return null;
-              const memberCount = (team.members?.length || 0) + (team.teamLead ? 1 : 0);
+              const memberCount = team.members?.length || 0;
               return (
                 <div key={tid} className="inline-flex items-center gap-1.5 px-2 py-1 bg-white border border-blue-200 rounded-lg text-xs">
                   <span className="w-2 h-2 rounded-full" style={{ background: team.color || '#3B82F6' }} />
@@ -142,6 +141,102 @@ function TeamSelector({ projectTeams, selectedTeamIds, onChange }) {
   );
 }
 
+// ── Team Manager (add/remove teams in Edit Project modal) ──────────────────
+function TeamManager({ projectId, currentTeams, allTeams, onChange }) {
+  const [adding, setAdding] = useState(false);
+  const [removing, setRemoving] = useState(null);
+
+  const assignedIds = (currentTeams || []).map(t => String(t._id || t));
+  const unassigned = allTeams.filter(t => !assignedIds.includes(String(t._id)));
+
+  const handleAdd = async (teamId) => {
+    setAdding(true);
+    try {
+      const res = await projectAPI.assignTeam(projectId, teamId);
+      const updatedProject = res.data.project;
+      onChange(updatedProject.teams || []);
+      toast.success('Team added to project');
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to add team');
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const handleRemove = async (teamId) => {
+    setRemoving(teamId);
+    try {
+      const res = await projectAPI.removeTeam(projectId, teamId);
+      const updatedProject = res.data.project;
+      onChange(updatedProject.teams || []);
+      toast.success('Team removed from project');
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to remove team');
+    } finally {
+      setRemoving(null);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide">
+        Teams Assigned to Project
+      </label>
+
+      {/* Currently assigned teams */}
+      {currentTeams.length === 0 ? (
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+          No teams assigned yet. Add teams below.
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {currentTeams.map(team => (
+            <div key={team._id} className="flex items-center justify-between gap-2 px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: team.color || '#3B82F6' }} />
+                <span className="text-sm font-semibold text-slate-800">{team.name}</span>
+                <span className="text-xs text-slate-400">· {team.members?.length || 0} member(s)</span>
+              </div>
+              <button
+                onClick={() => handleRemove(String(team._id))}
+                disabled={removing === String(team._id)}
+                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition-colors disabled:opacity-50"
+              >
+                {removing === String(team._id) ? <Spinner size="xs" /> : <X className="w-3 h-3" />}
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add available teams */}
+      {unassigned.length > 0 && (
+        <div>
+          <p className="text-xs text-slate-500 mb-2">Add a team:</p>
+          <div className="flex flex-wrap gap-2">
+            {unassigned.map(team => (
+              <button
+                key={team._id}
+                onClick={() => handleAdd(String(team._id))}
+                disabled={adding}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border border-slate-200 bg-white text-slate-700 hover:border-blue-400 hover:bg-blue-50 transition-all disabled:opacity-50"
+              >
+                <span className="w-2 h-2 rounded-full" style={{ background: team.color || '#3B82F6' }} />
+                + {team.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {unassigned.length === 0 && currentTeams.length > 0 && (
+        <p className="text-xs text-slate-400">All available teams are already assigned to this project.</p>
+      )}
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 export default function ProjectDetailPage() {
   const { id } = useParams();
@@ -150,14 +245,15 @@ export default function ProjectDetailPage() {
   const [project, setProject]   = useState(null);
   const [tasks, setTasks]       = useState([]);
   const [allUsers, setAllUsers] = useState([]);
-  const [projectTeams, setProjectTeams] = useState([]);
+  const [allTeams, setAllTeams] = useState([]); // all teams (for edit modal team manager)
+  const [projectTeams, setProjectTeams] = useState([]); // teams assigned to this project (populated)
   const [loading, setLoading]   = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab]           = useState('overview');
 
   // Task add
   const [showAddTask, setShowAddTask] = useState(false);
-  const [taskForm, setTaskForm] = useState({ title: '', description: '', priority: 'medium', status: 'todo', dueDate: '', assignee: '', type: 'task', parent: '' });
+  const [taskForm, setTaskForm] = useState({ title: '', description: '', priority: 'medium', status: 'backlog', dueDate: '', assignee: '', type: 'task', parent: '' });
   const [selectedTeamIds, setSelectedTeamIds] = useState([]);
   const [saving, setSaving]     = useState(false);
 
@@ -177,6 +273,12 @@ export default function ProjectDetailPage() {
   // Delete task
   const [deletingTaskId, setDeletingTaskId] = useState(null);
 
+  // ── Helper: derive projectTeams from populated project.teams ──────────────
+  const deriveProjectTeams = (proj) => {
+    // project.teams is populated with { _id, name, color, teamLead, members }
+    return (proj?.teams || []).filter(t => t && t._id);
+  };
+
   const loadData = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     try {
@@ -190,19 +292,15 @@ export default function ProjectDetailPage() {
       setTasks(tRes.data.tasks || tRes.data.data || []);
       setAllUsers(uRes.data.users || uRes.data.data || []);
 
-      // Load teams for this project (populated with members + teamLead)
-      if (proj?.teams?.length) {
-        try {
-          const allTeamsRes = await teamAPI.getAll();
-          const allTeams = allTeamsRes.data.teams || allTeamsRes.data.data || [];
-          const projTeamIds = (proj.teams || []).map(t => String(t._id || t));
-          const filtered = allTeams.filter(t => projTeamIds.includes(String(t._id)));
-          setProjectTeams(filtered);
-        } catch {
-          setProjectTeams([]);
-        }
-      } else {
-        setProjectTeams([]);
+      // Use the populated teams directly from project response
+      setProjectTeams(deriveProjectTeams(proj));
+
+      // Also load all teams for the edit modal team manager
+      try {
+        const allTeamsRes = await teamAPI.getAll();
+        setAllTeams(allTeamsRes.data.teams || []);
+      } catch {
+        setAllTeams([]);
       }
     } catch {
       navigate('/projects');
@@ -217,36 +315,30 @@ export default function ProjectDetailPage() {
   const isProjectLead = project && String(project.lead?._id || project.lead) === String(user?._id || user?.id);
   const canManageProject = isManagerOrAdmin || isProjectLead;
   const canEditProject = isManagerOrAdmin;
-  const canDeleteTask = isManagerOrAdmin; // both admin and manager can delete tasks
+  const canDeleteTask = isManagerOrAdmin;
 
-  // Manager-only (not admin)
+  // Manager-only (not admin): uses team-based task assignment
   const isManagerOnly = isManagement && !isAdmin;
 
   const handleCreateTask = async () => {
     setSaving(true);
     try {
       if (isManagerOnly && selectedTeamIds.length > 0) {
-        // Assign to ALL members of each selected team via assignToTeam flag
-        let firstTask = null;
         for (const teamId of selectedTeamIds) {
-          const res = await taskAPI.create({
+          await taskAPI.create({
             ...taskForm,
             project: id,
             team: teamId,
             assignToTeam: true,
           });
-          if (!firstTask) firstTask = res.data.task || res.data.data;
         }
-        // Reload tasks to show all the new per-member tasks
         const tRes = await taskAPI.getAll({ project: id }).catch(() => ({ data: { data: [] } }));
         setTasks(tRes.data.tasks || tRes.data.data || []);
         toast.success(`Task assigned to all members of ${selectedTeamIds.length} team(s)`);
       } else {
-        // Admin or direct assignee path
         const res = await taskAPI.create({ ...taskForm, project: id });
         const newTask = res.data.data || res.data.task;
         if (newTask) setTasks(t => [newTask, ...t]);
-        // Handle bulk (assign-to-all) response
         if (res.data.tasks?.length > 1) {
           setTasks(prev => [...res.data.tasks, ...prev]);
         }
@@ -254,7 +346,7 @@ export default function ProjectDetailPage() {
       }
 
       setShowAddTask(false);
-      setTaskForm({ title: '', description: '', priority: 'medium', status: 'todo', dueDate: '', assignee: '', type: 'task', parent: '' });
+      setTaskForm({ title: '', description: '', priority: 'medium', status: 'backlog', dueDate: '', assignee: '', type: 'task', parent: '' });
       setSelectedTeamIds([]);
     } catch (e) {
       toast.error(e.response?.data?.message || 'Failed to create task');
@@ -270,7 +362,6 @@ export default function ProjectDetailPage() {
     } catch (e) { console.error('Status update failed', e); }
   };
 
-  // Delete a task — available to both admin and manager
   const handleDeleteTask = async (taskId) => {
     if (!window.confirm('Delete this task permanently? This cannot be undone.')) return;
     setDeletingTaskId(taskId);
@@ -329,13 +420,33 @@ export default function ProjectDetailPage() {
     setEditSaving(true);
     try {
       const res = await projectAPI.update(id, editForm);
-      setProject(prev => ({ ...prev, ...(res.data.project || res.data.data || editForm) }));
+      const updatedProject = res.data.project || res.data.data;
+      setProject(prev => ({ ...prev, ...(updatedProject || editForm) }));
+      // Refresh teams from updated project if they changed
+      if (updatedProject?.teams) {
+        setProjectTeams(deriveProjectTeams(updatedProject));
+      }
       setShowEditModal(false);
       toast.success('Project updated');
     } catch (e) {
       toast.error(e.response?.data?.message || 'Failed to update project');
     } finally {
       setEditSaving(false);
+    }
+  };
+
+  // Called by TeamManager when teams change — refresh project teams from server
+  const handleTeamsChanged = async (updatedTeams) => {
+    // updatedTeams is already the populated teams array from the API response
+    // But to be safe, reload the project to get fresh populated data
+    try {
+      const pRes = await projectAPI.getById(id);
+      const proj = pRes.data.project || pRes.data.data;
+      setProject(proj);
+      setProjectTeams(deriveProjectTeams(proj));
+    } catch {
+      // fallback: just set what we got
+      setProjectTeams(updatedTeams);
     }
   };
 
@@ -357,7 +468,7 @@ export default function ProjectDetailPage() {
   };
 
   const openAddTask = () => {
-    setTaskForm({ title: '', description: '', priority: 'medium', status: 'todo', dueDate: '', assignee: '', type: 'task', parent: '' });
+    setTaskForm({ title: '', description: '', priority: 'medium', status: 'backlog', dueDate: '', assignee: '', type: 'task', parent: '' });
     setSelectedTeamIds([]);
     setShowAddTask(true);
   };
@@ -536,7 +647,6 @@ export default function ProjectDetailPage() {
                           {task.description && (
                             <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{task.description}</p>
                           )}
-                          {/* Show team badge if task was assigned via a team */}
                           {task.team?.name && (
                             <span className="inline-flex items-center gap-1 mt-1 text-xs px-1.5 py-0.5 rounded-md font-medium"
                               style={{ background: (task.team.color || '#3B82F6') + '18', color: task.team.color || '#3B82F6' }}>
@@ -773,7 +883,7 @@ export default function ProjectDetailPage() {
             )}
           </div>
 
-          {/* Team picker for manager — assigns to ALL team members */}
+          {/* Team picker for manager — only shows teams assigned to this project */}
           {isManagerOnly && (
             <TeamSelector
               projectTeams={projectTeams}
@@ -816,6 +926,7 @@ export default function ProjectDetailPage() {
           <div className="grid grid-cols-3 gap-3">
             <Select label="Status" value={editForm.status || 'planning'} onChange={e => setEditForm(p => ({ ...p, status: e.target.value }))}>
               <option value="planning">Planning</option>
+              <option value="active">Active</option>
               <option value="in-progress">In Progress</option>
               <option value="on-hold">On Hold</option>
               <option value="completed">Completed</option>
@@ -840,6 +951,17 @@ export default function ProjectDetailPage() {
             <Input label="Start Date" type="date" value={editForm.startDate || ''} onChange={e => setEditForm(p => ({ ...p, startDate: e.target.value }))} />
             <Input label="End Date" type="date" value={editForm.endDate || ''} onChange={e => setEditForm(p => ({ ...p, endDate: e.target.value }))} />
           </div>
+
+          {/* ── Team Management ── */}
+          <div className="border-t border-slate-100 pt-4">
+            <TeamManager
+              projectId={id}
+              currentTeams={projectTeams}
+              allTeams={allTeams}
+              onChange={handleTeamsChanged}
+            />
+          </div>
+
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="secondary" onClick={() => setShowEditModal(false)}>Cancel</Button>
             <Button onClick={handleEditProject} loading={editSaving} disabled={!editForm.name?.trim()}>Save Changes</Button>
@@ -855,7 +977,7 @@ export default function ProjectDetailPage() {
             <div>
               <p className="text-sm font-semibold text-red-800">This action cannot be undone</p>
               <p className="text-xs text-red-700 mt-1">
-                Deleting <strong>"{project.name}"</strong> will archive it and remove it from all views. All associated tasks may become inaccessible.
+                Deleting <strong>"{project.name}"</strong> will permanently remove it along with all associated tasks and sprints.
               </p>
             </div>
           </div>

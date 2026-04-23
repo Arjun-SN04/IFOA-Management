@@ -10,18 +10,18 @@ const {
   adminBulkToggle,
   adminSetSelected,
 } = require('../controllers/dailyTaskController');
-const { protect, adminOnly } = require('../middleware/authMiddleware');
+const { protect, hrOrAbove } = require('../middleware/authMiddleware');
 
-// Employee routes
-router.post('/submit',     protect, submitDailyTasks);
-router.get('/my-today',    protect, getMyToday);
-router.get('/my-status',   protect, getMyStatus);
+// Employee routes (all authenticated users)
+router.post('/submit',   protect, submitDailyTasks);
+router.get('/my-today',  protect, getMyToday);
+router.get('/my-status', protect, getMyStatus);
 
-// Admin routes
-router.get('/admin/all',              protect, adminOnly, adminGetAllEntries);
-router.get('/admin/settings',         protect, adminOnly, adminGetSettings);
-router.patch('/admin/settings/:userId', protect, adminOnly, adminToggleEmployee);
-router.post('/admin/settings/bulk',   protect, adminOnly, adminBulkToggle);
-router.post('/admin/settings/selected', protect, adminOnly, adminSetSelected);
+// Management routes — HR, Manager, Admin
+router.get('/admin/all',                protect, hrOrAbove, adminGetAllEntries);
+router.get('/admin/settings',           protect, hrOrAbove, adminGetSettings);
+router.patch('/admin/settings/:userId', protect, hrOrAbove, adminToggleEmployee);
+router.post('/admin/settings/bulk',     protect, hrOrAbove, adminBulkToggle);
+router.post('/admin/settings/selected', protect, hrOrAbove, adminSetSelected);
 
 module.exports = router;

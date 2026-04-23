@@ -10,7 +10,10 @@ const notificationSchema = new mongoose.Schema({
       'leave_applied', 'leave_approved', 'leave_rejected',
       'project_added', 'project_updated',
       'mention', 'announcement', 'sprint_started', 'sprint_ended',
-      'deadline_reminder'
+      'deadline_reminder',
+      // ── User lifecycle ──────────────────────────────────────────────────────
+      'user_registered',  // sent to admin/manager/hr when a new user self-registers
+      'user_approved',    // sent to the new user when their account is approved
     ],
     required: true,
   },

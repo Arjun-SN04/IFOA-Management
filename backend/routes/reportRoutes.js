@@ -4,12 +4,12 @@ const {
   getDashboardStats, getProjectReport, getUserReport,
   getLeaveReport, getSprintReport
 } = require('../controllers/reportController');
-const { protect, managerOrAdmin } = require('../middleware/authMiddleware');
+const { protect, hrOrAbove } = require('../middleware/authMiddleware');
 
 router.get('/dashboard', protect, getDashboardStats);
-router.get('/projects', protect, managerOrAdmin, getProjectReport);
-router.get('/users', protect, managerOrAdmin, getUserReport);
-router.get('/leaves', protect, managerOrAdmin, getLeaveReport);
-router.get('/sprints', protect, managerOrAdmin, getSprintReport);
+router.get('/projects', protect, hrOrAbove, getProjectReport);
+router.get('/users', protect, hrOrAbove, getUserReport);
+router.get('/leaves', protect, hrOrAbove, getLeaveReport);
+router.get('/sprints', protect, hrOrAbove, getSprintReport);
 
 module.exports = router;

@@ -157,7 +157,6 @@ export default function ReportsPage() {
   const tabs = [
     { key: 'overview', label: 'Overview',  icon: BarChart3 },
     { key: 'projects', label: 'Projects',  icon: FolderKanban },
-    { key: 'team',     label: 'Team',      icon: Users },
   ];
 
   return (

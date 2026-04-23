@@ -12,19 +12,16 @@ exports.createTeam = async (req, res) => {
     const { name, description, teamLead, members = [], projects = [], color } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Team name is required' });
 
-    // Only allow employees (role: employee or team_lead) as team lead and members
     const employeeRoles = ['employee', 'team_lead'];
 
-    // Validate teamLead is an employee (not admin/manager)
     if (teamLead) {
       const leadUser = await User.findById(teamLead).select('role name');
       if (!leadUser) return res.status(400).json({ success: false, message: 'Team lead user not found' });
       if (!employeeRoles.includes(leadUser.role)) {
-        return res.status(400).json({ success: false, message: 'Only employees can be assigned as team lead. Admins and managers cannot be team leads.' });
+        return res.status(400).json({ success: false, message: 'Only employees can be assigned as team lead.' });
       }
     }
 
-    // Filter out admin/manager from members
     let filteredMembers = [];
     if (members.length > 0) {
       const memberUsers = await User.find({ _id: { $in: members } }).select('role _id');
@@ -42,7 +39,6 @@ exports.createTeam = async (req, res) => {
       { path: 'projects', select: 'name key' },
     ]);
 
-    // Notify team lead and promote to team_lead role
     if (teamLead && String(teamLead) !== req.user.id) {
       await User.findByIdAndUpdate(teamLead, { role: 'team_lead' });
       await createAndEmit({
@@ -55,7 +51,6 @@ exports.createTeam = async (req, res) => {
       });
     }
 
-    // Notify members
     const uniqueMembers = [...new Set(filteredMembers)].filter(id => id !== req.user.id && id !== String(teamLead));
     await Promise.all(uniqueMembers.map(memberId =>
       createAndEmit({
@@ -86,7 +81,6 @@ exports.getTeams = async (req, res) => {
     } else if (req.user.role === 'team_lead') {
       query.$or = [{ teamLead: req.user.id }, { members: req.user.id }];
     }
-    // managers and admins see all teams
 
     const teams = await Team.find(query)
       .populate('teamLead', 'name email avatar role department')
@@ -111,7 +105,6 @@ exports.getTeamById = async (req, res) => {
       .populate('createdBy', 'name');
     if (!team) return res.status(404).json({ success: false, message: 'Team not found' });
 
-    // Get live task stats for the team
     const memberIds = team.members.map(m => m._id || m);
     const tasks = await Task.find({ assignee: { $in: memberIds } })
       .populate('assignee', 'name email avatar')
@@ -154,7 +147,6 @@ exports.getTeamById = async (req, res) => {
 // Access: Management + Admin
 exports.updateTeam = async (req, res) => {
   try {
-    // Filter out admin/manager from members if provided
     if (req.body.members && req.body.members.length > 0) {
       const memberUsers = await User.find({ _id: { $in: req.body.members } }).select('role _id');
       req.body.members = memberUsers.filter(u => ['employee', 'team_lead'].includes(u.role)).map(u => String(u._id));
@@ -171,7 +163,7 @@ exports.updateTeam = async (req, res) => {
   }
 };
 
-// @desc  Change team lead — management can change team lead at any time
+// @desc  Change team lead
 // @route PATCH /api/teams/:id/lead
 // Access: Management + Admin
 exports.changeTeamLead = async (req, res) => {
@@ -179,19 +171,26 @@ exports.changeTeamLead = async (req, res) => {
     const { newLeadId } = req.body;
     if (!newLeadId) return res.status(400).json({ success: false, message: 'newLeadId is required' });
 
-    // Validate new lead is an employee (not admin/manager)
     const newLeadUser = await User.findById(newLeadId).select('role name');
     if (!newLeadUser) return res.status(404).json({ success: false, message: 'New team lead user not found' });
     if (!['employee', 'team_lead'].includes(newLeadUser.role)) {
-      return res.status(400).json({ success: false, message: 'Only employees can be assigned as team lead. Admins and managers cannot be team leads.' });
+      return res.status(400).json({ success: false, message: 'Only employees can be assigned as team lead.' });
     }
 
     const team = await Team.findById(req.params.id);
     if (!team) return res.status(404).json({ success: false, message: 'Team not found' });
 
+    // New lead must already belong to this team (member or current lead).
+    const currentTeamUserIds = new Set([
+      ...(team.members || []).map(id => String(id)),
+      team.teamLead ? String(team.teamLead) : null,
+    ].filter(Boolean));
+    if (!currentTeamUserIds.has(String(newLeadId))) {
+      return res.status(400).json({ success: false, message: 'New team lead must be selected from current team members' });
+    }
+
     const oldLeadId = team.teamLead ? String(team.teamLead) : null;
 
-    // Demote old team lead back to employee
     if (oldLeadId && oldLeadId !== String(newLeadId)) {
       const otherTeamsAsLead = await Team.countDocuments({
         teamLead: oldLeadId,
@@ -210,10 +209,8 @@ exports.changeTeamLead = async (req, res) => {
       });
     }
 
-    // Promote new lead to team_lead role
     await User.findByIdAndUpdate(newLeadId, { role: 'team_lead' });
 
-    // Ensure new lead is in members list
     team.teamLead = newLeadId;
     const memberIds = team.members.map(String);
     if (!memberIds.includes(String(newLeadId))) {
@@ -254,15 +251,13 @@ exports.deleteTeam = async (req, res) => {
   }
 };
 
-// @desc  Add member to team (employees only)
+// @desc  Add member to team
 // @route POST /api/teams/:id/members
-// Access: Management + Admin
 exports.addMember = async (req, res) => {
   try {
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ success: false, message: 'userId is required' });
 
-    // Only employees can be added as team members
     const memberUser = await User.findById(userId).select('role name');
     if (!memberUser) return res.status(404).json({ success: false, message: 'User not found' });
     if (!['employee', 'team_lead'].includes(memberUser.role)) {
@@ -298,7 +293,6 @@ exports.addMember = async (req, res) => {
 
 // @desc  Remove member from team
 // @route DELETE /api/teams/:id/members/:userId
-// Access: Management + Admin
 exports.removeMember = async (req, res) => {
   try {
     const team = await Team.findById(req.params.id);
@@ -324,7 +318,6 @@ exports.removeMember = async (req, res) => {
 
 // @desc  Switch member from one team to another
 // @route POST /api/teams/switch-member
-// Access: Management + Admin
 exports.switchMember = async (req, res) => {
   try {
     const { userId, fromTeamId, toTeamId } = req.body;
@@ -366,12 +359,26 @@ exports.switchMember = async (req, res) => {
   }
 };
 
-// @desc  Assign project to team
+// @desc  Assign project to team — FIXED: now does full bidirectional sync
 // @route POST /api/teams/:id/projects
 // Access: Management + Admin
 exports.assignProject = async (req, res) => {
   try {
     const { projectId } = req.body;
+    if (!projectId) return res.status(400).json({ success: false, message: 'projectId is required' });
+
+    // Get team details to collect all member IDs
+    const teamDoc = await Team.findById(req.params.id)
+      .populate('members', '_id name')
+      .populate('teamLead', '_id name');
+
+    if (!teamDoc) return res.status(404).json({ success: false, message: 'Team not found' });
+
+    const memberIds = (teamDoc.members || []).map(m => String(m._id || m));
+    const leadId = teamDoc.teamLead ? String(teamDoc.teamLead._id || teamDoc.teamLead) : null;
+    const allIds = [...new Set([...memberIds, leadId].filter(Boolean))];
+
+    // 1. Add project to team's projects list
     const team = await Team.findByIdAndUpdate(
       req.params.id,
       { $addToSet: { projects: projectId } },
@@ -380,16 +387,26 @@ exports.assignProject = async (req, res) => {
       .populate('teamLead', 'name email avatar')
       .populate('members',  'name email avatar')
       .populate('projects', 'name key status');
+
     if (!team) return res.status(404).json({ success: false, message: 'Team not found' });
 
-    const allMemberIds = [...new Set([
-      ...(team.members || []).map(m => String(m._id || m)),
-      team.teamLead ? String(team.teamLead._id || team.teamLead) : null,
-    ].filter(Boolean))].filter(id => id !== req.user.id);
+    // 2. Add team to project's teams list AND add all team members to project.members
+    //    This is the critical fix: bidirectional sync so project knows which teams are assigned
+    await Project.findByIdAndUpdate(
+      projectId,
+      {
+        $addToSet: {
+          teams: req.params.id,
+          members: { $each: allIds },
+        },
+      }
+    );
 
+    // 3. Notify team members
     const project = await Project.findById(projectId).select('name');
+    const notifyIds = allIds.filter(id => id !== req.user.id);
     if (project) {
-      await Promise.all(allMemberIds.map(memberId =>
+      await Promise.all(notifyIds.map(memberId =>
         createAndEmit({
           recipient: memberId,
           sender: req.user.id,
@@ -401,7 +418,7 @@ exports.assignProject = async (req, res) => {
       ));
     }
 
-    res.json({ success: true, team });
+    res.json({ success: true, team, message: 'Project assigned to team' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -421,6 +438,12 @@ exports.removeProject = async (req, res) => {
       .populate('members',  'name email avatar')
       .populate('projects', 'name key status');
     if (!team) return res.status(404).json({ success: false, message: 'Team not found' });
+
+    // Also remove team from Project.teams for bidirectional sync
+    await Project.findByIdAndUpdate(req.params.projectId, {
+      $pull: { teams: req.params.id },
+    });
+
     res.json({ success: true, team });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -429,7 +452,7 @@ exports.removeProject = async (req, res) => {
 
 // @desc  Get live dashboard for a specific team
 // @route GET /api/teams/:id/dashboard
-// Access: Management + Admin
+// Access: HR + Management + Admin
 exports.getTeamDashboard = async (req, res) => {
   try {
     const team = await Team.findById(req.params.id)
@@ -441,6 +464,7 @@ exports.getTeamDashboard = async (req, res) => {
 
     const memberIds = team.members.map(m => m._id || m);
 
+    // Fetch tasks assigned to members of THIS specific team only
     const tasks = await Task.find({ assignee: { $in: memberIds } })
       .populate('assignee', 'name email avatar')
       .populate('project', 'name key')

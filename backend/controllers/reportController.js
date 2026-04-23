@@ -74,7 +74,8 @@ exports.getProjectReport = async (req, res) => {
 // @desc  User productivity report
 exports.getUserReport = async (req, res) => {
   try {
-    const users = await User.find({ isActive: true }).select('name email role department');
+    // Only include task-doing roles — exclude manager, hr, admin
+    const users = await User.find({ isActive: true, role: { $in: ['employee', 'team_lead'] } }).select('name email role department');
     const report = await Promise.all(users.map(async (u) => {
       const assigned = await Task.countDocuments({ assignee: u._id });
       const completed = await Task.countDocuments({ assignee: u._id, status: 'done' });

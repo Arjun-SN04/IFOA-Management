@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useNotifications } from '../../context/NotificationContext';
 import toast from 'react-hot-toast';
 import {
   LayoutDashboard,
@@ -10,60 +12,52 @@ import {
   Megaphone,
   BarChart3,
   Users,
-  UsersRound,
   ClipboardList,
   User,
   LogOut,
   ChevronLeft,
   ChevronRight,
-  ShieldCheck,
-  Briefcase,
-  UserCheck,
   LayoutGrid,
+  Archive,
 } from 'lucide-react';
-import GreenLogo from '../../assets/Green_logo.png';
+import IFOAIndia from '../../assets/IFOA_INDIA.png';
+import IFOABlank from '../../assets/IFOA_blank.png';
 
-// Nav items for EMPLOYEES and TEAM LEADS (they have a personal board)
+// Nav items for ALL employees (including team leads — team lead is just a title/post)
 const EMPLOYEE_NAV = [
   { to: '/dashboard',     label: 'Dashboard',     icon: LayoutDashboard },
   { to: '/projects',      label: 'Projects',      icon: FolderKanban },
   { to: '/tasks',         label: 'My Board',      icon: CheckSquare },
+  { to: '/backlog',       label: 'Backlog',        icon: Archive },
   { to: '/daily-tasks',   label: 'Daily Tasks',   icon: ClipboardList },
   { to: '/sprints',       label: 'Sprints',       icon: Zap },
   { to: '/leaves',        label: 'Leaves',        icon: CalendarDays },
   { to: '/announcements', label: 'Announcements', icon: Megaphone },
 ];
 
-// Nav items for ADMIN and MANAGER — no "My Board" (they assign, not do tasks)
-const MANAGEMENT_WORKSPACE_NAV = [
+// Nav items for HR and Manager — includes Daily Tasks for task management
+const HR_MANAGER_WORKSPACE_NAV = [
   { to: '/dashboard',     label: 'Dashboard',     icon: LayoutDashboard },
   { to: '/projects',      label: 'Projects',      icon: FolderKanban },
+  { to: '/daily-tasks',   label: 'Daily Tasks',   icon: ClipboardList },
   { to: '/sprints',       label: 'Sprints',       icon: Zap },
   { to: '/leaves',        label: 'Leaves',        icon: CalendarDays },
   { to: '/announcements', label: 'Announcements', icon: Megaphone },
 ];
 
-// Nav items shown to Management + Admin (managers and admins) — management section
+// Management section nav (HR + Manager + Admin)
 const MANAGEMENT_NAV = [
-  { to: '/reports',      label: 'Reports',         icon: BarChart3 },
-  { to: '/admin/teams',  label: 'Teams & Boards',  icon: UsersRound },
+  { to: '/admin/teams',  label: 'Team Board',  icon: LayoutGrid },
+  { to: '/reports',      label: 'Reports',     icon: BarChart3 },
+  { to: '/admin/users',  label: 'Users',       icon: Users },
 ];
 
-// Nav items shown to Admin only
-const ADMIN_NAV = [
-  { to: '/admin/users',  label: 'Users',     icon: Users },
-];
-
-// Badge for role label next to section header
-const ROLE_BADGE = {
-  admin:      { label: 'Admin',      color: '#EF4444', bg: '#FEF2F2' },
-  manager:    { label: 'Management', color: '#8B5CF6', bg: '#F5F3FF' },
-  team_lead:  { label: 'Team Lead',  color: '#F59E0B', bg: '#FFFBEB' },
-  employee:   { label: 'User',       color: '#3B82F6', bg: '#EFF6FF' },
-};
+// Admin-only nav (empty — users moved to management nav)
+const ADMIN_NAV = [];
 
 export default function Sidebar({ collapsed, setCollapsed }) {
-  const { user, isAdmin, isManagement, isTeamLead, isManagerOrAdmin, isTeamLeadOrAbove, logout } = useAuth();
+  const { user, isAdmin, isHR, isManagerOrAdmin, isHROrAbove, logout } = useAuth();
+  const { pendingUsersCount } = useNotifications();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -72,11 +66,8 @@ export default function Sidebar({ collapsed, setCollapsed }) {
     navigate('/login');
   };
 
-  const badge = ROLE_BADGE[user?.role] || ROLE_BADGE.employee;
-
-  // Choose workspace nav based on role:
-  // Admin and Manager do NOT get "My Board" — they manage teams and assign work
-  const workspaceNav = isManagerOrAdmin ? MANAGEMENT_WORKSPACE_NAV : EMPLOYEE_NAV;
+  const isHROrManager = isHR || isManagerOrAdmin;
+  const workspaceNav = isHROrManager ? HR_MANAGER_WORKSPACE_NAV : EMPLOYEE_NAV;
 
   const linkBase = (isActive) => ({
     display: 'flex',
@@ -97,10 +88,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
   });
 
   const sectionLabel = (label) => !collapsed && (
-    <p style={{
-      fontSize: 9, fontWeight: 700, color: '#94A3B8',
-      letterSpacing: '0.14em', textTransform: 'uppercase', margin: 0,
-    }}>
+    <p style={{ fontSize: 9, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.14em', textTransform: 'uppercase', margin: 0 }}>
       {label}
     </p>
   );
@@ -110,10 +98,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
     : null;
 
   const navSection = (items) => items.map(({ to, label, icon: Icon }) => (
-    <NavLink
-      key={to}
-      to={to}
-      title={collapsed ? label : undefined}
+    <NavLink key={to} to={to} title={collapsed ? label : undefined}
       style={({ isActive }) => linkBase(isActive)}
       onMouseEnter={(e) => {
         if (e.currentTarget.getAttribute('aria-current') !== 'page') {
@@ -124,10 +109,24 @@ export default function Sidebar({ collapsed, setCollapsed }) {
         if (e.currentTarget.getAttribute('aria-current') !== 'page') {
           Object.assign(e.currentTarget.style, { color: '#475569', background: 'transparent', borderColor: 'transparent' });
         }
-      }}
-    >
+      }}>
       <Icon size={16} style={{ flexShrink: 0 }} />
-      {!collapsed && <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>}
+      {!collapsed && (
+        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{label}</span>
+      )}
+      {/* Pending users badge on the Users link */}
+      {to === '/admin/users' && pendingUsersCount > 0 && (
+        <span style={{
+          minWidth: 18, height: 18, borderRadius: 999,
+          background: '#D97706', color: '#fff',
+          fontSize: 10, fontWeight: 800,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '0 4px', flexShrink: 0,
+          ...(collapsed ? { position: 'absolute', top: 2, right: 2 } : {}),
+        }}>
+          {pendingUsersCount > 9 ? '9+' : pendingUsersCount}
+        </span>
+      )}
     </NavLink>
   ));
 
@@ -144,75 +143,24 @@ export default function Sidebar({ collapsed, setCollapsed }) {
       position: 'relative',
       zIndex: 40,
     }}>
-
       {/* Logo */}
-      <div style={{
-        height: 64, display: 'flex', alignItems: 'center',
-        padding: collapsed ? '0 14px' : '0 16px',
-        borderBottom: '1px solid #E5E7EB', gap: 10, flexShrink: 0,
-        justifyContent: collapsed ? 'center' : 'flex-start',
-        overflow: 'hidden',
-      }}>
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0, minWidth: 0 }}>
-          <img src={GreenLogo} alt="IFOA" style={{ height: 30, width: 'auto', objectFit: 'contain', flexShrink: 0 }} />
-          {!collapsed && (
-            <div style={{ minWidth: 0 }}>
-              <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#0F172A', whiteSpace: 'nowrap', letterSpacing: '0.01em' }}>
-                IFOA Management
-              </p>
-              <span style={{
-                display: 'inline-flex', alignItems: 'center',
-                padding: '1px 7px', borderRadius: 20,
-                fontSize: 9, fontWeight: 700,
-                color: badge.color, background: badge.bg,
-                letterSpacing: '0.08em', textTransform: 'uppercase',
-              }}>
-                {badge.label}
-              </span>
-            </div>
+      <div style={{ height: 64, display: 'flex', alignItems: 'center', padding: collapsed ? '0 14px' : '0 16px', borderBottom: '1px solid #E5E7EB', flexShrink: 0, justifyContent: collapsed ? 'center' : 'flex-start', overflow: 'hidden' }}>
+        <Link to="/" style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', textDecoration: 'none', flexShrink: 0, width: '100%' }}>
+          {collapsed ? (
+            <img src={IFOABlank} alt="IFOA" style={{ height: 36, width: 'auto', objectFit: 'contain', flexShrink: 0 }} />
+          ) : (
+            <img src={IFOAIndia} alt="IFOA India" style={{ height: 36, width: 'auto', objectFit: 'contain', flexShrink: 0, maxWidth: '100%' }} />
           )}
         </Link>
       </div>
 
       {/* Navigation */}
       <nav style={{ flex: 1, overflowY: 'auto', padding: '16px 10px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
-
-        {/* ── Workspace (role-scoped) ── */}
-        <div style={{ padding: collapsed ? '0 0 4px' : '0 4px 4px' }}>
-          {sectionLabel('Workspace')}
-        </div>
+        <div style={{ padding: collapsed ? '0 0 4px' : '0 4px 4px' }}>{sectionLabel('Workspace')}</div>
         {navSection(workspaceNav)}
 
-        {/* ── Team Lead section (task board link for team leads) ── */}
-        {isTeamLead && !isManagerOrAdmin && (
-          <>
-            <div style={{ padding: collapsed ? '14px 0 4px' : '16px 4px 4px' }}>
-              {divider()}
-              {sectionLabel('Team Lead')}
-            </div>
-            <NavLink
-              to="/admin/teams"
-              title={collapsed ? 'My Team' : undefined}
-              style={({ isActive }) => linkBase(isActive)}
-              onMouseEnter={(e) => {
-                if (e.currentTarget.getAttribute('aria-current') !== 'page') {
-                  Object.assign(e.currentTarget.style, { color: '#0F172A', background: '#F8FAFC', borderColor: '#E2E8F0' });
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (e.currentTarget.getAttribute('aria-current') !== 'page') {
-                  Object.assign(e.currentTarget.style, { color: '#475569', background: 'transparent', borderColor: 'transparent' });
-                }
-              }}
-            >
-              <UserCheck size={16} style={{ flexShrink: 0 }} />
-              {!collapsed && <span style={{ whiteSpace: 'nowrap' }}>My Team</span>}
-            </NavLink>
-          </>
-        )}
-
-        {/* ── Management Section (manager + admin) ── */}
-        {isManagerOrAdmin && (
+        {/* Management Section (HR + Manager + Admin) */}
+        {isHROrAbove && (
           <>
             <div style={{ padding: collapsed ? '14px 0 4px' : '16px 4px 4px' }}>
               {divider()}
@@ -222,7 +170,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
           </>
         )}
 
-        {/* ── Admin Section (admin only) ── */}
+        {/* Admin Section */}
         {isAdmin && (
           <>
             <div style={{ padding: collapsed ? '14px 0 4px' : '16px 4px 4px' }}>
@@ -237,48 +185,25 @@ export default function Sidebar({ collapsed, setCollapsed }) {
       {/* Footer */}
       <div style={{ borderTop: '1px solid #E5E7EB', padding: '8px' }}>
         {!collapsed && (
-          <Link
-            to="/profile"
-            style={{
-              width: '100%', display: 'flex', alignItems: 'center', gap: 9,
-              padding: '9px 12px', fontSize: 12, fontWeight: 600,
-              color: '#334155', textDecoration: 'none', borderRadius: 10, transition: 'background 0.15s',
-            }}
+          <Link to="/profile"
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', fontSize: 12, fontWeight: 600, color: '#334155', textDecoration: 'none', borderRadius: 10, transition: 'background 0.15s' }}
             onMouseEnter={(e) => { e.currentTarget.style.background = '#F8FAFC'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-          >
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
             <User size={14} />
             My Profile
           </Link>
         )}
-
-        <button
-          onClick={handleLogout}
-          style={{
-            width: '100%', display: 'flex', alignItems: 'center',
-            justifyContent: collapsed ? 'center' : 'flex-start',
-            gap: 9, padding: collapsed ? '9px' : '9px 12px',
-            fontSize: 12, fontWeight: 600, color: '#DC2626', background: 'none',
-            border: 'none', cursor: 'pointer', borderRadius: 10, fontFamily: 'inherit', transition: 'background 0.15s',
-          }}
+        <button onClick={handleLogout}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', gap: 9, padding: collapsed ? '9px' : '9px 12px', fontSize: 12, fontWeight: 600, color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 10, fontFamily: 'inherit', transition: 'background 0.15s' }}
           onMouseEnter={(e) => { e.currentTarget.style.background = '#FEF2F2'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-        >
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
           <LogOut size={14} />
           {!collapsed && 'Sign out'}
         </button>
-
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          style={{
-            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            gap: 6, padding: '6px', marginTop: 4, borderRadius: 10, border: 'none',
-            cursor: 'pointer', background: 'transparent', color: '#94A3B8',
-            fontSize: 11, fontWeight: 500, transition: 'all 0.2s', fontFamily: 'inherit',
-          }}
+        <button onClick={() => setCollapsed(!collapsed)}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '6px', marginTop: 4, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'transparent', color: '#94A3B8', fontSize: 11, fontWeight: 500, transition: 'all 0.2s', fontFamily: 'inherit' }}
           onMouseEnter={(e) => { Object.assign(e.currentTarget.style, { color: '#2563EB', background: '#EFF6FF' }); }}
-          onMouseLeave={(e) => { Object.assign(e.currentTarget.style, { color: '#94A3B8', background: 'transparent' }); }}
-        >
+          onMouseLeave={(e) => { Object.assign(e.currentTarget.style, { color: '#94A3B8', background: 'transparent' }); }}>
           {collapsed ? <ChevronRight size={14} /> : <><ChevronLeft size={14} /><span>Collapse</span></>}
         </button>
       </div>

@@ -20,6 +20,8 @@ async function run() {
 
   if (user) {
     user.role = 'admin';
+    user.isApproved = true;
+    user.isActive = true;
     await user.save();
     console.log(`✅ User "${user.name}" (${email}) promoted to admin`);
   } else {
@@ -32,6 +34,8 @@ async function run() {
       department: 'Management',
       designation: 'Administrator',
       employeeId: `IFOA-${String(count + 1).padStart(4, '0')}`,
+      isApproved: true,
+      isActive: true,
     });
     console.log(`✅ Admin user created:`);
     console.log(`   Email: ${email}`);
@@ -43,3 +47,4 @@ async function run() {
 }
 
 run().catch(err => { console.error(err); process.exit(1); });
+

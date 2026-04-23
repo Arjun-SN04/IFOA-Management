@@ -35,14 +35,6 @@ function formatDayLabel(date) {
   return new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-/* ─────────────────────────────────────────
-   Colour palette — white primary, rich accents
-   - Indigo   : primary actions, active states
-   - Emerald  : success / completion
-   - Amber    : warnings / overdue
-   - Sky      : in-progress / activity
-   - Black    : headings, strong labels
-───────────────────────────────────────── */
 const C = {
   indigo:       '#2563EB',
   indigoBg:     '#EFF6FF',
@@ -73,14 +65,13 @@ const C = {
   surfaceAlt:    '#F8FAFC',
 };
 
-/* Each metric card gets its own accent colour */
 const METRIC_ACCENTS = [
-  { bg: C.indigoBg,   border: C.indigoBorder,   icon: C.indigo  },   // Total Tasks
-  { bg: C.emeraldBg,  border: C.emeraldBorder,  icon: C.emerald },   // Completion
-  { bg: C.skyBg,      border: C.skyBorder,      icon: C.sky     },   // In Progress
-  { bg: C.amberBg,    border: C.amberBorder,    icon: C.amber   },   // Overdue
-  { bg: C.indigoBg,   border: C.indigoBorder,   icon: C.indigo  },   // Projects
-  { bg: C.emeraldBg,  border: C.emeraldBorder,  icon: C.emerald },   // Leave Pending
+  { bg: C.indigoBg,   border: C.indigoBorder,   icon: C.indigo  },
+  { bg: C.emeraldBg,  border: C.emeraldBorder,  icon: C.emerald },
+  { bg: C.skyBg,      border: C.skyBorder,      icon: C.sky     },
+  { bg: C.amberBg,    border: C.amberBorder,    icon: C.amber   },
+  { bg: C.indigoBg,   border: C.indigoBorder,   icon: C.indigo  },
+  { bg: C.emeraldBg,  border: C.emeraldBorder,  icon: C.emerald },
 ];
 
 function Carousel({ slides }) {
@@ -90,8 +81,8 @@ function Carousel({ slides }) {
   const next = () => setIndex((i) => (i === total - 1 ? 0 : i + 1));
 
   return (
-    <div style={{ marginTop: 6 }}>
-      <div style={{ overflow: 'hidden', borderRadius: 24, border: `1px solid ${C.border}`, background: C.surface }}>
+    <div style={{ marginTop: 2 }}>
+      <div style={{ overflow: 'hidden', borderRadius: 18, border: `1px solid ${C.border}`, background: C.surface }}>
         <div
           style={{
             display: 'flex',
@@ -101,15 +92,15 @@ function Carousel({ slides }) {
           }}
         >
           {slides.map((slide, idx) => (
-            <section key={idx} style={{ width: `${100 / total}%`, padding: 28 }}>
+            <section key={idx} style={{ width: `${100 / total}%`, padding: 16 }}>
               {slide}
             </section>
           ))}
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, marginTop: 12 }}>
-        <button onClick={prev} style={{ width: 36, height: 36, borderRadius: 999, border: `1px solid ${C.border}`, background: C.surface, color: C.slate, cursor: 'pointer' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 8 }}>
+        <button onClick={prev} style={{ width: 32, height: 32, borderRadius: 999, border: `1px solid ${C.border}`, background: C.surface, color: C.slate, cursor: 'pointer' }}>
           <ChevronLeft size={16} style={{ margin: 'auto' }} />
         </button>
         {slides.map((_, idx) => (
@@ -128,7 +119,7 @@ function Carousel({ slides }) {
             }}
           />
         ))}
-        <button onClick={next} style={{ width: 36, height: 36, borderRadius: 999, border: `1px solid ${C.border}`, background: C.surface, color: C.slate, cursor: 'pointer' }}>
+        <button onClick={next} style={{ width: 32, height: 32, borderRadius: 999, border: `1px solid ${C.border}`, background: C.surface, color: C.slate, cursor: 'pointer' }}>
           <ChevronRight size={16} style={{ margin: 'auto' }} />
         </button>
       </div>
@@ -142,8 +133,8 @@ function Metric({ icon: Icon, label, value, hint, accentIndex = 0 }) {
     <div
       style={{
         border: `1px solid ${C.border}`,
-        borderRadius: 16,
-        padding: 14,
+        borderRadius: 14,
+        padding: 10,
         background: C.surface,
         boxShadow: '0 4px 16px rgba(15,23,42,0.05)',
         borderTop: `3px solid ${acc.icon}`,
@@ -166,20 +157,19 @@ function Metric({ icon: Icon, label, value, hint, accentIndex = 0 }) {
         </span>
         {label}
       </div>
-      <p style={{ margin: '8px 0 2px', fontSize: 28, fontWeight: 700, color: C.black, lineHeight: 1 }}>{value}</p>
+      <p style={{ margin: '6px 0 2px', fontSize: 22, fontWeight: 700, color: C.black, lineHeight: 1 }}>{value}</p>
       <p style={{ margin: 0, fontSize: 11, color: C.slateMid }}>{hint}</p>
     </div>
   );
 }
 
-/* Coloured status badge */
 function StatusBadge({ status }) {
   const s = (status || 'todo').replace('-', ' ');
   let bg, color;
-  if (status === 'done')        { bg = C.emeraldBg;  color = C.emerald; }
-  else if (status === 'in-progress') { bg = C.skyBg; color = C.sky;     }
-  else if (status === 'review') { bg = C.indigoBg;   color = C.indigo;  }
-  else                          { bg = C.surfaceAlt;  color = C.slate;  }
+  if (status === 'done')             { bg = C.emeraldBg;  color = C.emerald; }
+  else if (status === 'in-progress') { bg = C.skyBg;      color = C.sky;     }
+  else if (status === 'in-review')   { bg = C.indigoBg;   color = C.indigo;  }
+  else                               { bg = C.surfaceAlt; color = C.slate;   }
   return (
     <span style={{ background: bg, color, fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 999, textTransform: 'capitalize', whiteSpace: 'nowrap' }}>
       {s}
@@ -188,7 +178,8 @@ function StatusBadge({ status }) {
 }
 
 export default function DashboardPage() {
-  const { user, isManagerOrAdmin } = useAuth();
+  const { user, isHROrAbove } = useAuth();
+  const isManagementView = isHROrAbove;
 
   const [stats, setStats]             = useState(null);
   const [myTasks, setMyTasks]         = useState([]);
@@ -204,7 +195,7 @@ export default function DashboardPage() {
         taskAPI.getMy().catch(() => ({ data: { data: [] } })),
         leaveAPI.getBalance().catch(() => null),
       ];
-      if (isManagerOrAdmin) {
+      if (isManagementView) {
         calls.push(taskAPI.getAll().catch(() => ({ data: { data: [] } })));
         calls.push(projectAPI.getAll().catch(() => ({ data: { data: [] } })));
       }
@@ -212,14 +203,14 @@ export default function DashboardPage() {
       setStats(result[0]?.data?.data || null);
       setMyTasks(result[1]?.data?.tasks || result[1]?.data?.data || []);
       setLeaveBalance(result[2]?.data?.summary || null);
-      if (isManagerOrAdmin) {
+      if (isManagementView) {
         setAllTasks(result[3]?.data?.tasks || result[3]?.data?.data || []);
         setProjects(result[4]?.data?.projects || result[4]?.data?.data || []);
       }
     } finally {
       setLoading(false);
     }
-  }, [isManagerOrAdmin]);
+  }, [isManagementView]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -247,23 +238,42 @@ export default function DashboardPage() {
     return () => clearInterval(t);
   }, []);
 
-  const taskPool       = isManagerOrAdmin ? allTasks : myTasks;
-  const totalTasks     = taskPool.length;
-  const completedTasks = taskPool.filter((t) => t.status === 'done').length;
-  const inProgressTasks = taskPool.filter((t) => t.status === 'in-progress').length;
-  const overdueTasks   = taskPool.filter(
+  // Task pool: manager/admin sees all tasks, employees see only their tasks
+  // For employees, exclude backlog tasks from dashboard (backlog has its own page)
+  const taskPool = isManagementView ? allTasks : myTasks;
+
+  // For employees: active tasks only (non-backlog) for dashboard metrics
+  const activeTasks = isManagementView
+    ? taskPool
+    : taskPool.filter(t => t.status !== 'backlog');
+
+  const totalTasks     = activeTasks.length;
+  const completedTasks = activeTasks.filter((t) => t.status === 'done').length;
+  const inProgressTasks = activeTasks.filter((t) => t.status === 'in-progress').length;
+  const overdueTasks   = activeTasks.filter(
     (t) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'done'
   ).length;
   const completionRate = totalTasks ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   const upcomingTasks = useMemo(
-    () => [...taskPool].filter((t) => t.dueDate).sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate)).slice(0, 8),
-    [taskPool]
+    () => [...activeTasks].filter((t) => t.dueDate).sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate)).slice(0, 8),
+    [activeTasks]
   );
   const recentUpdates = useMemo(
-    () => [...taskPool].sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt)).slice(0, 8),
-    [taskPool]
+    () => [...activeTasks].sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt)).slice(0, 8),
+    [activeTasks]
   );
+  const leaveSummaryItems = useMemo(() => {
+    const items = [
+      ['Approved', leaveBalance?.approved ?? 0],
+      ['Pending', leaveBalance?.pending ?? 0],
+      ['Rejected', leaveBalance?.rejected ?? 0],
+    ];
+    if (!isManagementView) {
+      items.push(['Cancelled', leaveBalance?.cancelled ?? 0]);
+    }
+    return items;
+  }, [leaveBalance, isManagementView]);
 
   const chartData = stats?.weeklyActivity || [];
 
@@ -275,7 +285,6 @@ export default function DashboardPage() {
     );
   }
 
-  /* ─── Leave tile colours ─── */
   const leaveTileAccent = {
     Approved:  { bg: C.emeraldBg,  color: C.emerald },
     Pending:   { bg: C.amberBg,    color: C.amber   },
@@ -283,39 +292,40 @@ export default function DashboardPage() {
     Cancelled: { bg: C.surfaceAlt, color: C.slate   },
   };
 
-  /* ─── Action queue pill colours ─── */
   const actionAccent = [C.indigo, C.sky, C.amber, C.emerald];
 
-  const slides = [
-    /* ── Slide 1 : Overview ── */
-    <div key="overview" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+  // ── Slides vary by role ────────────────────────────────────────────────────
+  // Employee view: no backlog metrics, simpler action queue
+  // Manager/Admin view: full operational overview
+
+  /* ── Slide 1 : Overview ── */
+  const slide1 = (
+    <div key="overview" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
           <p style={{ margin: 0, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slateMid, fontWeight: 700 }}>
-            Operations Snapshot
+            {isManagementView ? 'Operations Snapshot' : 'My Work Overview'}
           </p>
-          <h2 style={{ margin: '6px 0 0', fontSize: 28, color: C.black, fontWeight: 700 }}>
-            Large Scale Data{' '}
-            <span style={{ color: '#2563EB' }}>Overview</span>
+          <h2 style={{ margin: '4px 0 0', fontSize: 22, color: C.black, fontWeight: 700 }}>
+            {isManagementView ? (
+              <>Large Scale Data{' '}<span style={{ color: '#2563EB' }}>Overview</span></>
+            ) : (
+              <>My Active <span style={{ color: '#2563EB' }}>Tasks</span></>
+            )}
           </h2>
-          <p style={{ margin: '6px 0 0', color: C.slateMid, fontSize: 13 }}>
-            Unified metrics for workload, completion, and delivery status.
+          <p style={{ margin: '4px 0 0', color: C.slateMid, fontSize: 12 }}>
+            {isManagementView
+              ? 'Unified metrics for workload, completion, and delivery status.'
+              : 'Your active tasks and upcoming deadlines. Backlog tasks are in the Backlog section.'}
           </p>
         </div>
         <Link
           to="/tasks"
           style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            textDecoration: 'none',
-            fontSize: 12,
-            fontWeight: 700,
-            color: C.surface,
-            border: 'none',
-            borderRadius: 10,
-            padding: '9px 14px',
-            background: C.black,
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            textDecoration: 'none', fontSize: 12, fontWeight: 700,
+            color: C.surface, border: 'none', borderRadius: 10,
+            padding: '8px 12px', background: C.black,
           }}
         >
           Open Task Board
@@ -323,17 +333,29 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-        <Metric icon={CheckSquare}  label="Total Tasks"   value={totalTasks}    hint="Across current scope"       accentIndex={0} />
-        <Metric icon={Activity}     label="Completion"    value={`${completionRate}%`} hint="Overall completion rate" accentIndex={1} />
-        <Metric icon={Clock}        label="In Progress"   value={inProgressTasks} hint="Currently active"         accentIndex={2} />
-        <Metric icon={AlertTriangle} label="Overdue"      value={overdueTasks}  hint="Need immediate action"      accentIndex={3} />
-        <Metric icon={FolderKanban} label="Projects"      value={isManagerOrAdmin ? projects.length : stats?.totalProjects ?? '-'} hint="Tracked project spaces" accentIndex={4} />
-        <Metric icon={CalendarDays} label="Leave Pending" value={leaveBalance?.pending ?? 0} hint="Requests waiting approval" accentIndex={5} />
+      {/* Metrics grid — employee has no backlog/projects metrics */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
+        {isManagementView ? (
+          <>
+            <Metric icon={CheckSquare}   label="Total Tasks"   value={totalTasks}              hint="Across current scope"         accentIndex={0} />
+            <Metric icon={Activity}      label="Completion"    value={`${completionRate}%`}    hint="Overall completion rate"      accentIndex={1} />
+            <Metric icon={Clock}         label="In Progress"   value={inProgressTasks}         hint="Currently active"             accentIndex={2} />
+            <Metric icon={AlertTriangle} label="Overdue"       value={overdueTasks}            hint="Need immediate action"        accentIndex={3} />
+            <Metric icon={FolderKanban}  label="Projects"      value={projects.length}         hint="Tracked project spaces"       accentIndex={4} />
+            <Metric icon={CalendarDays}  label="Leave Pending" value={leaveBalance?.pending ?? 0} hint="Requests waiting approval" accentIndex={5} />
+          </>
+        ) : (
+          <>
+            <Metric icon={CheckSquare}   label="Active Tasks"  value={totalTasks}              hint="Excluding backlog"            accentIndex={0} />
+            <Metric icon={Activity}      label="Completion"    value={`${completionRate}%`}    hint="Your completion rate"         accentIndex={1} />
+            <Metric icon={Clock}         label="In Progress"   value={inProgressTasks}         hint="Currently active"             accentIndex={2} />
+            <Metric icon={AlertTriangle} label="Overdue"       value={overdueTasks}            hint="Need immediate action"        accentIndex={3} />
+          </>
+        )}
       </div>
 
-      <div style={{ border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
-        <div style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, background: C.surfaceAlt, fontSize: 12, fontWeight: 700, color: C.blackMid, display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
+        <div style={{ padding: '9px 12px', borderBottom: `1px solid ${C.border}`, background: C.surfaceAlt, fontSize: 12, fontWeight: 700, color: C.blackMid, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ width: 8, height: 8, borderRadius: 999, background: C.indigo, display: 'inline-block' }} />
           Upcoming deadlines and ownership
         </div>
@@ -342,7 +364,7 @@ export default function DashboardPage() {
             <thead>
               <tr style={{ background: C.surface }}>
                 {['Task', 'Project', 'Assignee', 'Due Date', 'Status'].map((head) => (
-                  <th key={head} style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, color: C.slateMid, fontWeight: 700, borderBottom: `1px solid ${C.border}` }}>
+                  <th key={head} style={{ textAlign: 'left', padding: '8px 12px', fontSize: 11, color: C.slateMid, fontWeight: 700, borderBottom: `1px solid ${C.border}` }}>
                     {head}
                   </th>
                 ))}
@@ -351,7 +373,7 @@ export default function DashboardPage() {
             <tbody>
               {upcomingTasks.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: 20, textAlign: 'center', color: C.slateLight, fontSize: 12 }}>
+                  <td colSpan={5} style={{ padding: 14, textAlign: 'center', color: C.slateLight, fontSize: 12 }}>
                     No upcoming tasks found.
                   </td>
                 </tr>
@@ -361,19 +383,19 @@ export default function DashboardPage() {
                     onMouseEnter={(e) => e.currentTarget.style.background = C.surfaceAlt}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                   >
-                    <td style={{ padding: '10px 14px', fontSize: 12, color: C.black, fontWeight: 600, borderBottom: `1px solid ${C.borderLight}`, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '8px 12px', fontSize: 12, color: C.black, fontWeight: 600, borderBottom: `1px solid ${C.borderLight}`, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {task.title}
                     </td>
-                    <td style={{ padding: '10px 14px', fontSize: 12, color: C.slate, borderBottom: `1px solid ${C.borderLight}` }}>
+                    <td style={{ padding: '8px 12px', fontSize: 12, color: C.slate, borderBottom: `1px solid ${C.borderLight}` }}>
                       {task.project?.name || 'No project'}
                     </td>
-                    <td style={{ padding: '10px 14px', fontSize: 12, color: C.slate, borderBottom: `1px solid ${C.borderLight}` }}>
+                    <td style={{ padding: '8px 12px', fontSize: 12, color: C.slate, borderBottom: `1px solid ${C.borderLight}` }}>
                       {task.assignee?.name || user?.name || 'Unassigned'}
                     </td>
-                    <td style={{ padding: '10px 14px', fontSize: 12, color: C.slate, borderBottom: `1px solid ${C.borderLight}` }}>
+                    <td style={{ padding: '8px 12px', fontSize: 12, color: C.slate, borderBottom: `1px solid ${C.borderLight}` }}>
                       {formatDayLabel(task.dueDate)}
                     </td>
-                    <td style={{ padding: '10px 14px', borderBottom: `1px solid ${C.borderLight}` }}>
+                    <td style={{ padding: '8px 12px', borderBottom: `1px solid ${C.borderLight}` }}>
                       <StatusBadge status={task.status} />
                     </td>
                   </tr>
@@ -383,12 +405,14 @@ export default function DashboardPage() {
           </table>
         </div>
       </div>
-    </div>,
+    </div>
+  );
 
-    /* ── Slide 2 : Activity ── */
-    <div key="activity" style={{ display: 'grid', gridTemplateColumns: '1.15fr 1fr', gap: 16 }}>
-      <div style={{ border: `1px solid ${C.border}`, borderRadius: 16, padding: 16, background: C.surface }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14, gap: 8, flexWrap: 'wrap' }}>
+  /* ── Slide 2 : Activity ── */
+  const slide2 = (
+    <div key="activity" style={{ display: 'grid', gridTemplateColumns: '1.15fr 1fr', gap: 12 }}>
+      <div style={{ border: `1px solid ${C.border}`, borderRadius: 14, padding: 12, background: C.surface }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
           <div>
             <h3 style={{ margin: 0, fontSize: 16, color: C.black, fontWeight: 700 }}>Weekly Throughput</h3>
             <p style={{ margin: '4px 0 0', fontSize: 12, color: C.slateMid }}>Tasks completed over the last 7 days</p>
@@ -397,7 +421,7 @@ export default function DashboardPage() {
             {today}
           </div>
         </div>
-        <div style={{ height: 290 }}>
+        <div style={{ height: 220 }}>
           {chartData.length === 0 ? (
             <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.slateLight, fontSize: 12 }}>
               No chart data available.
@@ -422,20 +446,17 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div style={{ border: `1px solid ${C.border}`, borderRadius: 16, padding: 16, background: C.surface }}>
+      <div style={{ border: `1px solid ${C.border}`, borderRadius: 14, padding: 12, background: C.surface }}>
         <h3 style={{ margin: 0, fontSize: 16, color: C.black, fontWeight: 700 }}>Recent Updates</h3>
-        <p style={{ margin: '4px 0 12px', fontSize: 12, color: C.slateMid }}>Latest changes in tasks and progress.</p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 330, overflowY: 'auto' }}>
+        <p style={{ margin: '4px 0 10px', fontSize: 12, color: C.slateMid }}>Latest changes in tasks and progress.</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 250, overflowY: 'auto' }}>
           {recentUpdates.length === 0 ? (
             <div style={{ padding: 12, border: `1px dashed ${C.border}`, borderRadius: 12, color: C.slateLight, fontSize: 12 }}>
               No recent updates available.
             </div>
           ) : (
             recentUpdates.map((task) => (
-              <div
-                key={task._id}
-                style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', background: C.surface }}
-              >
+              <div key={task._id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', background: C.surface }}>
                 <p style={{ margin: 0, fontSize: 12, color: C.black, fontWeight: 600 }}>{task.title}</p>
                 <p style={{ margin: '3px 0 0', fontSize: 11, color: C.slateMid }}>{task.project?.name || 'No project'}</p>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
@@ -447,21 +468,18 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
-    </div>,
+    </div>
+  );
 
-    /* ── Slide 3 : Capacity ── */
-    <div key="capacity" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-      <div style={{ border: `1px solid ${C.border}`, borderRadius: 16, padding: 16, background: C.surface }}>
+  /* ── Slide 3 : Capacity / Action Queue ── */
+  const slide3 = (
+    <div key="capacity" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div style={{ border: `1px solid ${C.border}`, borderRadius: 14, padding: 12, background: C.surface }}>
         <h3 style={{ margin: 0, fontSize: 16, color: C.black, fontWeight: 700 }}>Capacity and Leave</h3>
-        <p style={{ margin: '4px 0 14px', fontSize: 12, color: C.slateMid }}>Current leave ledger and request pressure.</p>
+        <p style={{ margin: '4px 0 14px', fontSize: 12, color: C.slateMid }}>Current leave ledger and request status.</p>
         {leaveBalance ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
-            {[
-              ['Approved', leaveBalance.approved ?? 0],
-              ['Pending',  leaveBalance.pending  ?? 0],
-              ['Rejected', leaveBalance.rejected ?? 0],
-              ['Cancelled',leaveBalance.cancelled?? 0],
-            ].map(([label, value]) => {
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+            {leaveSummaryItems.map(([label, value]) => {
               const acc = leaveTileAccent[label] || { bg: C.surfaceAlt, color: C.slate };
               return (
                 <div key={label} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, background: acc.bg }}>
@@ -478,28 +496,30 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div style={{ border: `1px solid ${C.border}`, borderRadius: 16, padding: 16, background: C.surface }}>
-        <h3 style={{ margin: 0, fontSize: 16, color: C.black, fontWeight: 700 }}>Action Queue</h3>
-        <p style={{ margin: '4px 0 14px', fontSize: 12, color: C.slateMid }}>Quick links for high-priority actions.</p>
+      <div style={{ border: `1px solid ${C.border}`, borderRadius: 14, padding: 12, background: C.surface }}>
+        <h3 style={{ margin: 0, fontSize: 16, color: C.black, fontWeight: 700 }}>Quick Links</h3>
+        <p style={{ margin: '4px 0 14px', fontSize: 12, color: C.slateMid }}>Jump to key sections.</p>
         <div style={{ display: 'grid', gap: 10 }}>
-          {[
-            { to: '/tasks',         label: 'Review all tasks',        helper: `${totalTasks} total tasks in scope` },
-            { to: '/projects',      label: 'Check project boards',    helper: `${isManagerOrAdmin ? projects.length : stats?.totalProjects ?? 0} active projects` },
+          {(isManagementView ? [
+            { to: '/tasks',         label: 'Review all tasks',        helper: `${totalTasks} active tasks in scope` },
+            { to: '/projects',      label: 'Check project boards',    helper: `${projects.length} active projects` },
             { to: '/leaves',        label: 'Handle leave requests',   helper: `${leaveBalance?.pending ?? 0} pending approvals` },
             { to: '/announcements', label: 'Publish update',          helper: 'Share operations updates' },
-          ].map((item, i) => (
+          ] : [
+            { to: '/tasks',         label: 'My task board',           helper: `${totalTasks} active tasks` },
+            { to: '/leaves',        label: 'My leave requests',       helper: `${leaveBalance?.pending ?? 0} pending` },
+            { to: '/announcements', label: 'Announcements',           helper: 'Latest updates from management' },
+            { to: '/profile',       label: 'My profile',              helper: 'View and update your info' },
+          ]).map((item, i) => (
             <Link
               key={item.to}
               to={item.to}
               style={{
                 border: `1px solid ${C.border}`,
                 borderLeft: `3px solid ${actionAccent[i]}`,
-                borderRadius: 12,
-                padding: '10px 12px',
-                textDecoration: 'none',
-                color: C.black,
-                background: C.surface,
-                transition: 'background 0.15s',
+                borderRadius: 12, padding: '10px 12px',
+                textDecoration: 'none', color: C.black,
+                background: C.surface, transition: 'background 0.15s',
               }}
               onMouseEnter={(e) => e.currentTarget.style.background = C.surfaceAlt}
               onMouseLeave={(e) => e.currentTarget.style.background = C.surface}
@@ -510,19 +530,21 @@ export default function DashboardPage() {
           ))}
         </div>
       </div>
-    </div>,
-  ];
+    </div>
+  );
+
+  const slides = [slide1, slide2, slide3];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* ── Greeting header ── */}
       <section
         style={{
-          padding: '8px 2px',
+          padding: '4px 2px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: 18,
+          gap: 12,
           flexWrap: 'wrap',
         }}
       >
@@ -530,32 +552,29 @@ export default function DashboardPage() {
           <p style={{ margin: 0, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slateMid }}>
             Daily Greeting
           </p>
-          <h1 style={{ margin: '4px 0 0', fontSize: 34, lineHeight: 1.1, color: C.black, fontWeight: 700 }}>
+          <h1 style={{ margin: '2px 0 0', fontSize: 36, lineHeight: 1.1, color: C.black, fontWeight: 700 }}>
             <span>{typedGreeting.slice(0, greetingPrefix.length)}</span>
             <span style={{ color: '#2563EB' }}>{typedGreeting.slice(greetingPrefix.length)}</span>
             <span style={{ marginLeft: 2, color: '#2563EB', opacity: showCaret ? 1 : 0, transition: 'opacity 0.2s ease' }}>|</span>
           </h1>
-          <p style={{ margin: '5px 0 0', fontSize: 14, color: C.slateMid }}>
-            Welcome back. Today is {today}. Here is your expanded operational view.
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: C.slateMid }}>
+            Welcome back. Today is {today}.{' '}
+            {isManagementView ? 'Here is your expanded operational view.' : 'Here is your work summary.'}
           </p>
         </div>
 
         {/* ── Quick stats card ── */}
         <div
           style={{
-            flex: '0 0 260px',
-            width: '100%',
-            maxWidth: 320,
-            border: `1px solid ${C.border}`,
-            borderRadius: 14,
-            background: C.surface,
-            padding: '10px 12px',
+            flex: '0 0 260px', width: '100%', maxWidth: 320,
+            border: `1px solid ${C.border}`, borderRadius: 14,
+            background: C.surface, padding: '8px 10px',
           }}
         >
           <p style={{ margin: 0, fontSize: 11, color: C.slateMid, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
             Quick Updates
           </p>
-          <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
+          <div style={{ marginTop: 6, display: 'grid', gap: 5 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
               <span style={{ color: C.slate }}>Overdue Tasks</span>
               <span style={{ color: C.amber, fontWeight: 700 }}>{overdueTasks}</span>
@@ -576,20 +595,11 @@ export default function DashboardPage() {
           <Link
             to="/tasks"
             style={{
-              marginTop: 10,
-              width: '100%',
-              textDecoration: 'none',
-              border: 'none',
-              color: C.surface,
-              background: C.black,
-              borderRadius: 10,
-              padding: '8px 10px',
-              fontSize: 12,
-              fontWeight: 700,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 6,
+              marginTop: 8, width: '100%',
+              textDecoration: 'none', border: 'none',
+              color: C.surface, background: C.black, borderRadius: 10,
+              padding: '7px 10px', fontSize: 12, fontWeight: 700,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}
           >
             <CheckSquare size={13} />

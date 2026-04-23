@@ -1,20 +1,26 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import toast from 'react-hot-toast';
 import { projectAPI, userAPI, teamAPI } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { Card, Button, Modal, Input, Textarea, Select, Badge, Empty, Spinner, PageHeader } from '../../components/ui';
-import { Plus, FolderKanban, Users, CalendarDays, UsersRound } from 'lucide-react';
+import { Plus, FolderKanban, Users, CalendarDays, UsersRound, Trash2 } from 'lucide-react';
 
 export default function ProjectsPage() {
-  const { isManagerOrAdmin, user: me } = useAuth();
+  const { isManagerOrAdmin, isHROrAbove, isHR, user: me } = useAuth();
   const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
+
+  // HR + Manager + Admin can delete projects
+  const canDelete = isHROrAbove;
 
   // Form: manager/admin assigns teams — lead is always themselves (the manager)
   const [form, setForm] = useState({
@@ -48,7 +54,6 @@ export default function ProjectsPage() {
     try {
       const payload = {
         ...form,
-        // lead is always the logged-in manager/admin (set server-side too, but pass for clarity)
         lead: me?.id || me?._id,
       };
       const res = await projectAPI.create(payload);
@@ -59,6 +64,19 @@ export default function ProjectsPage() {
     } catch (e) {
       alert(e.response?.data?.message || 'Failed to create project');
     } finally { setSaving(false); }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteConfirm) return;
+    setDeleting(true);
+    try {
+      await projectAPI.archive(deleteConfirm._id);
+      setProjects(prev => prev.filter(p => p._id !== deleteConfirm._id));
+      toast.success(`Project "${deleteConfirm.name}" deleted`);
+      setDeleteConfirm(null);
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to delete project');
+    } finally { setDeleting(false); }
   };
 
   const autoKey = (name) =>
@@ -139,11 +157,47 @@ export default function ProjectsPage() {
         : <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {filtered.map((p, idx) => (
               <motion.div key={p._id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: idx * 0.05 }}>
-                <ProjectCard project={p} onClick={() => navigate(`/projects/${p._id}`)} />
+                <ProjectCard
+                  project={p}
+                  onClick={() => navigate(`/projects/${p._id}`)}
+                  canDelete={canDelete}
+                  onDelete={(e) => { e.stopPropagation(); setDeleteConfirm(p); }}
+                />
               </motion.div>
             ))}
           </motion.div>
       }
+
+      {/* ── Delete Confirm Modal ── */}
+      <Modal open={!!deleteConfirm} onClose={() => !deleting && setDeleteConfirm(null)} title="Delete Project" size="sm">
+        {deleteConfirm && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 12, padding: '14px 16px' }}>
+              <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700, color: '#991B1B' }}>
+                Delete "{deleteConfirm.name}"?
+              </p>
+              <p style={{ margin: 0, fontSize: 12, color: '#B91C1C' }}>
+                This will permanently remove the project and all its associated data. This cannot be undone.
+              </p>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                disabled={deleting}
+                style={{ padding: '9px 16px', borderRadius: 9, border: '1px solid #E2E8F0', background: '#fff', color: '#475569', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 9, border: 'none', background: '#DC2626', color: '#fff', fontSize: 13, fontWeight: 700, cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.7 : 1 }}>
+                {deleting ? <Spinner size="xs" /> : <Trash2 size={13} />}
+                {deleting ? 'Deleting…' : 'Delete Project'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* ── Create Project Modal ── */}
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Create New Project" size="lg">
@@ -154,7 +208,6 @@ export default function ProjectsPage() {
           </div>
           <Textarea label="Description" value={form.description} onChange={set('description')} placeholder="What is this project about?" rows={3} />
 
-          {/* ── Assign Teams (replaces Project Lead dropdown for managers) ── */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
               <p style={{ fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.07em', margin: 0 }}>
@@ -181,7 +234,6 @@ export default function ProjectsPage() {
                   return (
                     <div key={team._id} onClick={() => toggleTeam(team._id)}
                       style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, cursor: 'pointer', background: selected ? '#EFF6FF' : '#F8FAFC', border: `1.5px solid ${selected ? '#2563EB' : '#E2E8F0'}`, transition: 'all 0.15s' }}>
-                      {/* Team color dot */}
                       <div style={{ width: 12, height: 12, borderRadius: 999, background: team.color || '#3B82F6', flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: selected ? '#1D4ED8' : '#0F172A' }}>{team.name}</p>
@@ -190,7 +242,6 @@ export default function ProjectsPage() {
                           {team.teamLead?.name ? ` · Lead: ${team.teamLead.name}` : ' · No lead set'}
                         </p>
                       </div>
-                      {/* Checkmark */}
                       <div style={{ width: 20, height: 20, borderRadius: 6, border: `2px solid ${selected ? '#2563EB' : '#D1D5DB'}`, background: selected ? '#2563EB' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
                         {selected && <span style={{ color: '#fff', fontSize: 12, fontWeight: 900 }}>✓</span>}
                       </div>
@@ -204,7 +255,6 @@ export default function ProjectsPage() {
             </p>
           </div>
 
-          {/* Status, Priority, Category */}
           <div className="grid grid-cols-3 gap-3">
             <Select label="Status" value={form.status} onChange={set('status')}>
               <option value="planning">Planning</option>
@@ -259,7 +309,7 @@ const PROJECT_PRIORITY_CONFIG = {
   critical: { color: '#DC2626', bg: '#FEF2F2', label: 'Critical', icon: '↑↑' },
 };
 
-function ProjectCard({ project: p, onClick }) {
+function ProjectCard({ project: p, onClick, canDelete, onDelete }) {
   const progress = p.progress ?? 0;
   const memberCount = p.members?.length || 0;
   const teamCount = p.teams?.length || 0;
@@ -276,10 +326,31 @@ function ProjectCard({ project: p, onClick }) {
         borderTop: `3px solid ${sc.color}`, padding: '18px 20px 16px',
         cursor: 'pointer', boxShadow: '0 2px 10px rgba(15,23,42,0.06)',
         display: 'flex', flexDirection: 'column', gap: 14, height: '100%',
+        position: 'relative',
       }}
     >
+      {/* Delete button — shown to HR + Manager + Admin */}
+      {canDelete && (
+        <button
+          onClick={onDelete}
+          title="Delete project"
+          style={{
+            position: 'absolute', top: 14, right: 14,
+            width: 28, height: 28, borderRadius: 8,
+            border: '1px solid #FCA5A5', background: '#FEF2F2',
+            color: '#DC2626', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', cursor: 'pointer', zIndex: 2,
+            transition: 'all 0.15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = '#DC2626'; e.currentTarget.style.color = '#fff'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.color = '#DC2626'; }}
+        >
+          <Trash2 size={12} />
+        </button>
+      )}
+
       {/* Status + priority badges */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', paddingRight: canDelete ? 36 : 0 }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 999, background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           {sc.label}
         </span>

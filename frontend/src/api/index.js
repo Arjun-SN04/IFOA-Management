@@ -21,8 +21,18 @@ export const userAPI = {
   getMyAccessories: () => API.get('/users/me/accessories'),
   getAccessories: (id) => API.get(`/users/${id}/accessories`),
   addAccessory: (id, data) => API.post(`/users/${id}/accessories`, data),
+  updateAccessory: (id, accessoryId, data) => API.put(`/users/${id}/accessories/${accessoryId}`, data),
   removeAccessory: (id, accessoryId) => API.delete(`/users/${id}/accessories/${accessoryId}`),
   toggleStatus: (id) => API.patch(`/users/${id}/toggle-status`),
+  approveUser: (id, approved, reason) => API.patch(`/users/${id}/approve`, { approved, reason }),
+  getPending: () => API.get('/users/pending'),
+};
+
+export const nocAPI = {
+  create: (data) => API.post('/nocs', data),
+  getAll: (params) => API.get('/nocs', { params }),
+  review: (id, data) => API.patch(`/nocs/${id}/review`, data),
+  delete: (id) => API.delete(`/nocs/${id}`),
 };
 
 export const projectAPI = {
@@ -42,6 +52,7 @@ export const taskAPI = {
   create: (data) => API.post('/tasks', data),
   getAll: (params) => API.get('/tasks', { params }),
   getMy: () => API.get('/tasks/my'),
+  getAssignableUsers: () => API.get('/tasks/assignable-users'),
   getById: (id) => API.get(`/tasks/${id}`),
   update: (id, data) => API.put(`/tasks/${id}`, data),
   delete: (id) => API.delete(`/tasks/${id}`),

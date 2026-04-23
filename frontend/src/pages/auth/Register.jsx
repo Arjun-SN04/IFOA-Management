@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authAPI } from '../../api';
-import { UserPlus, ShieldCheck, Briefcase, User } from 'lucide-react';
-import IFOAWhite from '../../assets/IFOA_white.png';
+import { UserPlus, Briefcase, User, Clock, CheckCircle2 } from 'lucide-react';
+import IFOAIndia from '../../assets/IFOA_INDIA.png';
 
 const ROLE_OPTIONS = [
   {
     value: 'employee',
-    label: 'User',
+    label: 'Employee',
     icon: User,
     description: 'View & manage your assigned tasks',
     color: '#3B82F6',
@@ -15,38 +15,37 @@ const ROLE_OPTIONS = [
   },
   {
     value: 'manager',
-    label: 'Management',
+    label: 'Manager',
     icon: Briefcase,
     description: 'Create projects, manage teams & assign tasks',
     color: '#8B5CF6',
     bg: '#F5F3FF',
   },
-  {
-    value: 'admin',
-    label: 'Admin',
-    icon: ShieldCheck,
-    description: 'Full system control & user management',
-    color: '#EF4444',
-    bg: '#FEF2F2',
-  },
 ];
 
 export default function Register() {
+  const LOGO_SHIFT_X_PX = -10;
   const navigate = useNavigate();
   const [form, setForm] = useState({
-    name: '', email: '', password: '',
-    department: '', designation: '', role: 'employee',
+    name: '', email: '', password: '', role: 'employee',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // After successful registration show pending-approval screen
+  const [registered, setRegistered] = useState(null); // { name, email }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      await authAPI.register(form);
-      navigate('/login');
+      const res = await authAPI.register(form);
+      if (res.data?.pending) {
+        // Show the pending-approval message instead of redirecting to login
+        setRegistered({ name: form.name, email: form.email });
+      } else {
+        navigate('/login');
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed');
     } finally {
@@ -61,20 +60,67 @@ export default function Register() {
 
   const selectedRole = ROLE_OPTIONS.find(r => r.value === form.role);
 
+  // ── Pending Approval Screen ───────────────────────────────────────────────
+  if (registered) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px' }}>
+        <div style={{ width: '100%', maxWidth: 480, textAlign: 'center' }}>
+          <div style={{ textAlign: 'center', marginBottom: 24 }}>
+            <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', transform: `translateX(${LOGO_SHIFT_X_PX}px)` }}>
+              <img src={IFOAIndia} alt="IFOA" style={{ height: 56, width: 'auto', objectFit: 'contain', margin: '0 auto' }} />
+            </Link>
+          </div>
+          <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 16, padding: 36, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+            <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#FFF7ED', border: '2px solid #FED7AA', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+              <Clock size={28} style={{ color: '#EA580C' }} />
+            </div>
+            <h2 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 800, color: '#0F172A' }}>
+              Registration Submitted!
+            </h2>
+            <p style={{ margin: '0 0 16px', fontSize: 14, color: '#64748B', lineHeight: 1.6 }}>
+              Hi <strong>{registered.name}</strong>, your account has been created and is now <strong>pending approval</strong>.
+            </p>
+            <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 12, padding: '14px 16px', marginBottom: 20, textAlign: 'left' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                <Clock size={15} style={{ color: '#D97706', flexShrink: 0, marginTop: 1 }} />
+                <div>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#92400E' }}>What happens next?</p>
+                  <ul style={{ margin: '6px 0 0', padding: '0 0 0 14px', fontSize: 12, color: '#92400E', lineHeight: 1.7 }}>
+                    <li>An admin, manager, or HR will review your registration</li>
+                    <li>Once approved, you'll be able to log in with your credentials</li>
+                    <li>You will receive a notification when approved</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 10, marginBottom: 20 }}>
+              <CheckCircle2 size={14} style={{ color: '#059669', flexShrink: 0 }} />
+              <p style={{ margin: 0, fontSize: 12, color: '#475569' }}>Registered with: <strong>{registered.email}</strong></p>
+            </div>
+            <Link to="/login" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 24px', background: '#3B82F6', color: '#fff', fontSize: 13, fontWeight: 700, borderRadius: 10, textDecoration: 'none' }}>
+              Go to Login
+            </Link>
+          </div>
+        </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px' }}>
       <div style={{ width: '100%', maxWidth: 480 }}>
 
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
-            <img src={IFOAWhite} alt="IFOA" style={{ height: 64, width: 'auto', objectFit: 'contain' }} />
+          <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', width: '100%', transform: `translateX(${LOGO_SHIFT_X_PX}px)` }}>
+            <img src={IFOAIndia} alt="IFOA" style={{ height: 56, width: 'auto', objectFit: 'contain', margin: '0 auto' }} />
           </Link>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0F172A', margin: '8px 0 4px', letterSpacing: '-0.01em' }}>
             Create your account
           </h1>
           <p style={{ fontSize: 13, color: '#64748B', margin: 0 }}>
-            Fill in your details to get started
+            Fill in your details to get started — an admin will review and approve your account.
           </p>
         </div>
 
@@ -87,6 +133,12 @@ export default function Register() {
                 {error}
               </div>
             )}
+
+            {/* Approval notice */}
+            <div style={{ padding: '10px 14px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, fontSize: 12, color: '#92400E', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Clock size={13} style={{ flexShrink: 0 }} />
+              Your account will require approval from admin, manager, or HR before you can log in.
+            </div>
 
             {/* Name + Email */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -104,27 +156,6 @@ export default function Register() {
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Password</label>
               <input type="password" className={fieldCls} value={form.password} onChange={set('password')} placeholder="Minimum 6 characters" required minLength={6} />
-            </div>
-
-            {/* Department + Designation */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Department</label>
-                <select className={fieldCls} value={form.department} onChange={set('department')}>
-                  <option value="">Select</option>
-                  <option value="Engineering">Engineering</option>
-                  <option value="Design">Design</option>
-                  <option value="Marketing">Marketing</option>
-                  <option value="Sales">Sales</option>
-                  <option value="HR">HR</option>
-                  <option value="Finance">Finance</option>
-                  <option value="Operations">Operations</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Designation</label>
-                <input className={fieldCls} value={form.designation} onChange={set('designation')} placeholder="e.g. Developer" />
-              </div>
             </div>
 
             {/* Role Selection — Card-based */}

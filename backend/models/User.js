@@ -5,7 +5,8 @@ const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   email: { type: String, required: true, unique: true, lowercase: true },
   password: { type: String, required: true, minlength: 6 },
-  role: { type: String, enum: ['admin', 'manager', 'team_lead', 'employee'], default: 'employee' },
+  // hr = HR role: can view everything, manage leaves, but CANNOT create/assign projects or create teams
+  role: { type: String, enum: ['admin', 'hr', 'manager', 'team_lead', 'employee'], default: 'employee' },
   department: { type: String, trim: true },
   designation: { type: String, trim: true },
   phone: { type: String },
@@ -13,6 +14,13 @@ const userSchema = new mongoose.Schema({
   employeeId: { type: String, unique: true },
   joiningDate: { type: Date, default: Date.now },
   isActive: { type: Boolean, default: true },
+
+  // ── Approval flow ─────────────────────────────────────────────────────────
+  // New self-registered users are set to isApproved: false.
+  // Admin / Manager / HR must approve them before they can use the dashboard.
+  // Users created directly by admin (via UsersPage) bypass this and start approved.
+  isApproved: { type: Boolean, default: false },
+
   leaveBalance: {
     casual: { type: Number, default: 12 },
     sick: { type: Number, default: 10 },
