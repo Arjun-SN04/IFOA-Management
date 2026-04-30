@@ -96,13 +96,17 @@ exports.getProjects = async (req, res) => {
     const query = { isArchived: false };
 
     if (req.user.role === 'employee') {
-      // Employees only see projects they are members of (via their team assignment)
-      query.$or = [{ lead: req.user.id }, { members: req.user.id }];
+      // FIX BUG 2: Employees only see projects where they are an explicit member.
+      // This means projects with no team assigned (where members only contains
+      // the manager) are correctly invisible to employees.
+      query.members = req.user.id;
     } else if (req.user.role === 'team_lead') {
-      // Team leads see projects their teams are assigned to, or they are a member
+      // FIX BUG 2: Team leads see only projects their team is explicitly assigned to,
+      // or projects where they are a direct member/lead.
       const myTeams = await Team.find({
         $or: [{ teamLead: req.user.id }, { members: req.user.id }],
       }).select('projects');
+
       const teamProjectIds = myTeams.flatMap(t => t.projects.map(String));
       const uniqueProjectIds = [...new Set(teamProjectIds)];
 
@@ -113,10 +117,11 @@ exports.getProjects = async (req, res) => {
           { members: req.user.id },
         ];
       } else {
+        // No team projects — only show projects they are a direct member of
         query.$or = [{ lead: req.user.id }, { members: req.user.id }];
       }
     }
-    // managers and admins see all projects
+    // managers and admins see all projects (no additional filter)
 
     if (status) query.status = status;
     if (search) query.name = { $regex: search, $options: 'i' };
@@ -327,9 +332,25 @@ exports.assignTeamToProject = async (req, res) => {
 // Access: Management + Admin
 exports.removeTeamFromProject = async (req, res) => {
   try {
+    // FIX BUG 2 (supporting): When a team is removed from a project, also remove
+    // those team members from project.members so they immediately lose visibility.
+    const teamDoc = await Team.findById(req.params.teamId)
+      .populate('members', '_id')
+      .populate('teamLead', '_id');
+
+    const memberIds = (teamDoc?.members || []).map(m => String(m._id || m));
+    const teamLeadId = teamDoc?.teamLead ? String(teamDoc.teamLead._id || teamDoc.teamLead) : null;
+    const allTeamMemberIds = [...new Set([...memberIds, teamLeadId].filter(Boolean))];
+
+    // Pull the team and all its members from the project
     const project = await Project.findByIdAndUpdate(
       req.params.id,
-      { $pull: { teams: req.params.teamId } },
+      {
+        $pull: {
+          teams: req.params.teamId,
+          members: { $in: allTeamMemberIds },
+        },
+      },
       { new: true }
     )
       .populate('lead', 'name email avatar')
@@ -337,6 +358,12 @@ exports.removeTeamFromProject = async (req, res) => {
       .populate('teams', 'name color teamLead');
 
     if (!project) return res.status(404).json({ success: false, message: 'Project not found' });
+
+    // Always keep the project lead in members even if they were in the removed team
+    if (project.lead) {
+      const leadId = project.lead._id ? String(project.lead._id) : String(project.lead);
+      await Project.findByIdAndUpdate(req.params.id, { $addToSet: { members: leadId } });
+    }
 
     await Team.findByIdAndUpdate(req.params.teamId, { $pull: { projects: req.params.id } });
 

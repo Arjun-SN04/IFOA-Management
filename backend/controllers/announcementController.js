@@ -1,4 +1,5 @@
 const Announcement = require('../models/Announcement');
+const Notification = require('../models/Notification');
 const User = require('../models/User');
 const { createAndEmit } = require('./notificationController');
 
@@ -46,17 +47,15 @@ exports.createAnnouncement = async (req, res) => {
   try {
     const { scheduledFor, ...rest } = req.body;
 
-    // Determine if this is scheduled or immediate
     const isScheduled = scheduledFor && new Date(scheduledFor) > new Date();
     const announcement = await Announcement.create({
       ...rest,
       createdBy: req.user._id,
       creatorRole: req.user.role,
       scheduledFor: isScheduled ? new Date(scheduledFor) : undefined,
-      isPublished: !isScheduled, // scheduled = not yet published
+      isPublished: !isScheduled,
     });
 
-    // Send notifications immediately only if not scheduled
     if (!isScheduled) {
       await sendAnnouncementNotifications(announcement, req.user);
     }
@@ -67,29 +66,53 @@ exports.createAnnouncement = async (req, res) => {
   }
 };
 
-// @desc  Get all announcements (audience-filtered, only published + creator's own scheduled)
+// @desc  Get all announcements — expired ones are excluded and auto-deleted
 exports.getAllAnnouncements = async (req, res) => {
   try {
     const role = req.user.role;
-    let audienceFilter = {};
+    const now = new Date();
 
+    // ── Auto-delete expired announcements (fire-and-forget) ────────────────
+    Announcement.find({
+      expiresAt: { $exists: true, $ne: null, $lte: now },
+    }).then(async (expired) => {
+      if (!expired.length) return;
+      const ids = expired.map(a => a._id);
+      await Announcement.deleteMany({ _id: { $in: ids } });
+      console.log(`[Announcements] Auto-deleted ${expired.length} expired announcement(s)`);
+    }).catch(() => {});
+
+    // ── Audience filter ────────────────────────────────────────────────────
+    let audienceFilter = {};
     if (role === 'employee' || role === 'team_lead') {
       audienceFilter.$or = [{ audience: 'all' }, { audience: 'employees' }];
     } else if (role === 'manager' || role === 'hr') {
       audienceFilter.$or = [{ audience: 'all' }, { audience: 'managers' }];
     }
-    // admin sees everything (no audience filter)
 
-    // Published announcements (audience-filtered) + own scheduled drafts
+    // ── "Not expired" clause ───────────────────────────────────────────────
+    const notExpired = {
+      $or: [
+        { expiresAt: { $exists: false } },
+        { expiresAt: null },
+        { expiresAt: { $gt: now } },
+      ],
+    };
+
+    // ── Build main filter ──────────────────────────────────────────────────
     let filter;
     if (role === 'admin') {
-      filter = {}; // admin sees all
+      filter = { $and: [notExpired] };
     } else {
       filter = {
-        $or: [
-          { ...audienceFilter, isPublished: true },
-          // Also show creator their own scheduled (unpublished) drafts
-          { createdBy: req.user._id, isPublished: false },
+        $and: [
+          notExpired,
+          {
+            $or: [
+              { ...audienceFilter, isPublished: true },
+              { createdBy: req.user._id, isPublished: false }, // own scheduled drafts
+            ],
+          },
         ],
       };
     }
@@ -121,7 +144,6 @@ exports.updateAnnouncement = async (req, res) => {
     const announcement = await Announcement.findById(req.params.id);
     if (!announcement) return res.status(404).json({ success: false, message: 'Not found' });
 
-    // Only admin or the original creator can update
     const isOwner = String(announcement.createdBy) === String(req.user._id);
     if (!isOwner && req.user.role !== 'admin') {
       return res.status(403).json({ success: false, message: 'You can only edit announcements you created' });
@@ -147,6 +169,12 @@ exports.deleteAnnouncement = async (req, res) => {
       return res.status(403).json({ success: false, message: 'You can only delete announcements you created' });
     }
 
+    const escapedTitle = announcement.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    await Notification.deleteMany({
+      type: 'announcement',
+      message: { $regex: escapedTitle },
+    });
+
     await Announcement.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: 'Announcement deleted' });
   } catch (err) {
@@ -154,7 +182,7 @@ exports.deleteAnnouncement = async (req, res) => {
   }
 };
 
-// @desc  Pin/unpin — HR/Manager own announcements; Admin any
+// @desc  Pin/unpin
 exports.pinAnnouncement = async (req, res) => {
   try {
     const announcement = await Announcement.findById(req.params.id);
@@ -175,8 +203,7 @@ exports.pinAnnouncement = async (req, res) => {
   }
 };
 
-// ── Scheduler: publish scheduled announcements when their time arrives ──────────
-// Call this from server.js on an interval (every minute)
+// ── Scheduler: publish scheduled announcements ────────────────────────────────
 exports.processScheduledAnnouncements = async () => {
   try {
     const due = await Announcement.find({
@@ -198,5 +225,20 @@ exports.processScheduledAnnouncements = async () => {
     }
   } catch (err) {
     console.error('[Scheduler] Error processing scheduled announcements:', err.message);
+  }
+};
+
+// ── Scheduler: delete expired announcements ───────────────────────────────────
+exports.deleteExpiredAnnouncements = async () => {
+  try {
+    const now = new Date();
+    const result = await Announcement.deleteMany({
+      expiresAt: { $lte: now },
+    });
+    if (result.deletedCount > 0) {
+      console.log(`[Scheduler] Deleted ${result.deletedCount} expired announcement(s)`);
+    }
+  } catch (err) {
+    console.error('[Scheduler] Error deleting expired announcements:', err.message);
   }
 };

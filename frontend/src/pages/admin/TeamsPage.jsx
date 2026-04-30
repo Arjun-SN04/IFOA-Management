@@ -842,7 +842,7 @@ export default function TeamsPage() {
       await teamAPI.switchMember({ userId: switchModal.member._id, fromTeamId: switchModal.fromTeam._id, toTeamId: switchToTeam });
       toast.success(`${switchModal.member.name} moved to new team!`);
       setSwitchModal(null); setSwitchToTeam('');
-      await loadData();
+      await loadData(); // always re-fetch so color + members are fresh
     } catch (e) { toast.error(e.response?.data?.message || 'Failed to switch member'); }
     finally { setSwitching(false); }
   };

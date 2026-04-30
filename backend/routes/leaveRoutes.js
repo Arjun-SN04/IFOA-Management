@@ -11,11 +11,13 @@ const {
   updateLeaveResetSettings,
   adminCreateLeave,
   getMyLeaves,
+  selfMarkLeave,
 } = require('../controllers/leaveController');
 const { protect, hrOrAbove, adminOnly } = require('../middleware/authMiddleware');
 
 // Static named routes before wildcard /:id routes
 router.post('/admin/create', protect, hrOrAbove, adminCreateLeave);   // HR + manager + admin can add leave manually
+router.post('/self-mark',    protect, hrOrAbove, selfMarkLeave);       // HR/Manager mark own day as leave
 router.post('/apply',        protect, applyLeave);                    // any authenticated user
 router.get('/balance',       protect, getLeaveBalance);
 router.get('/calendar',      protect, getLeaveCalendar);

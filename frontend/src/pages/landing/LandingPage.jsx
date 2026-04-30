@@ -1,588 +1,786 @@
-/* eslint-disable no-unused-vars */
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { useEffect, useRef, useState } from 'react';
-import { motion, useScroll, useTransform, AnimatePresence, useInView } from 'framer-motion';
 import {
-  FolderKanban, CheckSquare, Zap, CalendarDays, Megaphone, BarChart3,
-  ArrowRight, Users, Shield, Clock, TrendingUp, Layers, Activity,
-  Bell, GitBranch, Star, Plane, Globe, MapPin, ChevronRight, Quote,
+  FolderKanban, CheckSquare, Zap, CalendarDays,
+  Megaphone, BarChart3, ArrowRight,
+  Radio, ShieldCheck, Lock,
+  Shield, Clock, Users, TrendingUp,
+  Database, Activity, GitBranch, Bell, FileText, Target, UserCheck, Layers,
 } from 'lucide-react';
-import IFOAIndia from '../../assets/IFOA_INDIA.png';
-import HeroSectionImg from '../../assets/herosection_img.png';
 
-/* ─── DATA ─────────────────────────────────────────────────────────────── */
+/* ── Asset imports ── */
+import IFOALogo    from '../../assets/IFOA_INDIA.png';
+import IFOAWhite   from '../../assets/IFOA_INDIA.png';
+import HeroImg     from '../../assets/hero.png';
+import HeroSection from '../../assets/herosection_img.png';
+import TeamImg     from '../../assets/team.png';
+
+const B = '#1D4ED8';
+
+const SLIDE_DATA = [
+  {
+    img: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=1400&q=85',
+    badge: 'Flight Operations',
+    title: 'Manage Every\nFlight with Precision',
+    sub: 'Centralise schedules, crew logs and dispatch protocols in one powerful hub.',
+    accent: '#1D4ED8',
+  },
+  {
+    img: 'https://images.unsplash.com/photo-1540962351504-03099e0a754b?w=1400&q=85',
+    badge: 'Flight Deck',
+    title: 'Cockpit-Grade\nSituational Awareness',
+    sub: 'Give your operations team real-time visibility across every active flight.',
+    accent: '#0EA5E9',
+  },
+  {
+    img: 'https://images.unsplash.com/photo-1500869812169-22a1ad0a3398?w=1400&q=85',
+    badge: 'Performance Analytics',
+    title: 'Data-Driven\nDecision Making',
+    sub: 'Live dashboards, exportable reports and velocity tracking for leadership.',
+    accent: '#059669',
+  },
+  {
+    img: 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=1400&q=85',
+    badge: 'Ground Operations',
+    title: 'Ground-to-Gate\nCoordination',
+    sub: 'Synchronise ground staff, gate assignments and turnaround workflows seamlessly.',
+    accent: '#D97706',
+  },
+];
+
 const FEATURES = [
-  { icon: FolderKanban, title: 'Project Management', desc: 'Create and manage projects with full visibility across your entire team.', color: '#1B4FD8', bg: '#EFF6FF' },
-  { icon: CheckSquare, title: 'Task Boards', desc: 'Kanban-style boards to move tasks seamlessly across every stage.', color: '#2563EB', bg: '#EFF6FF' },
-  { icon: Zap, title: 'Sprint Planning', desc: 'Agile sprints with velocity tracking to ship work consistently faster.', color: '#1D4ED8', bg: '#EFF6FF' },
-  { icon: CalendarDays, title: 'Leave Management', desc: 'Apply, approve and track leave balances in one unified place.', color: '#0EA5E9', bg: '#F0F9FF' },
-  { icon: Megaphone, title: 'Announcements', desc: 'Keep every member informed with pinned, real-time team updates.', color: '#3B82F6', bg: '#EFF6FF' },
-  { icon: BarChart3, title: 'Analytics & Reports', desc: 'Real-time dashboards and charts for complete operational visibility.', color: '#1B4FD8', bg: '#EFF6FF' },
-];
-
-const WORKFLOW_STEPS = [
-  { num: '01', icon: Users, title: 'Set Up Your Team', desc: 'Create an account, invite members and define roles — all in minutes.' },
-  { num: '02', icon: Layers, title: 'Organise Projects', desc: 'Structure projects, assign tasks, set priorities, and define sprint goals.' },
-  { num: '03', icon: TrendingUp, title: 'Track & Deliver', desc: 'Monitor progress with live dashboards and ship on schedule, every time.' },
-];
-
-const STATS = [
-  { val: '100%', label: 'Internal & Private' },
-  { val: '6+', label: 'Core Modules' },
-  { val: 'Live', label: 'Real-Time Updates' },
-  { val: '∞', label: 'Team Scalability' },
-];
-
-const ABOUT_ITEMS = [
-  { icon: Shield, text: 'Role-based access for admins, managers and members' },
-  { icon: Bell, text: 'Real-time socket notifications for every update' },
-  { icon: Users, text: 'Unlimited team members across all departments' },
-  { icon: Plane, text: 'Aviation-focused operations and compliance tracking' },
-];
-
-const TESTIMONIALS = [
   {
-    name: 'Antoine de Saint-Exupéry',
-    role: 'Aviator & Author',
-    quote: 'A goal without a plan is just a wish. Build the systems, and the mission will follow.',
+    icon: FolderKanban,
+    title: 'Project Management',
+    desc: 'Full lifecycle visibility — from initiation to delivery — across every team and department.',
+    color: '#1D4ED8', bg: '#EFF6FF', tag: 'Core',
+    stat: '3× faster', statLabel: 'delivery',
   },
   {
-    name: 'Amelia Earhart',
-    role: 'Pioneer Aviator',
-    quote: 'The most difficult thing is the decision to act — the rest is merely tenacity.',
+    icon: CheckSquare,
+    title: 'Task Boards',
+    desc: 'Kanban-style boards with drag-and-drop simplicity and real-time status syncing.',
+    color: '#7C3AED', bg: '#F5F3FF', tag: 'Daily',
+    stat: '80%', statLabel: 'less missed tasks',
   },
   {
-    name: 'Howard Hughes',
-    role: 'Aviation Visionary',
-    quote: 'I am not a man who can be pushed around or forced into doing something against my better judgment.',
+    icon: Zap,
+    title: 'Sprint Planning',
+    desc: 'Agile sprints with velocity tracking and burndown charts for on-time delivery.',
+    color: '#0EA5E9', bg: '#F0F9FF', tag: 'Agile',
+    stat: '2-week', statLabel: 'sprint cycles',
+  },
+  {
+    icon: CalendarDays,
+    title: 'Leave Management',
+    desc: 'Transparent leave tracking, manager approvals and team calendar — all in one place.',
+    color: '#059669', bg: '#ECFDF5', tag: 'HR',
+    stat: '< 1 min', statLabel: 'approval time',
+  },
+  {
+    icon: Megaphone,
+    title: 'Announcements',
+    desc: 'Broadcast real-time company-wide updates instantly — no email chains needed.',
+    color: '#D97706', bg: '#FFFBEB', tag: 'Comms',
+    stat: '100%', statLabel: 'team reach',
+  },
+  {
+    icon: BarChart3,
+    title: 'Analytics & Reports',
+    desc: 'Live dashboards and exportable CSV/PDF reports for actionable leadership insights.',
+    color: '#DC2626', bg: '#FEF2F2', tag: 'Insights',
+    stat: '15+ KPIs', statLabel: 'tracked',
   },
 ];
 
-/* ─── ANIMATION HELPERS ─────────────────────────────────────────────────── */
-const fadeUp = {
-  hidden: { opacity: 0, y: 40 },
-  visible: (i = 0) => ({ opacity: 1, y: 0, transition: { duration: 0.6, delay: i * 0.1, ease: [0.22, 1, 0.36, 1] } }),
-};
+/* ─── Marquee strip — company management ops ─── */
+const STRIP_ITEMS = [
+  { icon: FolderKanban, text: 'Project Tracking',      sub: 'End-to-end visibility'    },
+  { icon: CheckSquare,  text: 'Task Assignment',        sub: 'Assign, track & close'    },
+  { icon: Zap,          text: 'Sprint Velocity',        sub: 'Agile delivery cycles'    },
+  { icon: CalendarDays, text: 'Leave Calendar',         sub: 'Team availability sync'   },
+  { icon: Megaphone,    text: 'Team Announcements',     sub: 'Instant org-wide broadcast'},
+  { icon: BarChart3,    text: 'Reports & Insights',     sub: 'Export CSV / PDF'         },
+  { icon: Users,        text: 'Role-based Access',      sub: 'Manager & member tiers'   },
+  { icon: Activity,     text: 'Live Dashboards',        sub: '15+ KPIs at a glance'     },
+  { icon: Clock,        text: 'Time & Milestones',      sub: 'Deadline monitoring'       },
+  { icon: Database,     text: 'Centralised Records',    sub: 'Single source of truth'   },
+  { icon: TrendingUp,   text: 'Performance Reviews',    sub: 'Data-driven feedback'     },
+  { icon: Shield,       text: 'Audit Trails',           sub: 'Full change history'      },
+  { icon: GitBranch,    text: 'Version Control',        sub: 'Track all iterations'     },
+  { icon: Bell,         text: 'Smart Notifications',    sub: 'Never miss an update'     },
+  { icon: FileText,     text: 'Document Management',    sub: 'Attach files to tasks'    },
+  { icon: Target,       text: 'Goal Tracking',          sub: 'OKR-aligned delivery'     },
+  { icon: UserCheck,    text: 'Approval Workflows',     sub: 'Manager sign-off flows'   },
+  { icon: Layers,       text: 'Multi-project View',     sub: 'Cross-team overview'      },
+];
 
-const staggerContainer = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.1 } },
-};
+const TRUST = [
+  { icon: Lock,       label: 'Private & Secure'  },
+  { icon: Radio,      label: 'Real-time Sync'    },
+  { icon: ShieldCheck,label: 'Role-based Access' },
+];
 
-function RevealSection({ children, className = '', delay = 0 }) {
+/* ── IntersectionObserver hook ── */
+function useInView(ref, threshold = 0.12) {
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) { setInView(true); obs.disconnect(); } },
+      { threshold, rootMargin: '-40px' }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [ref, threshold]);
+  return inView;
+}
+
+function Reveal({ children, delay = 0, style = {} }) {
   const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: '-80px' });
+  const inView = useInView(ref);
   return (
-    <motion.div
-      ref={ref}
-      variants={fadeUp}
-      custom={delay}
-      initial="hidden"
-      animate={inView ? 'visible' : 'hidden'}
-      className={className}
-    >
+    <div ref={ref} style={{
+      opacity: inView ? 1 : 0,
+      transform: inView ? 'translateY(0)' : 'translateY(36px)',
+      transition: `opacity .7s cubic-bezier(.22,1,.36,1) ${delay}s, transform .7s cubic-bezier(.22,1,.36,1) ${delay}s`,
+      ...style,
+    }}>
       {children}
-    </motion.div>
+    </div>
   );
 }
 
-/* ─── COMPONENT ─────────────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════
+   HERO CAROUSEL
+══════════════════════════════════════════════════ */
+function HeroCarousel() {
+  const [active,  setActive]  = useState(0);
+  const [leaving, setLeaving] = useState(null);
+  const timerRef  = useRef(null);
+  const dragStart = useRef(null);
+
+  const go = useCallback((next) => {
+    if (next === active) return;
+    setLeaving(active);
+    setActive(next);
+    setTimeout(() => setLeaving(null), 900);
+  }, [active]);
+
+  const resetTimer = useCallback(() => {
+    clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setActive(prev => {
+        const next = (prev + 1) % SLIDE_DATA.length;
+        setLeaving(prev);
+        setTimeout(() => setLeaving(null), 900);
+        return next;
+      });
+    }, 5500);
+  }, []);
+
+  useEffect(() => { resetTimer(); return () => clearInterval(timerRef.current); }, [resetTimer]);
+
+  const onPointerDown = (e) => { dragStart.current = e.clientX; };
+  const onPointerUp   = (e) => {
+    if (dragStart.current === null) return;
+    const diff = dragStart.current - e.clientX;
+    dragStart.current = null;
+    if (Math.abs(diff) < 40) return;
+    const next = diff > 0
+      ? (active + 1) % SLIDE_DATA.length
+      : (active - 1 + SLIDE_DATA.length) % SLIDE_DATA.length;
+    go(next);
+    resetTimer();
+  };
+
+  return (
+    <div
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      style={{ position: 'absolute', inset: 0, overflow: 'hidden', cursor: 'grab', userSelect: 'none' }}
+    >
+      {SLIDE_DATA.map((s, i) => (
+        <div key={i} style={{
+          position: 'absolute', inset: 0,
+          opacity: i === active ? 1 : (i === leaving ? 0 : 0),
+          transform: i === active ? 'scale(1)' : (i === leaving ? 'scale(1.04)' : 'scale(1.08)'),
+          transition: 'opacity .9s cubic-bezier(.4,0,.2,1), transform 1.3s cubic-bezier(.4,0,.2,1)',
+          willChange: 'opacity,transform',
+        }}>
+          <img src={s.img} alt="" draggable={false} style={{
+            position: 'absolute', inset: 0, width: '100%', height: '100%',
+            objectFit: 'cover', objectPosition: 'center',
+          }} />
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'linear-gradient(110deg,rgba(5,15,40,0.85) 0%,rgba(5,15,40,0.55) 55%,rgba(5,15,40,0.18) 100%)',
+          }} />
+        </div>
+      ))}
+
+      {/* Slide counter */}
+      <div style={{
+        position: 'absolute', top: 24, right: 20, zIndex: 30,
+        display: 'flex', alignItems: 'center', gap: 6,
+        background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(8px)',
+        border: '1px solid rgba(255,255,255,0.12)',
+        borderRadius: 999, padding: '5px 12px',
+      }}>
+        <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{active + 1}</span>
+        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>/ {SLIDE_DATA.length}</span>
+      </div>
+
+      {/* IFOA white logo */}
+      <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 30 }}>
+        <img src={IFOAWhite} alt="IFOA" style={{ height: 30, objectFit: 'contain', filter: 'brightness(0) invert(1)', opacity: 0.55 }} />
+      </div>
+
+      {SLIDE_DATA.map((s, i) => (
+        <div key={`txt-${i}`} style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'flex-end',
+          padding: 'clamp(32px,5vw,72px)',
+          paddingBottom: 'clamp(56px,7vw,90px)',
+          pointerEvents: i === active ? 'auto' : 'none',
+          opacity: i === active ? 1 : 0,
+          transform: i === active ? 'translateY(0)' : 'translateY(18px)',
+          transition: 'opacity .6s .28s, transform .7s .22s',
+        }}>
+          <div style={{ maxWidth: 520 }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '5px 14px', borderRadius: 999,
+              background: s.accent + '28', border: `1px solid ${s.accent}65`,
+              fontSize: 11, fontWeight: 700, letterSpacing: '0.1em',
+              textTransform: 'uppercase', color: '#fff', marginBottom: 20,
+            }}>
+              {s.badge}
+            </div>
+            <h2 style={{
+              margin: '0 0 18px',
+              fontSize: 'clamp(28px,3.8vw,52px)', fontWeight: 900, lineHeight: 1.1,
+              color: '#fff', letterSpacing: '-0.02em', whiteSpace: 'pre-line',
+            }}>{s.title}</h2>
+            <p style={{ margin: 0, fontSize: 'clamp(13px,1.3vw,16px)', color: 'rgba(255,255,255,0.75)', lineHeight: 1.65 }}>{s.sub}</p>
+          </div>
+        </div>
+      ))}
+
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, background: 'rgba(255,255,255,0.07)', zIndex: 20 }}>
+        <div key={active} style={{ height: '100%', background: SLIDE_DATA[active].accent, animation: 'progressBar 5.5s linear forwards' }} />
+      </div>
+      <div style={{ position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)', fontSize: 11, color: 'rgba(255,255,255,0.28)', fontWeight: 500, letterSpacing: '0.06em', zIndex: 20, pointerEvents: 'none', whiteSpace: 'nowrap' }}>⟵ drag to explore ⟶</div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════
+   FEATURE CARD
+══════════════════════════════════════════════════ */
+ /* eslint-disable-next-line no-unused-vars */
+ function FeatureCard({ icon: Icon, title, desc, color, bg, tag, stat, statLabel, delay }) {
+  const [hov, setHov] = useState(false);
+  return (
+    <Reveal delay={delay}>
+      <div
+        onMouseEnter={() => setHov(true)}
+        onMouseLeave={() => setHov(false)}
+        style={{
+          background: hov ? bg : '#FFFFFF',
+          border: `1.5px solid ${hov ? color + '38' : 'rgba(15,23,42,0.07)'}`,
+          borderRadius: 20, padding: '32px 28px 28px',
+          position: 'relative', overflow: 'hidden',
+          transition: 'all .35s cubic-bezier(.22,1,.36,1)',
+          transform: hov ? 'translateY(-6px)' : 'translateY(0)',
+          boxShadow: hov ? `0 20px 50px ${color}18` : '0 2px 8px rgba(15,23,42,0.04)',
+          cursor: 'default', display: 'flex', flexDirection: 'column', minHeight: 240,
+        }}
+      >
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+          background: `linear-gradient(90deg,${color},${color}00)`,
+          transform: `scaleX(${hov ? 1 : 0.25})`, transformOrigin: 'left',
+          transition: 'transform .4s cubic-bezier(.22,1,.36,1)',
+          borderRadius: '20px 20px 0 0',
+        }} />
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
+          <div style={{
+            width: 52, height: 52, borderRadius: 14,
+            background: `linear-gradient(135deg,${color}18,${color}08)`,
+            border: `1.5px solid ${color}20`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'transform .3s',
+            transform: hov ? 'scale(1.1) rotate(-4deg)' : 'scale(1)',
+          }}>
+            <Icon size={24} color={color} strokeWidth={1.75} />
+          </div>
+          <span style={{
+            padding: '4px 11px', borderRadius: 999, background: bg, color,
+            fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
+            textTransform: 'uppercase', border: `1px solid ${color}22`,
+          }}>{tag}</span>
+        </div>
+        <h3 style={{ margin: '0 0 10px', fontSize: 16, fontWeight: 800, color: '#1A1F36' }}>{title}</h3>
+        <p style={{ margin: 0, fontSize: 13.5, color: '#64748B', lineHeight: 1.65, flex: 1 }}>{desc}</p>
+        <div style={{ marginTop: 20, display: 'flex', alignItems: 'center', gap: 8, paddingTop: 16, borderTop: `1px solid ${color}15` }}>
+          <span style={{ fontSize: 18, fontWeight: 900, color, letterSpacing: '-0.02em' }}>{stat}</span>
+          <span style={{ fontSize: 12, color: '#94A3B8', fontWeight: 500 }}>{statLabel}</span>
+        </div>
+      </div>
+    </Reveal>
+  );
+}
+
+/* ══════════════════════════════════════════════════
+   INFINITE MARQUEE STRIP
+   • Company management operations content
+   • 3× duplicated for perfectly seamless loop
+   • Compact height — padding: '14px 0'
+══════════════════════════════════════════════════ */
+function FeatureStrip() {
+  const items = [...STRIP_ITEMS, ...STRIP_ITEMS, ...STRIP_ITEMS];
+  return (
+      <div style={{
+      overflow: 'hidden',
+      background: '#0F172A',
+      borderTop: '1px solid rgba(255,255,255,0.05)',
+      borderBottom: '1px solid rgba(255,255,255,0.05)',
+      padding: '14px 0',          /* ← reduced from 22px */
+      position: 'relative',
+    }}>
+      <div style={{ position: 'absolute', inset: '0 auto 0 0', width: 100, background: 'linear-gradient(90deg,#0F172A,transparent)', zIndex: 10, pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', inset: '0 0 0 auto', width: 100, background: 'linear-gradient(270deg,#0F172A,transparent)', zIndex: 10, pointerEvents: 'none' }} />
+
+      <div style={{
+        display: 'flex',
+        gap: 0,
+        animation: 'stripScroll 48s linear infinite',
+        width: 'max-content',
+        willChange: 'transform',
+      }}>
+        {/* eslint-disable-next-line no-unused-vars */}
+        {items.map(({ icon: Icon, text, sub }, i) => (
+          <div key={i} style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '0 22px',
+            borderRight: '1px solid rgba(255,255,255,0.06)',
+            flexShrink: 0, whiteSpace: 'nowrap',
+          }}>
+            <div style={{
+              width: 30, height: 30, borderRadius: 8,      /* ← smaller icon box */
+              background: 'rgba(29,78,216,0.18)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0, border: '1px solid rgba(29,78,216,0.3)',
+            }}>
+              <Icon size={14} color='#60A5FA' strokeWidth={1.8} />
+            </div>
+            <div>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: '#E2E8F0', letterSpacing: '0.01em', lineHeight: 1.2 }}>{text}</div>
+              <div style={{ fontSize: 10.5, color: 'rgba(148,163,184,0.65)', marginTop: 1, lineHeight: 1.2 }}>{sub}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════
+   MAIN PAGE
+══════════════════════════════════════════════════ */
 export default function LandingPage() {
   const { user } = useAuth();
-  const [activeTestimonial, setActiveTestimonial] = useState(0);
-  const heroRef = useRef(null);
-  const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
-  const heroY = useTransform(scrollYProgress, [0, 1], ['0%', '18%']);
-  const heroOpacity = useTransform(scrollYProgress, [0, 0.7], [1, 0]);
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    const t = setInterval(() => setActiveTestimonial(p => (p + 1) % TESTIMONIALS.length), 5000);
-    return () => clearInterval(t);
+    const fn = () => setScrolled(window.scrollY > 24);
+    window.addEventListener('scroll', fn, { passive: true });
+    return () => window.removeEventListener('scroll', fn);
   }, []);
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-white text-slate-900" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ minHeight: '100vh', overflowX: 'hidden', background: '#fff', fontFamily: "'Outfit',sans-serif", color: '#1A1F36' }}>
+
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Playfair+Display:ital,wght@0,700;0,800;1,700&display=swap');
-        * { box-sizing: border-box; }
-        .serif { font-family: 'Playfair Display', serif; }
-        .card-glass {
-          background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.12);
-          backdrop-filter: blur(16px);
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        @keyframes progressBar { from{width:0%} to{width:100%} }
+        @keyframes heroFadeUp  { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes fadeIn      { from{opacity:0} to{opacity:1} }
+        @keyframes pulseDot    { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.5)} }
+        @keyframes stripScroll { from{transform:translateX(0)} to{transform:translateX(-33.333%)} }
+
+        .hero-badge { animation: heroFadeUp .7s cubic-bezier(.22,1,.36,1) .2s both; }
+        .hero-h1    { animation: heroFadeUp .8s cubic-bezier(.22,1,.36,1) .35s both; }
+        .hero-sub   { animation: heroFadeUp .7s cubic-bezier(.22,1,.36,1) .5s both; }
+        .hero-btns  { animation: heroFadeUp .7s cubic-bezier(.22,1,.36,1) .62s both; }
+        .hero-trust { animation: heroFadeUp .7s cubic-bezier(.22,1,.36,1) .74s both; }
+        .carousel-wrap { animation: fadeIn 1s .4s both; }
+
+        .nav-link { position:relative; font-size:14px; font-weight:500; color:#475569; text-decoration:none; transition:color .2s; }
+        .nav-link::after { content:''; position:absolute; bottom:-4px; left:0; width:0; height:2px; background:${B}; transition:width .25s; border-radius:999px; }
+        .nav-link:hover { color:${B}; }
+        .nav-link:hover::after { width:100%; }
+
+        .btn-primary {
+          display:inline-flex; align-items:center; gap:8px;
+          padding:13px 28px; border-radius:12px; border:none;
+          background:${B}; color:#fff; font-size:15px; font-weight:700;
+          font-family:'Outfit',sans-serif; text-decoration:none; cursor:pointer;
+          box-shadow:0 4px 20px rgba(29,78,216,.3);
+          transition:transform .2s, box-shadow .22s;
         }
-        .feature-card {
-          transition: transform 0.3s cubic-bezier(.22,1,.36,1), box-shadow 0.3s ease, border-color 0.3s ease;
+        .btn-primary:hover { transform:translateY(-2px); box-shadow:0 10px 32px rgba(29,78,216,.42); }
+
+        .btn-ghost {
+          display:inline-flex; align-items:center; gap:8px;
+          padding:12px 24px; border-radius:12px;
+          border:1.5px solid #E2E8F0; background:#fff;
+          color:#475569; font-size:15px; font-weight:600;
+          font-family:'Outfit',sans-serif; text-decoration:none; cursor:pointer;
+          transition:border-color .2s, color .2s, background .2s, transform .2s;
         }
-        .feature-card:hover {
-          transform: translateY(-6px) scale(1.01);
-          box-shadow: 0 20px 60px rgba(27,79,216,0.12);
-          border-color: #93C5FD;
+        .btn-ghost:hover { border-color:${B}; color:${B}; background:#EFF6FF; transform:translateY(-1px); }
+
+        .feature-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:24px; }
+        @media(max-width:960px){ .feature-grid{grid-template-columns:repeat(2,1fr);} }
+        @media(max-width:600px){ .feature-grid{grid-template-columns:1fr;} }
+        @media(max-width:700px){ .nav-desktop{display:none!important;} }
+
+        .hero-section {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          height: 100vh;
+          min-height: 640px;
+          padding-top: 64px;
         }
-        .workflow-card-new {
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.10);
-          transition: transform 0.3s cubic-bezier(.22,1,.36,1), background 0.3s ease, border-color 0.3s ease;
+        @media(max-width:800px){
+          .hero-section { grid-template-columns:1fr; grid-template-rows:55vh 45vh; height:auto; min-height:100svh; }
         }
-        .workflow-card-new:hover {
-          transform: translateY(-6px);
-          background: rgba(255,255,255,0.08);
-          border-color: rgba(255,255,255,0.20);
-        }
-        .glow-btn {
-          box-shadow: 0 0 0 0 rgba(37,99,235,0.5);
-          transition: box-shadow 0.3s ease, transform 0.2s ease, background 0.2s ease;
-        }
-        .glow-btn:hover {
-          box-shadow: 0 8px 40px rgba(37,99,235,0.45);
-          transform: translateY(-2px);
-        }
-        .nav-link {
-          position: relative;
-        }
-        .nav-link::after {
-          content: '';
-          position: absolute;
-          bottom: -2px;
-          left: 0;
-          width: 0;
-          height: 2px;
-          background: #2563EB;
-          transition: width 0.3s ease;
-        }
-        .nav-link:hover::after { width: 100%; }
       `}</style>
 
-      {/* ─── NAVBAR ─────────────────────────────────────────────────────── */}
-      <motion.nav
-        initial={{ y: -80, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-        className="fixed inset-x-0 top-0 z-50 bg-white/98 border-b border-gray-100 shadow-sm backdrop-blur-md"
-      >
-        <div className="mx-auto flex w-full max-w-none items-center justify-between px-5 sm:px-10 lg:px-16 xl:px-24 py-3">
-          <Link to="/" className="flex shrink-0 items-center gap-3 no-underline">
-            <img src={IFOAIndia} alt="IFOA" className="h-8 w-auto object-contain" />
-            <div className="flex items-center">
-              <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-gray-500 leading-none">Management Platform</div>
-            </div>
+      {/* ── NAV ── */}
+      <nav style={{
+        position: 'fixed', inset: '0 0 auto 0', zIndex: 200,
+        background: scrolled ? 'rgba(255,255,255,0.96)' : 'transparent',
+        backdropFilter: scrolled ? 'blur(18px)' : 'none',
+        borderBottom: scrolled ? '1px solid #F0F4FF' : '1px solid transparent',
+        boxShadow: scrolled ? '0 2px 20px rgba(29,78,216,.06)' : 'none',
+        transition: 'all .4s',
+      }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 32px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+            <img src={IFOALogo} alt="IFOA" style={{ height: 34, objectFit: 'contain' }} />
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.15em', textTransform: 'uppercase' }}>Management</span>
           </Link>
-
-          <div className="hidden items-center gap-8 md:flex">
-            {[['Features', '#features'], ['How it Works', '#how-it-works'], ['About', '#about']].map(([label, href]) => (
-              <a key={label} href={href} className="nav-link text-sm font-medium text-gray-600 transition-colors hover:text-blue-700">
-                {label}
-              </a>
+          <div className="nav-desktop" style={{ display: 'flex', gap: 32 }}>
+            {[['Platform','#features'],['About','#about'],['Team','#team']].map(([l,h]) => (
+              <a key={l} href={h} className="nav-link">{l}</a>
             ))}
           </div>
-
-          <div className="ml-2 flex items-center gap-2">
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             {user ? (
-              <Link to="/dashboard" className="glow-btn inline-flex items-center gap-2 rounded-full bg-blue-600 px-6 py-2 text-sm font-semibold text-white">
-                {user.name} <ArrowRight size={14} />
+              <Link to="/dashboard" className="btn-primary" style={{ padding: '10px 22px', fontSize: 14 }}>
+                {user.name?.split(' ')[0]} <ArrowRight size={14} />
               </Link>
             ) : (
               <>
-                <Link to="/login" className="rounded-full border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-all hover:bg-gray-50 hover:border-gray-300">
-                  Login
-                </Link>
-                <Link to="/register" className="glow-btn inline-flex items-center gap-2 rounded-full bg-blue-600 px-6 py-2 text-sm font-semibold text-white">
-                  Sign up <ChevronRight size={14} />
-                </Link>
+                <Link to="/login"    className="btn-ghost"   style={{ padding: '9px 20px',  fontSize: 14 }}>Sign in</Link>
+                <Link to="/register" className="btn-primary" style={{ padding: '10px 22px', fontSize: 14 }}>Get access</Link>
               </>
             )}
           </div>
         </div>
-      </motion.nav>
+      </nav>
 
-      {/* ─── HERO ───────────────────────────────────────────────────────── */}
-      <section ref={heroRef} className="relative flex min-h-screen items-center justify-start overflow-hidden pt-16">
-        <motion.div
-          className="absolute inset-0 bg-center bg-no-repeat"
-          style={{
-            backgroundImage: `url('https://i.pinimg.com/1200x/33/af/c2/33afc28f3f95140295a67622f9020d40.jpg')`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center center',
-            filter: 'brightness(1.06) contrast(1.08) saturate(1.06)',
-            y: heroY,
-          }}
-        />
-        {/* Lightweight overlay — no blue tint */}
-        <div className="absolute inset-0" style={{
-          background: 'linear-gradient(to bottom, rgba(0,0,0,0.16) 0%, rgba(0,0,0,0.24) 55%, rgba(0,0,0,0.34) 100%)',
+      {/* ── HERO ── */}
+      <section className="hero-section" style={{ background: '#FFFFFF', position: 'relative' }}>
+        <div style={{
+          position: 'absolute', inset: '0 50% 0 0',
+          backgroundImage: 'radial-gradient(rgba(29,78,216,0.055) 1px,transparent 1px)',
+          backgroundSize: '28px 28px', pointerEvents: 'none',
         }} />
 
-        <motion.div
-          style={{ opacity: heroOpacity }}
-          className="relative z-10 w-full max-w-none px-5 sm:px-10 lg:px-16 xl:px-24 pb-32 pt-20 text-left"
-        >
-          <div className="max-w-3xl">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.7 }}
-            className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-5 py-1.5 text-xs font-medium uppercase tracking-widest text-white/80 backdrop-blur"
-          >
-           
-            Internal Operations Platform · IFOA Aviation
-          </motion.div>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.45, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-            className="serif mb-5 text-4xl font-bold leading-tight text-white md:text-6xl lg:text-7xl"
-          >
-            Your team's work,<br /> cleared for <br />
-            <em className="text-white not-italic"> takeoff.</em>
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6, duration: 0.7 }}
-            className="mb-9 max-w-lg text-base font-light leading-relaxed text-white/75 md:text-lg"
-          >
-            Projects, tasks, sprints, leave management and analytics — a unified command centre built exclusively for IFOA members.
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.75, duration: 0.7 }}
-            className="flex flex-wrap items-center justify-start gap-4"
-          >
-            {user ? (
-              <Link
-                to="/dashboard"
-                className="glow-btn inline-flex items-center gap-2 rounded-full bg-blue-600 px-9 py-4 text-[15px] font-bold text-white"
-              >
-                Go to Dashboard <ArrowRight size={16} />
-              </Link>
-            ) : (
-              <>
-                <Link
-                  to="/register"
-                  className="glow-btn inline-flex items-center gap-2 rounded-full bg-blue-600 px-9 py-4 text-[15px] font-bold text-white"
-                >
-                  Sign up <ArrowRight size={16} />
-                </Link>
-                <Link
-                  to="/login"
-                  className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-8 py-4 text-[15px] font-medium text-white/90 backdrop-blur transition-all hover:bg-white/20"
-                >
-                  Login
-                </Link>
-              </>
-            )}
-          </motion.div>
+        <div style={{
+          display: 'flex', flexDirection: 'column', justifyContent: 'center',
+          padding: 'clamp(40px,6vw,100px) clamp(32px,5vw,80px)',
+          position: 'relative', zIndex: 10,
+        }}>
+          <div className="hero-badge" style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '7px 16px', borderRadius: 999,
+            background: 'rgba(29,78,216,0.07)', border: '1px solid rgba(29,78,216,0.18)',
+            fontSize: 11, fontWeight: 700, letterSpacing: '0.1em',
+            textTransform: 'uppercase', color: B, width: 'fit-content', marginBottom: 28,
+          }}>
+            Internal Operations Platform
           </div>
-        </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.2, duration: 1 }}
-          className="absolute bottom-6 left-1/2 z-20 -translate-x-1/2 flex flex-col items-center gap-1"
-        >
-          <motion.div
-            animate={{ y: [0, 8, 0] }}
-            transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
-            className="h-10 w-px bg-linear-to-b from-white/60 to-transparent"
-          />
-          <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-white/45">Scroll</span>
-        </motion.div>
-      </section>
+          <h1 className="hero-h1" style={{
+            fontSize: 'clamp(38px,4.5vw,64px)', fontWeight: 900, lineHeight: 1.12,
+            letterSpacing: '-0.025em', marginBottom: 24, color: B,
+          }}>
+            One Platform.<br />
+            <span style={{ color: '#0F172A' }}>Every Operation.</span>
+          </h1>
 
-      {/* ─── STATS STRIP — compact height ────────────────────────────────── */}
-      <section className="bg-[#050F2D] px-8 py-8">
-        <motion.div
-          variants={staggerContainer}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: '-60px' }}
-          className="mx-auto grid max-w-5xl grid-cols-2 gap-4 md:grid-cols-4"
-        >
-          {STATS.map(({ val, label }, idx) => (
-            <motion.div
-              key={label}
-              variants={fadeUp}
-              custom={idx}
-              className={`group text-center py-3 ${idx < 3 ? 'md:border-r md:border-white/10' : ''}`}
-            >
-              <div className="serif mb-0.5 text-4xl font-bold leading-none text-white transition-colors group-hover:text-blue-300">{val}</div>
-              <div className="text-xs tracking-wide text-white/50 transition-colors group-hover:text-white/75">{label}</div>
-            </motion.div>
-          ))}
-        </motion.div>
-      </section>
+          <p className="hero-sub" style={{ fontSize: 17, color: '#64748B', lineHeight: 1.75, maxWidth: 460, marginBottom: 40 }}>
+            Streamline projects, tasks, sprints, leaves and analytics — purpose-built for the IFOA team.
+          </p>
 
-      {/* ─── FEATURES ────────────────────────────────────────────────────── */}
-      <section id="features" className="bg-[#F8FAFF] px-8 py-28">
-        <div className="mx-auto max-w-7xl">
-          <RevealSection>
-            <div className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">Platform Capabilities</div>
-            <h2 className="serif mb-4 text-5xl font-bold leading-tight text-slate-900">
-              Everything IFOA needs,<br />in one place.
-            </h2>
-            <p className="max-w-xl text-lg leading-relaxed text-slate-500">Six integrated modules, one cohesive workspace. No external tools required.</p>
-          </RevealSection>
+          <div className="hero-btns" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 44 }}>
+            <Link to={user ? '/dashboard' : '/register'} className="btn-primary" style={{ padding: '14px 30px', fontSize: 15 }}>
+              {user ? 'Go to Dashboard' : 'Get Started'} <ArrowRight size={16} />
+            </Link>
+            {!user && <Link to="/login" className="btn-ghost" style={{ padding: '13px 26px', fontSize: 15 }}>Sign in</Link>}
+          </div>
 
-          <motion.div
-            variants={staggerContainer}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: '-60px' }}
-            className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
-          >
-            {FEATURES.map(({ icon: Icon, title, desc, color, bg }, i) => (
-              <motion.article
-                key={title}
-                variants={fadeUp}
-                custom={i}
-                className="feature-card cursor-default rounded-2xl border border-blue-100 bg-white p-8"
-              >
-                <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl transition-transform duration-300" style={{ backgroundColor: bg }}>
-                  <Icon size={20} color={color} />
-                </div>
-                <h3 className="mb-2 text-lg font-semibold text-slate-900">{title}</h3>
-                <p className="text-sm leading-relaxed text-slate-500">{desc}</p>
-              </motion.article>
+          <div className="hero-trust" style={{ display: 'flex', gap: 22, flexWrap: 'wrap' }}>
+            {/* eslint-disable-next-line no-unused-vars */}
+            {TRUST.map(({ icon: Icon, label }) => (
+              <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#64748B', fontWeight: 600 }}>
+                <Icon size={13} color={B} /> {label}
+              </span>
             ))}
-          </motion.div>
+          </div>
+        </div>
+
+        <div className="carousel-wrap" style={{ position: 'relative', alignSelf: 'stretch', overflow: 'hidden', background: '#0A0F1E' }}>
+          <HeroCarousel />
         </div>
       </section>
 
-      {/* ─── WORKFLOW / HOW IT WORKS ─────────────────────────────────────── */}
-      <section id="how-it-works" className="relative overflow-hidden px-8 py-24">
-        {/* Airport tarmac background — no blue tint, neutral dark scrim only */}
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: "url('https://images.unsplash.com/photo-1529074963764-98f45c47344b?w=1800&q=80')" }}
-        />
-        <div className="absolute inset-0" style={{ background: 'rgba(5,10,22,0.72)' }} />
+      {/* ── STATS BAR ── */}
+      <div style={{ background: '#0F172A', padding: '32px 40px', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 0 }}>
+        {[
+          { num: '6+',   label: 'Core Modules'  },
+          { num: '100%', label: 'Team Coverage'  },
+          { num: 'Live', label: 'Real-time Sync' },
+          { num: 'RBAC', label: 'Secure Access'  },
+        ].map((s, i) => (
+          <div key={i} style={{ textAlign: 'center', padding: '12px 0', borderRight: i < 3 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
+            <div style={{ fontSize: 28, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1 }}>{s.num}</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 6 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
 
-        <div className="relative mx-auto max-w-6xl">
-          <RevealSection className="mb-14 text-center">
-            <div className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-blue-300">Workflow</div>
-            <h2 className="serif text-5xl font-bold leading-tight text-white">
-              Up and running<br /><em className="text-blue-300 not-italic">in minutes</em>
+      {/* ── FEATURES ── */}
+      <section id="features" style={{ background: '#FFFFFF', paddingTop: 100, paddingBottom: 100, position: 'relative' }}>
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle at 100% 0%,rgba(29,78,216,0.03) 0%,transparent 60%)', pointerEvents: 'none' }} />
+
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 40px', position: 'relative', zIndex: 1 }}>
+          <Reveal style={{ textAlign: 'center', marginBottom: 56 }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: B, marginBottom: 14 }}>
+              <span style={{ width: 24, height: 3, borderRadius: 999, background: B, display: 'inline-block' }} />
+              Core Platform
+            </div>
+            <h2 style={{ fontSize: 'clamp(30px,3.5vw,48px)', fontWeight: 900, color: '#0F172A', letterSpacing: '-0.025em', lineHeight: 1.15, marginBottom: 16 }}>
+              Six Modules. One Unified System.
             </h2>
-            <p className="mt-4 text-lg font-light text-white/55">Three simple steps to transform how your team operates.</p>
-          </RevealSection>
+            <p style={{ fontSize: 16, color: '#64748B', maxWidth: 500, margin: '0 auto', lineHeight: 1.7 }}>
+              Every tool your team needs to plan, execute, and report — tightly integrated and always in sync.
+            </p>
+          </Reveal>
+        </div>
 
-          <motion.div
-            variants={staggerContainer}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: '-60px' }}
-            className="grid gap-5 md:grid-cols-3"
-          >
-            {WORKFLOW_STEPS.map(({ num, icon: Icon, title, desc }, i) => (
-              <motion.article
-                key={title}
-                variants={fadeUp}
-                custom={i}
-                className="workflow-card-new group cursor-default rounded-2xl p-8 text-center"
-              >
-                {/* Step number — small, top right corner style */}
-                <div className="mb-4 flex items-center justify-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-white/30">{num}</span>
-                </div>
-                {/* Icon block — solid dark pill, no blue bg */}
-                <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15 transition-all duration-300 group-hover:bg-white/16 group-hover:scale-110">
-                  <Icon size={22} color="#ffffff" strokeWidth={1.6} />
-                </div>
-                <h3 className="mb-2 text-base font-semibold text-white">{title}</h3>
-                <p className="text-sm leading-relaxed text-white/55">{desc}</p>
-              </motion.article>
+        {/* ── STRIP (compact, management content) ── */}
+        <div style={{ marginBottom: 56 }}>
+          <FeatureStrip />
+        </div>
+
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 40px', position: 'relative', zIndex: 1 }}>
+          <div className="feature-grid">
+            {FEATURES.map((f, i) => (
+              <FeatureCard key={f.title} {...f} delay={i * 0.07} />
             ))}
-          </motion.div>
+          </div>
         </div>
       </section>
 
-      {/* ─── ABOUT / BUILT FOR YOUR ORG ──────────────────────────────────── */}
-      <section id="about" className="overflow-hidden bg-white px-8 py-28">
-        <div className="mx-auto grid max-w-7xl items-center gap-20 lg:grid-cols-2">
-          {/* Left text */}
-          <div>
-            <RevealSection>
-              <div className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">For IFOA Members Only</div>
-              <h2 className="serif mb-5 text-5xl font-bold leading-tight text-slate-900">
-                Built for your<br />organisation.
-              </h2>
-              <p className="mb-10 text-lg leading-relaxed text-slate-500">
-                This platform is exclusively for IFOA staff, instructors and trainees. Every feature is designed around how your aviation team works.
-              </p>
-            </RevealSection>
-
-            <motion.div
-              variants={staggerContainer}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, margin: '-60px' }}
-              className="space-y-4"
-            >
-              {ABOUT_ITEMS.map(({ icon: Icon, text }, i) => (
-                <motion.div
-                  key={text}
-                  variants={fadeUp}
-                  custom={i}
-                  className="group flex items-start gap-4 rounded-2xl border border-transparent p-4 transition-all duration-300 hover:border-blue-100 hover:bg-blue-50/50"
-                >
-                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-100 transition-all duration-300 group-hover:bg-blue-200 group-hover:scale-110">
-                    <Icon size={16} color="#1B4FD8" />
-                  </div>
-                  <p className="text-sm font-medium leading-relaxed text-slate-700">{text}</p>
-                </motion.div>
-              ))}
-            </motion.div>
-          </div>
-
-          {/* Right: mosaic visual panel */}
-          <RevealSection delay={2}>
-            <div className="relative h-130 w-full overflow-hidden rounded-3xl bg-[#050F2D]">
-              <img
-                src="https://images.unsplash.com/photo-1488998527040-85054a85150e?w=900&q=80"
-                alt="Aviation control"
-                className="absolute inset-0 h-full w-full object-cover opacity-40 transition-transform duration-700 hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-linear-to-t from-[#050F2D] via-transparent to-transparent" />
-
-              <motion.div
-                animate={{ y: [0, -10, 0] }}
-                transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
-                className="absolute left-6 top-8 card-glass rounded-2xl px-5 py-4"
-              >
-                <div className="serif text-3xl font-bold text-white">6+</div>
-                <div className="text-xs text-white/60">Integrated Modules</div>
-              </motion.div>
-
-              <motion.div
-                animate={{ y: [0, 10, 0] }}
-                transition={{ repeat: Infinity, duration: 5, ease: 'easeInOut', delay: 1 }}
-                className="absolute right-6 top-16 card-glass rounded-2xl px-5 py-4"
-              >
-                <div className="serif text-3xl font-bold text-blue-300">Live</div>
-                <div className="text-xs text-white/60">Real-time updates</div>
-              </motion.div>
-
-              <motion.div
-                animate={{ y: [0, -8, 0] }}
-                transition={{ repeat: Infinity, duration: 4.5, ease: 'easeInOut', delay: 0.5 }}
-                className="absolute bottom-24 left-6 card-glass rounded-2xl px-5 py-4"
-              >
-                <div className="serif text-3xl font-bold text-white">∞</div>
-                <div className="text-xs text-white/60">Team Scalability</div>
-              </motion.div>
-
-              <div className="absolute bottom-6 inset-x-0 px-6">
-                <div className="serif text-xl font-bold text-white">IFOA Aviation</div>
-                <div className="text-xs text-white/50 mt-1">Unified Operations Platform</div>
+      {/* ── ABOUT ── */}
+      <section id="about" style={{ background: '#F8FAFF', padding: '100px 40px' }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'center' }}>
+          <Reveal>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div style={{ gridColumn: '1/-1', borderRadius: 20, overflow: 'hidden', aspectRatio: '16/7', position: 'relative' }}>
+                <img src={HeroImg} alt="IFOA Operations" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg,rgba(29,78,216,0.3),transparent)' }} />
+                <div style={{ position: 'absolute', bottom: 16, left: 16, background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(10px)', borderRadius: 10, padding: '8px 14px', fontSize: 12, fontWeight: 700, color: '#0F172A' }}>✈️ IFOA Aviation Operations</div>
+              </div>
+              <div style={{ borderRadius: 20, overflow: 'hidden', aspectRatio: '4/3', position: 'relative' }}>
+                <img src={HeroSection} alt="Platform" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(29,78,216,0.15)' }} />
+              </div>
+              <div style={{ borderRadius: 20, overflow: 'hidden', aspectRatio: '4/3', position: 'relative', background: '#0F172A' }}>
+                <img src={TeamImg} alt="Team" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }} />
+                <div style={{ position: 'absolute', bottom: 12, left: 12, background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 700, color: '#fff', letterSpacing: '0.05em' }}>👥 Our Team</div>
               </div>
             </div>
-          </RevealSection>
-        </div>
-      </section>
+          </Reveal>
 
-      {/* ─── QUOTES ──────────────────────────────────────────────────────── */}
-      <section className="bg-[#F0F4FF] px-8 py-24">
-        <div className="mx-auto max-w-4xl text-center">
-          <RevealSection>
-            <div className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">Good Words</div>
-            <h2 className="serif mb-14 text-5xl font-bold text-slate-900">Words worth flying by</h2>
-          </RevealSection>
-
-          <div className="relative min-h-55">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTestimonial}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                className="mx-auto max-w-2xl"
-              >
-                {/* Large open-quote icon */}
-                <div className="mb-6 flex justify-center">
-                  <Quote size={36} strokeWidth={1.4} className="text-blue-300 rotate-180" />
+          <div>
+            <Reveal>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: B, marginBottom: 14 }}>
+                <span style={{ width: 24, height: 3, borderRadius: 999, background: B, display: 'inline-block' }} />
+                About the Platform
+              </div>
+            </Reveal>
+            <Reveal delay={0.1}>
+              <h2 style={{ fontSize: 'clamp(30px,3vw,44px)', fontWeight: 900, color: '#0F172A', lineHeight: 1.15, marginBottom: 20, letterSpacing: '-0.02em' }}>
+                Built for the IFOA Management Team
+              </h2>
+            </Reveal>
+            <Reveal delay={0.2}>
+              <p style={{ fontSize: 15.5, color: '#64748B', lineHeight: 1.75, marginBottom: 32 }}>
+                An internal operations platform designed specifically for IFOA India. Manage aviation projects, coordinate your team, track tasks and monitor performance — all from one secure, unified interface.
+              </p>
+            </Reveal>
+            {[
+              'Manage projects from planning to deployment',
+              'Integrated leave & attendance management',
+              'Agile sprint boards with velocity tracking',
+              'Broadcast announcements across the team',
+            ].map((item, i) => (
+              <Reveal key={item} delay={0.25 + i * 0.08}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 14 }}>
+                  <div style={{ width: 22, height: 22, borderRadius: 6, background: `${B}15`, border: `1.5px solid ${B}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                    <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke={B} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </div>
+                  <span style={{ fontSize: 14.5, color: '#475569', lineHeight: 1.55, fontWeight: 500 }}>{item}</span>
                 </div>
-                <blockquote className="serif mb-8 text-2xl font-bold leading-snug text-slate-800 italic">
-                  "{TESTIMONIALS[activeTestimonial].quote}"
-                </blockquote>
-                <div className="flex flex-col items-center gap-1">
-                  <div className="h-px w-10 bg-blue-300 mb-3" />
-                  <div className="text-sm font-semibold text-slate-900">{TESTIMONIALS[activeTestimonial].name}</div>
-                  <div className="text-xs text-slate-400 tracking-wide">{TESTIMONIALS[activeTestimonial].role}</div>
-                </div>
-              </motion.div>
-            </AnimatePresence>
-          </div>
-
-          {/* Dots */}
-          <div className="mt-10 flex justify-center gap-2">
-            {TESTIMONIALS.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setActiveTestimonial(i)}
-                className={`h-2 rounded-full transition-all duration-300 ${i === activeTestimonial ? 'w-7 bg-blue-600' : 'w-2 bg-slate-300 hover:bg-slate-400'}`}
-              />
+              </Reveal>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ─── CTA ─────────────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden px-8 py-32 text-center">
-        {/* Different image: cockpit / runway approach — distinct from hero */}
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: "url('https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=1600&q=80')" }}
-        />
-        {/* Neutral dark scrim only — no blue tint */}
-        <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.40)' }} />
-
-        <div className="relative mx-auto max-w-3xl">
-          <RevealSection>
-            <h2 className="serif mb-4 text-5xl font-bold leading-tight text-white md:text-6xl">
-              Ready to get<br /><em className="text-white not-italic">organised?</em>
+      {/* ══════════════════════════════════════════════
+          TEAM — reduced padding, image fully visible
+      ══════════════════════════════════════════════ */}
+      <section id="team" style={{ background: '#F0F5FF', padding: '40px 40px 48px' }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+          <Reveal style={{ textAlign: 'center', marginBottom: 28 }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: B, marginBottom: 14 }}>
+              <span style={{ width: 24, height: 3, borderRadius: 999, background: B, display: 'inline-block' }} />
+              Our People
+            </div>
+            <h2 style={{ fontSize: 'clamp(28px,3.5vw,42px)', fontWeight: 900, color: '#0F172A', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
+              The Team Behind the Platform
             </h2>
-            <p className="mb-10 text-lg font-light text-white/75">Sign in with your IFOA credentials and take control of your team's work today.</p>
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <Link
-                to={user ? '/dashboard' : '/register'}
-                className="glow-btn inline-flex items-center gap-2 rounded-full bg-blue-600 px-10 py-4 text-[15px] font-bold text-white"
-              >
-                {user ? 'Go to Dashboard' : 'Access Platform'} <ArrowRight size={16} />
+          </Reveal>
+
+          <Reveal delay={0.1}>
+            <div style={{
+              borderRadius: 24, overflow: 'hidden', position: 'relative',
+              boxShadow: '0 20px 60px rgba(15,23,42,0.1)',
+              maxWidth: 1120,
+              margin: '0 auto',
+              aspectRatio: '16 / 8.4',
+            }}>
+              <img
+                src={TeamImg}
+                alt="IFOA Team"
+                style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }}
+              />
+              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,transparent 65%,rgba(10,15,40,0.5) 100%)' }} />
+              <div style={{ position: 'absolute', bottom: 28, left: 36, color: '#fff' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>IFOA India</div>
+                <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.01em' }}>Professionals in Aviation Excellence</div>
+              </div>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ── CTA ── */}
+      <section style={{ background: '#0F172A', padding: '100px 40px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+        {[400,650,900].map((size,i) => (
+          <div key={i} style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: size, height: size, borderRadius: '50%', border: '1px solid rgba(29,78,216,0.12)', pointerEvents: 'none' }} />
+        ))}
+        <div style={{ position: 'relative', zIndex: 10, maxWidth: 640, margin: '0 auto' }}>
+          <Reveal>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#60A5FA', marginBottom: 20 }}>
+              <span style={{ width: 20, height: 2, borderRadius: 999, background: '#60A5FA', display: 'inline-block' }} />
+              Ready to Fly?
+            </div>
+            <h2 style={{ fontSize: 'clamp(32px,4vw,52px)', fontWeight: 900, color: '#fff', letterSpacing: '-0.025em', lineHeight: 1.15, marginBottom: 20 }}>
+              Join Your Team on the Platform
+            </h2>
+            <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, marginBottom: 44 }}>
+              IFOA Management is exclusively for internal team members. Sign in or register with your IFOA credentials.
+            </p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <Link to={user ? '/dashboard' : '/register'} className="btn-primary" style={{ padding: '15px 34px', fontSize: 15 }}>
+                {user ? 'Go to Dashboard' : 'Create Account'} <ArrowRight size={16} />
               </Link>
               {!user && (
-                <Link
-                  to="/login"
-                  className="inline-flex items-center gap-2 rounded-full border border-white/25 px-8 py-4 text-[15px] font-medium text-white/80 transition-all hover:bg-white/10"
-                >
-                  Sign in
-                </Link>
+                <Link to="/login" style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                  padding: '14px 30px', borderRadius: 12,
+                  border: '1.5px solid rgba(255,255,255,0.15)',
+                  background: 'transparent', color: 'rgba(255,255,255,0.8)',
+                  fontSize: 15, fontWeight: 600, fontFamily: "'Outfit',sans-serif",
+                  textDecoration: 'none', cursor: 'pointer',
+                }}>Sign in</Link>
               )}
             </div>
-          </RevealSection>
+          </Reveal>
         </div>
       </section>
 
-      {/* ─── FOOTER ──────────────────────────────────────────────────────── */}
-      <footer className="bg-[#02060F] px-8 py-10">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-6">
-          <div className="flex items-center gap-3">
-            <img src={IFOAIndia} alt="IFOA" className="h-8 w-auto opacity-50" />
-            <span className="text-sm text-white/30">IFOA Management Platform</span>
+      {/* ── FOOTER ── */}
+      <footer style={{ background: '#08101E', padding: '60px 40px 32px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 48, marginBottom: 52 }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+                <img src={IFOAWhite} alt="IFOA" style={{ height: 28, objectFit: 'contain', opacity: 0.45, filter: 'brightness(0) invert(1)' }} />
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>Management</span>
+              </div>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.22)', lineHeight: 1.7 }}>Internal operations platform for IFOA India team members.</p>
+            </div>
+            {['Platform','Access','Info'].map((col,ci) => {
+              const links = [
+                [['Features','#features'],['About','#about'],['Team','#team']],
+                [['Sign In','/login'],['Register','/register']],
+                [['Privacy','#'],['Terms','#']],
+              ][ci];
+              return (
+                <div key={col}>
+                  <h4 style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.75)', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{col}</h4>
+                  <ul style={{ listStyle: 'none' }}>
+                    {links.map(([label,href]) => (
+                      <li key={label} style={{ marginBottom: 10 }}>
+                        {href.startsWith('/') ? (
+                          <Link to={href} style={{ fontSize: 13, color: 'rgba(255,255,255,0.28)', textDecoration: 'none', fontWeight: 500 }}
+                            onMouseEnter={e=>e.target.style.color='rgba(255,255,255,0.7)'}
+                            onMouseLeave={e=>e.target.style.color='rgba(255,255,255,0.28)'}
+                          >{label}</Link>
+                        ) : (
+                          <a href={href} style={{ fontSize: 13, color: 'rgba(255,255,255,0.28)', textDecoration: 'none', fontWeight: 500 }}
+                            onMouseEnter={e=>e.target.style.color='rgba(255,255,255,0.7)'}
+                            onMouseLeave={e=>e.target.style.color='rgba(255,255,255,0.28)'}
+                          >{label}</a>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
           </div>
-          <div className="flex gap-6">
-            {[['Features', '#features'], ['How it Works', '#how-it-works'], ['About', '#about']].map(([l, h]) => (
-              <a key={l} href={h} className="text-sm text-white/35 transition-colors hover:text-blue-300">{l}</a>
-            ))}
-            <Link to="/login" className="text-sm text-white/35 transition-colors hover:text-blue-300">Sign In</Link>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 28, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14 }}>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.18)' }}>© {new Date().getFullYear()} IFOA India. All rights reserved.</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgba(255,255,255,0.2)', fontWeight: 600 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 8px rgba(34,197,94,.5)', display: 'inline-block' }} />
+              All Systems Operational
+            </div>
           </div>
-          <p className="text-sm text-white/25">© {new Date().getFullYear()} IFOA. Internal use only.</p>
         </div>
       </footer>
     </div>

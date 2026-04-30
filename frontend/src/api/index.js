@@ -65,6 +65,7 @@ export const taskAPI = {
 export const leaveAPI = {
   apply: (data) => API.post('/leaves/apply', data),
   adminCreate: (data) => API.post('/leaves/admin/create', data),
+  selfMark: (data) => API.post('/leaves/self-mark', data),
   getMy: () => API.get('/leaves/my'),
   getAll: (params) => API.get('/leaves', { params }),
   getBalance: () => API.get('/leaves/balance'),

@@ -50,9 +50,13 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT} with WebSocket support`);
 
+  const { processScheduledAnnouncements, deleteExpiredAnnouncements } = require('./controllers/announcementController');
+
   // ── Scheduled announcement publisher (runs every 60 seconds) ──
-  const { processScheduledAnnouncements } = require('./controllers/announcementController');
   setInterval(processScheduledAnnouncements, 60 * 1000);
-  // Run once immediately on startup to catch any that fired while server was down
   processScheduledAnnouncements();
+
+  // ── Expired announcement cleanup (runs every 60 seconds) ──
+  setInterval(deleteExpiredAnnouncements, 60 * 1000);
+  deleteExpiredAnnouncements();
 });

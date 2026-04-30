@@ -390,6 +390,86 @@ exports.getMyLeaves = async (req, res) => {
   }
 };
 
+// @desc  HR/Manager mark their own day as leave directly (self-leave, approved instantly for HR; request flow for manager)
+// @route POST /api/leaves/self-mark
+exports.selfMarkLeave = async (req, res) => {
+  try {
+    const { startDate, endDate, reason = 'Self-marked leave', asRequest = false } = req.body;
+    if (!startDate) return res.status(400).json({ success: false, message: 'startDate is required' });
+
+    const end = endDate || startDate;
+    const start = new Date(startDate);
+    const endD = new Date(end);
+    if (endD < start) return res.status(400).json({ success: false, message: 'End date cannot be before start date' });
+
+    const totalDays = Math.ceil((endD - start) / (1000 * 60 * 60 * 24)) + 1;
+    const role = req.user.role;
+
+    // Check overlap
+    const overlap = await Leave.findOne({
+      employee: req.user.id,
+      status: { $in: ['pending', 'approved'] },
+      $or: [{ startDate: { $lte: endD }, endDate: { $gte: start } }],
+    });
+    if (overlap) return res.status(400).json({ success: false, message: 'You already have a leave on overlapping dates' });
+
+    const isHR = role === 'hr' || role === 'admin';
+    const isManager = role === 'manager';
+
+    // HR/Admin: immediately approved self-leave (no approval needed)
+    // Manager with asRequest=false: immediately approved
+    // Manager with asRequest=true: goes through HR approval flow
+    const shouldAutoApprove = isHR || (isManager && !asRequest);
+    const approvalFlow = asRequest ? 'manager_request' : 'admin_created';
+
+    const leave = await Leave.create({
+      employee: req.user.id,
+      startDate,
+      endDate: end,
+      totalDays,
+      reason,
+      status: shouldAutoApprove ? 'approved' : 'pending',
+      approvalFlow,
+      reviewedBy: shouldAutoApprove ? req.user.id : undefined,
+      reviewedAt: shouldAutoApprove ? new Date() : undefined,
+      reviewComment: shouldAutoApprove ? 'Self-marked leave' : undefined,
+      managerDecision: {
+        status: shouldAutoApprove ? 'approved' : (isManager ? 'approved' : 'pending'),
+        reviewedBy: req.user.id,
+        reviewedAt: new Date(),
+        reviewComment: 'Self-marked',
+      },
+      hrDecision: {
+        status: shouldAutoApprove ? 'approved' : 'pending',
+        reviewedBy: shouldAutoApprove ? req.user.id : undefined,
+        reviewedAt: shouldAutoApprove ? new Date() : undefined,
+        reviewComment: shouldAutoApprove ? 'Self-marked leave' : undefined,
+      },
+    });
+
+    // If asRequest (manager requesting HR approval), notify HR
+    if (asRequest && isManager) {
+      const user = await User.findById(req.user.id);
+      const hrUsers = await User.find({ role: { $in: ['hr', 'admin'] }, isActive: true });
+      await Promise.all(hrUsers.map(hr =>
+        createAndEmit({
+          recipient: hr._id,
+          sender: req.user.id,
+          type: 'leave_applied',
+          title: 'Manager Leave Request',
+          message: `${user.name} (Manager) requested ${totalDays} day(s) leave`,
+          link: '/leaves',
+        })
+      ));
+    }
+
+    await leave.populate('employee', 'name email department employeeId avatar role');
+    res.status(201).json({ success: true, leave });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 // @desc  Get leave reset settings
 // @route GET /api/leaves/reset-settings
 exports.getLeaveResetSettings = async (req, res) => {
