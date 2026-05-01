@@ -7,6 +7,7 @@ import {
   Radio, ShieldCheck, Lock,
   Shield, Clock, Users, TrendingUp,
   Database, Activity, GitBranch, Bell, FileText, Target, UserCheck, Layers,
+  Plane, Monitor, BookOpen,
 } from 'lucide-react';
 
 /* ── Asset imports ── */
@@ -289,44 +290,45 @@ function HeroCarousel() {
         onMouseEnter={() => setHov(true)}
         onMouseLeave={() => setHov(false)}
         style={{
-          background: hov ? bg : '#FFFFFF',
-          border: `1.5px solid ${hov ? color + '38' : 'rgba(15,23,42,0.07)'}`,
-          borderRadius: 20, padding: '32px 28px 28px',
+          background: hov ? 'linear-gradient(135deg,' + bg + ' 0%,#ffffff 100%)' : '#FFFFFF',
+          border: `1.5px solid ${hov ? color + '45' : '#E8E8FF'}`,
+          borderRadius: 16, padding: '28px 24px 24px',
           position: 'relative', overflow: 'hidden',
           transition: 'all .35s cubic-bezier(.22,1,.36,1)',
-          transform: hov ? 'translateY(-6px)' : 'translateY(0)',
-          boxShadow: hov ? `0 20px 50px ${color}18` : '0 2px 8px rgba(15,23,42,0.04)',
-          cursor: 'default', display: 'flex', flexDirection: 'column', minHeight: 240,
+          transform: hov ? 'translateY(-8px) translateX(-2px)' : 'translateY(0)',
+          boxShadow: hov ? `0 24px 48px ${color}22` : '0 4px 12px rgba(29,78,216,0.08)',
+          cursor: 'default', display: 'flex', flexDirection: 'column', minHeight: 280,
+          backdropFilter: hov ? 'blur(8px)' : 'none',
         }}
       >
         <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+          position: 'absolute', top: 0, left: 0, right: 0, height: 4,
           background: `linear-gradient(90deg,${color},${color}00)`,
-          transform: `scaleX(${hov ? 1 : 0.25})`, transformOrigin: 'left',
+          transform: `scaleX(${hov ? 1 : 0})`, transformOrigin: 'left',
           transition: 'transform .4s cubic-bezier(.22,1,.36,1)',
-          borderRadius: '20px 20px 0 0',
+          borderRadius: '16px 16px 0 0',
         }} />
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
           <div style={{
-            width: 52, height: 52, borderRadius: 14,
-            background: `linear-gradient(135deg,${color}18,${color}08)`,
-            border: `1.5px solid ${color}20`,
+            width: 56, height: 56, borderRadius: 12,
+            background: `linear-gradient(135deg,${color}25,${color}12)`,
+            border: `1.5px solid ${color}30`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'transform .3s',
-            transform: hov ? 'scale(1.1) rotate(-4deg)' : 'scale(1)',
+            transition: 'all .3s cubic-bezier(.22,1,.36,1)',
+            transform: hov ? 'scale(1.12) rotate(-3deg)' : 'scale(1)',
           }}>
-            <Icon size={24} color={color} strokeWidth={1.75} />
+            <Icon size={26} color={color} strokeWidth={1.6} />
           </div>
           <span style={{
-            padding: '4px 11px', borderRadius: 999, background: bg, color,
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
-            textTransform: 'uppercase', border: `1px solid ${color}22`,
+            padding: '5px 12px', borderRadius: 8, background: bg, color,
+            fontSize: 9, fontWeight: 800, letterSpacing: '0.12em',
+            textTransform: 'uppercase', border: `1px solid ${color}28`,
           }}>{tag}</span>
         </div>
-        <h3 style={{ margin: '0 0 10px', fontSize: 16, fontWeight: 800, color: '#1A1F36' }}>{title}</h3>
-        <p style={{ margin: 0, fontSize: 13.5, color: '#64748B', lineHeight: 1.65, flex: 1 }}>{desc}</p>
-        <div style={{ marginTop: 20, display: 'flex', alignItems: 'center', gap: 8, paddingTop: 16, borderTop: `1px solid ${color}15` }}>
-          <span style={{ fontSize: 18, fontWeight: 900, color, letterSpacing: '-0.02em' }}>{stat}</span>
+        <h3 style={{ margin: '0 0 12px', fontSize: 17, fontWeight: 800, color: '#1A1F36', letterSpacing: '-0.01em' }}>{title}</h3>
+        <p style={{ margin: 0, fontSize: 13.5, color: '#64748B', lineHeight: 1.7, flex: 1 }}>{desc}</p>
+        <div style={{ marginTop: 24, display: 'flex', alignItems: 'center', gap: 8, paddingTop: 16, borderTop: `1.5px solid ${color}12` }}>
+          <span style={{ fontSize: 19, fontWeight: 900, color, letterSpacing: '-0.02em' }}>{stat}</span>
           <span style={{ fontSize: 12, color: '#94A3B8', fontWeight: 500 }}>{statLabel}</span>
         </div>
       </div>
@@ -445,10 +447,6 @@ export default function LandingPage() {
           transition:border-color .2s, color .2s, background .2s, transform .2s;
         }
         .btn-ghost:hover { border-color:${B}; color:${B}; background:#EFF6FF; transform:translateY(-1px); }
-
-        .feature-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:24px; }
-        @media(max-width:960px){ .feature-grid{grid-template-columns:repeat(2,1fr);} }
-        @media(max-width:600px){ .feature-grid{grid-template-columns:1fr;} }
         @media(max-width:700px){ .nav-desktop{display:none!important;} }
 
         .hero-section {
@@ -478,7 +476,7 @@ export default function LandingPage() {
             <span style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.15em', textTransform: 'uppercase' }}>Management</span>
           </Link>
           <div className="nav-desktop" style={{ display: 'flex', gap: 32 }}>
-            {[['Platform','#features'],['About','#about'],['Team','#team']].map(([l,h]) => (
+            {[['Platform','#features'],['About','#about']].map(([l,h]) => (
               <a key={l} href={h} className="nav-link">{l}</a>
             ))}
           </div>
@@ -498,58 +496,98 @@ export default function LandingPage() {
       </nav>
 
       {/* ── HERO ── */}
-      <section className="hero-section" style={{ background: '#FFFFFF', position: 'relative' }}>
+      <section className="hero-section" style={{ background: '#FFFFFF', position: 'relative', overflow: 'hidden' }}>
+        {/* Subtle background gradient */}
         <div style={{
-          position: 'absolute', inset: '0 50% 0 0',
-          backgroundImage: 'radial-gradient(rgba(29,78,216,0.055) 1px,transparent 1px)',
-          backgroundSize: '28px 28px', pointerEvents: 'none',
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(135deg, #ffffff 0%, #F8FAFF 100%)',
+          pointerEvents: 'none',
+        }} />
+        
+        {/* Decorative elements */}
+        <div style={{
+          position: 'absolute', top: -100, right: -100, width: 300, height: 300,
+          borderRadius: '50%', background: 'radial-gradient(circle, rgba(29,78,216,0.08) 0%, transparent 70%)',
+          pointerEvents: 'none',
+        }} />
+        <div style={{
+          position: 'absolute', bottom: -50, left: '50%', width: 400, height: 400,
+          borderRadius: '50%', background: 'radial-gradient(circle, rgba(29,78,216,0.05) 0%, transparent 70%)',
+          pointerEvents: 'none', transform: 'translateX(-50%)',
         }} />
 
         <div style={{
           display: 'flex', flexDirection: 'column', justifyContent: 'center',
-          padding: 'clamp(40px,6vw,100px) clamp(32px,5vw,80px)',
+          padding: 'clamp(60px,8vw,120px) clamp(32px,5vw,80px)',
           position: 'relative', zIndex: 10,
+          maxWidth: 900,
         }}>
+          {/* Badge */}
           <div className="hero-badge" style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            padding: '7px 16px', borderRadius: 999,
-            background: 'rgba(29,78,216,0.07)', border: '1px solid rgba(29,78,216,0.18)',
-            fontSize: 11, fontWeight: 700, letterSpacing: '0.1em',
-            textTransform: 'uppercase', color: B, width: 'fit-content', marginBottom: 28,
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '8px 14px', borderRadius: 8,
+            background: '#EFF6FF', border: `1px solid ${B}25`,
+            fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+            textTransform: 'uppercase', color: B, width: 'fit-content', marginBottom: 32,
           }}>
-            Internal Operations Platform
+            Streamlined Operations
           </div>
 
+          {/* Main Heading */}
           <h1 className="hero-h1" style={{
-            fontSize: 'clamp(38px,4.5vw,64px)', fontWeight: 900, lineHeight: 1.12,
-            letterSpacing: '-0.025em', marginBottom: 24, color: B,
+            fontSize: 'clamp(44px,5.5vw,72px)', fontWeight: 900, lineHeight: 1.1,
+            letterSpacing: '-0.03em', marginBottom: 20, color: '#0F172A',
           }}>
             One Platform.<br />
-            <span style={{ color: '#0F172A' }}>Every Operation.</span>
+            <span style={{ color: B }}>Every Operation.</span>
           </h1>
 
-          <p className="hero-sub" style={{ fontSize: 17, color: '#64748B', lineHeight: 1.75, maxWidth: 460, marginBottom: 40 }}>
+          {/* Subheading */}
+          <p className="hero-sub" style={{
+            fontSize: 'clamp(16px,1.5vw,18px)', color: '#64748B', lineHeight: 1.8,
+            maxWidth: 520, marginBottom: 48, fontWeight: 400,
+          }}>
             Streamline projects, tasks, sprints, leaves and analytics — purpose-built for the IFOA team.
           </p>
 
-          <div className="hero-btns" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 44 }}>
-            <Link to={user ? '/dashboard' : '/register'} className="btn-primary" style={{ padding: '14px 30px', fontSize: 15 }}>
-              {user ? 'Go to Dashboard' : 'Get Started'} <ArrowRight size={16} />
+          {/* CTA Buttons */}
+          <div className="hero-btns" style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 56 }}>
+            <Link to={user ? '/dashboard' : '/register'} className="btn-primary" style={{
+              padding: '16px 36px', fontSize: 16, fontWeight: 600,
+              boxShadow: `0 12px 40px ${B}25`,
+            }}>
+              {user ? 'Go to Dashboard' : 'Get Started'} <ArrowRight size={18} />
             </Link>
-            {!user && <Link to="/login" className="btn-ghost" style={{ padding: '13px 26px', fontSize: 15 }}>Sign in</Link>}
+            {!user && (
+              <Link to="/login" className="btn-ghost" style={{
+                padding: '15px 32px', fontSize: 16, fontWeight: 600,
+              }}>
+                Sign in
+              </Link>
+            )}
           </div>
 
-          <div className="hero-trust" style={{ display: 'flex', gap: 22, flexWrap: 'wrap' }}>
-            {/* eslint-disable-next-line no-unused-vars */}
+          {/* Trust Indicators */}
+          <div className="hero-trust" style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
             {TRUST.map(({ icon: Icon, label }) => (
-              <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#64748B', fontWeight: 600 }}>
-                <Icon size={13} color={B} /> {label}
-              </span>
+              <div key={label} style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                fontSize: 13, color: '#64748B', fontWeight: 500,
+                opacity: 0.9,
+              }}>
+                <Icon size={16} color={B} strokeWidth={1.8} />
+                {label}
+              </div>
             ))}
           </div>
         </div>
 
-        <div className="carousel-wrap" style={{ position: 'relative', alignSelf: 'stretch', overflow: 'hidden', background: '#0A0F1E' }}>
+        {/* Carousel Section */}
+        <div className="carousel-wrap" style={{
+          position: 'relative', alignSelf: 'stretch', overflow: 'hidden',
+          background: 'linear-gradient(135deg, #0A0F1E 0%, #1a2234 100%)',
+          minHeight: 500,
+        }}>
           <HeroCarousel />
         </div>
       </section>
@@ -580,7 +618,7 @@ export default function LandingPage() {
               Core Platform
             </div>
             <h2 style={{ fontSize: 'clamp(30px,3.5vw,48px)', fontWeight: 900, color: '#0F172A', letterSpacing: '-0.025em', lineHeight: 1.15, marginBottom: 16 }}>
-              Six Modules. One Unified System.
+              Powerful Tools. Seamless Integration.
             </h2>
             <p style={{ fontSize: 16, color: '#64748B', maxWidth: 500, margin: '0 auto', lineHeight: 1.7 }}>
               Every tool your team needs to plan, execute, and report — tightly integrated and always in sync.
@@ -589,111 +627,272 @@ export default function LandingPage() {
         </div>
 
         {/* ── STRIP (compact, management content) ── */}
-        <div style={{ marginBottom: 56 }}>
+        <div>
           <FeatureStrip />
-        </div>
-
-        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 40px', position: 'relative', zIndex: 1 }}>
-          <div className="feature-grid">
-            {FEATURES.map((f, i) => (
-              <FeatureCard key={f.title} {...f} delay={i * 0.07} />
-            ))}
-          </div>
         </div>
       </section>
 
       {/* ── ABOUT ── */}
-      <section id="about" style={{ background: '#F8FAFF', padding: '100px 40px' }}>
-        <div style={{ maxWidth: 1280, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'center' }}>
+      <section id="about" style={{ background: '#F8FAFF', padding: '120px 40px', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle at 0% 100%,rgba(29,78,216,0.05) 0%,transparent 70%)', pointerEvents: 'none' }} />
+        
+        <div style={{ maxWidth: 1280, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 100, alignItems: 'center', position: 'relative', zIndex: 1 }}>
+          {/* Image Gallery with Modern Cards */}
           <Reveal>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-              <div style={{ gridColumn: '1/-1', borderRadius: 20, overflow: 'hidden', aspectRatio: '16/7', position: 'relative' }}>
-                <img src={HeroImg} alt="IFOA Operations" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg,rgba(29,78,216,0.3),transparent)' }} />
-                <div style={{ position: 'absolute', bottom: 16, left: 16, background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(10px)', borderRadius: 10, padding: '8px 14px', fontSize: 12, fontWeight: 700, color: '#0F172A' }}>✈️ IFOA Aviation Operations</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+              {/* Main image card */}
+              <div style={{
+                gridColumn: '1/-1',
+                borderRadius: 24,
+                overflow: 'hidden',
+                aspectRatio: '16/7',
+                position: 'relative',
+                group: 'hover',
+              }}>
+                <img
+                  src={HeroImg}
+                  alt="IFOA Operations"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    transition: 'transform .6s cubic-bezier(.22,1,.36,1)',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.08)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                />
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(135deg,rgba(29,78,216,0.25) 0%,rgba(29,78,216,0.08) 100%)',
+                  transition: 'opacity .4s',
+                }} />
+                <div style={{
+                  position: 'absolute',
+                  bottom: 24,
+                  left: 24,
+                  background: 'rgba(255,255,255,0.95)',
+                  backdropFilter: 'blur(12px)',
+                  borderRadius: 12,
+                  padding: '12px 18px',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: '#0F172A',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  boxShadow: '0 8px 32px rgba(29,78,216,0.15)',
+                }}>
+                  <Plane size={16} color={B} />
+                  IFOA Aviation Operations
+                </div>
               </div>
-              <div style={{ borderRadius: 20, overflow: 'hidden', aspectRatio: '4/3', position: 'relative' }}>
-                <img src={HeroSection} alt="Platform" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                <div style={{ position: 'absolute', inset: 0, background: 'rgba(29,78,216,0.15)' }} />
+
+              {/* Secondary image card 1 */}
+              <div style={{
+                borderRadius: 20,
+                overflow: 'hidden',
+                aspectRatio: '4/3',
+                position: 'relative',
+              }}>
+                <img
+                  src={HeroSection}
+                  alt="Platform Dashboard"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    transition: 'transform .6s cubic-bezier(.22,1,.36,1)',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                />
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(180deg,transparent 40%,rgba(29,78,216,0.3) 100%)',
+                }} />
+                <div style={{
+                  position: 'absolute',
+                  top: 12,
+                  right: 12,
+                  background: 'rgba(29,78,216,0.9)',
+                  backdropFilter: 'blur(8px)',
+                  borderRadius: 10,
+                  padding: '8px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: '#fff',
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  boxShadow: '0 8px 24px rgba(29,78,216,0.2)',
+                }}>
+                  <Monitor size={12} />
+                  Dashboard
+                </div>
               </div>
-              <div style={{ borderRadius: 20, overflow: 'hidden', aspectRatio: '4/3', position: 'relative', background: '#0F172A' }}>
-                <img src={TeamImg} alt="Team" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }} />
-                <div style={{ position: 'absolute', bottom: 12, left: 12, background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 700, color: '#fff', letterSpacing: '0.05em' }}>👥 Our Team</div>
+
+              {/* Secondary image card 2 */}
+              <div style={{
+                borderRadius: 20,
+                overflow: 'hidden',
+                aspectRatio: '4/3',
+                position: 'relative',
+              }}>
+                <img
+                  src={TeamImg}
+                  alt="Team Collaboration"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    opacity: 0.95,
+                    transition: 'transform .6s cubic-bezier(.22,1,.36,1)',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                />
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(135deg,rgba(29,78,216,0.4) 0%,transparent 60%)',
+                }} />
+                <div style={{
+                  position: 'absolute',
+                  bottom: 14,
+                  left: 14,
+                  background: 'rgba(255,255,255,0.12)',
+                  backdropFilter: 'blur(12px)',
+                  borderRadius: 10,
+                  padding: '10px 14px',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: '#fff',
+                  letterSpacing: '0.06em',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  border: '1px solid rgba(255,255,255,0.2)',
+                }}>
+                  <Users size={14} />
+                  Team Collaboration
+                </div>
               </div>
             </div>
           </Reveal>
 
+          {/* Content Section */}
           <div>
             <Reveal>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: B, marginBottom: 14 }}>
-                <span style={{ width: 24, height: 3, borderRadius: 999, background: B, display: 'inline-block' }} />
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: B,
+                marginBottom: 16,
+              }}>
+                <span style={{
+                  width: 24,
+                  height: 3,
+                  borderRadius: 999,
+                  background: B,
+                  display: 'inline-block',
+                }} />
                 About the Platform
               </div>
             </Reveal>
+
             <Reveal delay={0.1}>
-              <h2 style={{ fontSize: 'clamp(30px,3vw,44px)', fontWeight: 900, color: '#0F172A', lineHeight: 1.15, marginBottom: 20, letterSpacing: '-0.02em' }}>
+              <h2 style={{
+                fontSize: 'clamp(32px,3.5vw,48px)',
+                fontWeight: 900,
+                color: '#0F172A',
+                lineHeight: 1.2,
+                marginBottom: 24,
+                letterSpacing: '-0.02em',
+              }}>
                 Built for the IFOA Management Team
               </h2>
             </Reveal>
+
             <Reveal delay={0.2}>
-              <p style={{ fontSize: 15.5, color: '#64748B', lineHeight: 1.75, marginBottom: 32 }}>
+              <p style={{
+                fontSize: 16,
+                color: '#64748B',
+                lineHeight: 1.8,
+                marginBottom: 40,
+              }}>
                 An internal operations platform designed specifically for IFOA India. Manage aviation projects, coordinate your team, track tasks and monitor performance — all from one secure, unified interface.
               </p>
             </Reveal>
-            {[
-              'Manage projects from planning to deployment',
-              'Integrated leave & attendance management',
-              'Agile sprint boards with velocity tracking',
-              'Broadcast announcements across the team',
-            ].map((item, i) => (
-              <Reveal key={item} delay={0.25 + i * 0.08}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 14 }}>
-                  <div style={{ width: 22, height: 22, borderRadius: 6, background: `${B}15`, border: `1.5px solid ${B}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
-                    <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke={B} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {[
+                { icon: FolderKanban, text: 'Manage projects from planning to deployment' },
+                { icon: CalendarDays, text: 'Integrated leave & attendance management' },
+                { icon: Zap, text: 'Agile sprint boards with velocity tracking' },
+                { icon: Megaphone, text: 'Broadcast announcements across the team' },
+              ].map(({ icon: Icon, text }, i) => (
+                <Reveal key={text} delay={0.3 + i * 0.08}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 16,
+                      padding: '14px 16px',
+                      borderRadius: 12,
+                      background: '#ffffff',
+                      border: '1.5px solid rgba(29,78,216,0.08)',
+                      transition: 'all .3s cubic-bezier(.22,1,.36,1)',
+                      cursor: 'default',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, rgba(29,78,216,0.06) 0%, rgba(29,78,216,0.02) 100%)';
+                      e.currentTarget.style.borderColor = B + '28';
+                      e.currentTarget.style.transform = 'translateX(6px)';
+                      e.currentTarget.style.boxShadow = '0 12px 32px rgba(29,78,216,0.12)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = '#ffffff';
+                      e.currentTarget.style.borderColor = 'rgba(29,78,216,0.08)';
+                      e.currentTarget.style.transform = 'translateX(0)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  >
+                    <div style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 10,
+                      background: `linear-gradient(135deg,${B}15,${B}08)`,
+                      border: `1.5px solid ${B}22`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      transition: 'all .3s cubic-bezier(.22,1,.36,1)',
+                    }} id={`icon-${i}`}>
+                      <Icon size={18} color={B} strokeWidth={1.8} />
+                    </div>
+                    <span style={{
+                      fontSize: 15,
+                      color: '#475569',
+                      lineHeight: 1.6,
+                      fontWeight: 500,
+                    }}>
+                      {text}
+                    </span>
                   </div>
-                  <span style={{ fontSize: 14.5, color: '#475569', lineHeight: 1.55, fontWeight: 500 }}>{item}</span>
-                </div>
-              </Reveal>
-            ))}
+                </Reveal>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════════
-          TEAM — reduced padding, image fully visible
-      ══════════════════════════════════════════════ */}
-      <section id="team" style={{ background: '#F0F5FF', padding: '40px 40px 48px' }}>
-        <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-          <Reveal style={{ textAlign: 'center', marginBottom: 28 }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: B, marginBottom: 14 }}>
-              <span style={{ width: 24, height: 3, borderRadius: 999, background: B, display: 'inline-block' }} />
-              Our People
-            </div>
-            <h2 style={{ fontSize: 'clamp(28px,3.5vw,42px)', fontWeight: 900, color: '#0F172A', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
-              The Team Behind the Platform
-            </h2>
-          </Reveal>
-
-          <Reveal delay={0.1}>
-            <div style={{
-              borderRadius: 24, overflow: 'hidden', position: 'relative',
-              boxShadow: '0 20px 60px rgba(15,23,42,0.1)',
-              maxWidth: 1120,
-              margin: '0 auto',
-              aspectRatio: '16 / 8.4',
-            }}>
-              <img
-                src={TeamImg}
-                alt="IFOA Team"
-                style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }}
-              />
-              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,transparent 65%,rgba(10,15,40,0.5) 100%)' }} />
-              <div style={{ position: 'absolute', bottom: 28, left: 36, color: '#fff' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>IFOA India</div>
-                <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.01em' }}>Professionals in Aviation Excellence</div>
-              </div>
-            </div>
-          </Reveal>
         </div>
       </section>
 
@@ -746,7 +945,7 @@ export default function LandingPage() {
             </div>
             {['Platform','Access','Info'].map((col,ci) => {
               const links = [
-                [['Features','#features'],['About','#about'],['Team','#team']],
+                [['Features','#features'],['About','#about']],
                 [['Sign In','/login'],['Register','/register']],
                 [['Privacy','#'],['Terms','#']],
               ][ci];
