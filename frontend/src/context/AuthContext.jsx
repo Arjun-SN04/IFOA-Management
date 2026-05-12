@@ -35,12 +35,12 @@ export const AuthProvider = ({ children }) => {
   // ── Role booleans ────────────────────────────────────────────────────────────
   const isAdmin    = user?.role === 'admin';
   const isManager  = user?.role === 'manager';  // Can create projects, teams, assign tasks
-  const isHR       = user?.role === 'hr';        // Can view all, manage leaves — CANNOT create projects/teams
+  const isHR       = user?.role === 'hr';       // Can create projects, teams, assign tasks exactly like manager
   const isTeamLead = user?.role === 'team_lead'; // Can assign tasks within their team
   const isEmployee = user?.role === 'employee';
 
-  // Manager + Admin: full project/team management
-  const isManagerOrAdmin = isAdmin || isManager;
+  // Manager + Admin + HR: full project/team management
+  const isManagerOrAdmin = isAdmin || isManager || isHR;
 
   // HR + Manager + Admin: can view everything, manage leaves, manage users
   const isHROrAbove = isAdmin || isManager || isHR;

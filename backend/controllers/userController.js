@@ -229,6 +229,41 @@ exports.updateLeaveBalance = async (req, res) => {
   }
 };
 
+// @desc  Update employee ID (admin / manager / HR — uniqueness enforced)
+// @route PATCH /api/users/:id/employee-id
+exports.updateEmployeeId = async (req, res) => {
+  try {
+    const { employeeId } = req.body;
+    if (!employeeId || !String(employeeId).trim()) {
+      return res.status(400).json({ success: false, message: 'Employee ID cannot be empty' });
+    }
+    const newId = String(employeeId).trim();
+
+    // Uniqueness check — exclude the current user being updated
+    const conflict = await User.findOne({
+      employeeId: new RegExp(`^${newId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+      _id: { $ne: req.params.id },
+    });
+    if (conflict) {
+      return res.status(409).json({
+        success: false,
+        message: `Employee ID "${newId}" is already assigned to ${conflict.name}.`,
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { employeeId: newId },
+      { new: true, runValidators: true }
+    ).select('-password');
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    res.json({ success: true, user });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 // @desc  Get accessories for current user
 // @route GET /api/users/me/accessories
 exports.getMyAccessories = async (req, res) => {

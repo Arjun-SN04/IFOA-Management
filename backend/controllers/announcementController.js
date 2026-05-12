@@ -2,6 +2,7 @@ const Announcement = require('../models/Announcement');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 const { createAndEmit } = require('./notificationController');
+const { getIO } = require('../socket');
 
 // ── Audience filter helper ─────────────────────────────────────────────────────
 const getAnnouncementAudienceFilter = (announcement) => {
@@ -17,7 +18,7 @@ const getAnnouncementAudienceFilter = (announcement) => {
   return {};
 };
 
-// ── Send notifications to all relevant recipients ─────────────────────────────
+// ── Send notifications + socket broadcast to all relevant recipients ───────────
 const sendAnnouncementNotifications = async (announcement, senderUser) => {
   const audienceFilter = getAnnouncementAudienceFilter(announcement);
   const recipients = await User.find({
@@ -40,20 +41,50 @@ const sendAnnouncementNotifications = async (announcement, senderUser) => {
       )
     );
   }
+
+  // ── Broadcast a dedicated socket event so all connected clients redirect ────
+  // The payload contains just enough info for the client to decide whether to redirect
+  try {
+    const io = getIO();
+    const broadcastPayload = {
+      _id: announcement._id,
+      title: announcement.title,
+      audience: announcement.audience,
+      department: announcement.department || null,
+      priority: announcement.priority || 'normal',
+      createdBy: { _id: senderUser._id, name: senderUser.name },
+    };
+    // Emit to all connected sockets (across all authenticated users)
+    io.emit('announcement:new', broadcastPayload);
+  } catch {}
 };
 
 // @desc  Create announcement (immediate or scheduled)
 exports.createAnnouncement = async (req, res) => {
   try {
-    const { scheduledFor, ...rest } = req.body;
+    const { scheduledFor, expiresAt, ...rest } = req.body;
 
     const isScheduled = scheduledFor && new Date(scheduledFor) > new Date();
+
+    // If user explicitly sets expiresAt, use it.
+    // Otherwise: immediate posts expire in 24 hours, scheduled posts expire 24h after their publish time.
+    // This intentional 24-hour window keeps the feed fresh — old announcements auto-clear.
+    let resolvedExpiresAt;
+    if (expiresAt) {
+      resolvedExpiresAt = new Date(expiresAt);
+    } else if (!isScheduled) {
+      resolvedExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    } else {
+      resolvedExpiresAt = new Date(new Date(scheduledFor).getTime() + 24 * 60 * 60 * 1000);
+    }
+
     const announcement = await Announcement.create({
       ...rest,
       createdBy: req.user._id,
       creatorRole: req.user.role,
       scheduledFor: isScheduled ? new Date(scheduledFor) : undefined,
       isPublished: !isScheduled,
+      expiresAt: resolvedExpiresAt,
     });
 
     if (!isScheduled) {
@@ -72,9 +103,9 @@ exports.getAllAnnouncements = async (req, res) => {
     const role = req.user.role;
     const now = new Date();
 
-    // ── Auto-delete expired announcements (fire-and-forget) ────────────────
+    // ── Auto-delete announcements that have an explicit expiresAt that has passed ──
     Announcement.find({
-      expiresAt: { $exists: true, $ne: null, $lte: now },
+      expiresAt: { $exists: true, $ne: null, $type: 'date', $lte: now },
     }).then(async (expired) => {
       if (!expired.length) return;
       const ids = expired.map(a => a._id);
@@ -90,7 +121,6 @@ exports.getAllAnnouncements = async (req, res) => {
       audienceFilter.$or = [{ audience: 'all' }, { audience: 'managers' }];
     }
 
-    // ── "Not expired" clause ───────────────────────────────────────────────
     const notExpired = {
       $or: [
         { expiresAt: { $exists: false } },
@@ -99,7 +129,6 @@ exports.getAllAnnouncements = async (req, res) => {
       ],
     };
 
-    // ── Build main filter ──────────────────────────────────────────────────
     let filter;
     if (role === 'admin') {
       filter = { $and: [notExpired] };
@@ -110,7 +139,7 @@ exports.getAllAnnouncements = async (req, res) => {
           {
             $or: [
               { ...audienceFilter, isPublished: true },
-              { createdBy: req.user._id, isPublished: false }, // own scheduled drafts
+              { createdBy: req.user._id, isPublished: false },
             ],
           },
         ],
@@ -232,8 +261,9 @@ exports.processScheduledAnnouncements = async () => {
 exports.deleteExpiredAnnouncements = async () => {
   try {
     const now = new Date();
+    // Only delete announcements that have an explicit expiresAt in the past
     const result = await Announcement.deleteMany({
-      expiresAt: { $lte: now },
+      expiresAt: { $exists: true, $ne: null, $lte: now },
     });
     if (result.deletedCount > 0) {
       console.log(`[Scheduler] Deleted ${result.deletedCount} expired announcement(s)`);

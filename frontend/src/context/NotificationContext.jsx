@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
-import { Bell } from 'lucide-react';
+import { Bell, Megaphone } from 'lucide-react';
 import { notificationAPI, userAPI } from '../api';
 import { useAuth } from './AuthContext';
 
@@ -18,12 +18,14 @@ const SOCKET_URL = RAW_SOCKET_URL
 
 export const NotificationProvider = ({ children }) => {
   const { user } = useAuth();
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount]     = useState(0);
-  const [taskEvents, setTaskEvents]       = useState(null);
-  const [bellRing, setBellRing]           = useState(0);
+  const [notifications, setNotifications]     = useState([]);
+  const [unreadCount, setUnreadCount]         = useState(0);
+  const [taskEvents, setTaskEvents]           = useState(null);
+  const [bellRing, setBellRing]               = useState(0);
   const [pendingUsersCount, setPendingUsersCount] = useState(0);
   const socketRef = useRef(null);
+  // Holds the navigate fn injected by App — avoids a circular import
+  const navigateRef = useRef(null);
 
   const fetchNotifications = useCallback(async () => {
     if (!user) return;
@@ -35,7 +37,9 @@ export const NotificationProvider = ({ children }) => {
     } catch {}
   }, [user]);
 
-  // Fetch pending users count for HR / Manager / Admin
+  // Allow App.jsx to inject the navigate function once the router is mounted
+  const setNavigate = useCallback((fn) => { navigateRef.current = fn; }, []);
+
   const isHROrAbove = ['admin', 'manager', 'hr'].includes(user?.role);
   useEffect(() => {
     if (!isHROrAbove) return;
@@ -52,7 +56,6 @@ export const NotificationProvider = ({ children }) => {
 
     const socket = io(SOCKET_URL, {
       auth: { token },
-      // Start with polling and upgrade to websocket to avoid noisy websocket-first failures in some browsers.
       transports: ['polling', 'websocket'],
       upgrade: true,
       reconnectionAttempts: 5,
@@ -70,8 +73,92 @@ export const NotificationProvider = ({ children }) => {
       toast(notif.message || notif.title, {
         icon: <Bell size={16} />,
         duration: 5000,
-        style: { borderRadius: '12px', background: '#1e293b', color: '#f8fafc', fontSize: '14px', padding: '12px 16px', boxShadow: '0 10px 40px rgba(0,0,0,0.25)' },
+        style: {
+          borderRadius: '12px', background: '#1e293b', color: '#f8fafc',
+          fontSize: '14px', padding: '12px 16px', boxShadow: '0 10px 40px rgba(0,0,0,0.25)',
+        },
       });
+    });
+
+    // ── New announcement: smart redirect with Page Visibility API ──────────────
+    socket.on('announcement:new', (ann) => {
+      const isHidden = document.hidden; // true = user is in another tab/app
+
+      const doNavigate = () => {
+        if (navigateRef.current) {
+          navigateRef.current('/announcements');
+        } else {
+          window.location.href = '/announcements';
+        }
+      };
+
+      if (isHidden) {
+        // ── Tab is not visible: flash the title and redirect when they return ──
+        const originalTitle = document.title;
+        let flashInterval = null;
+        let flashing = true;
+
+        flashInterval = setInterval(() => {
+          document.title = flashing
+            ? `📣 New Announcement — ${ann.title}`
+            : originalTitle;
+          flashing = !flashing;
+        }, 1000);
+
+        // Browser Notification (if permission granted)
+        if (Notification && Notification.permission === 'granted') {
+          try {
+            new Notification('New Announcement', {
+              body: ann.title,
+              icon: '/favicon.ico',
+            });
+          } catch {}
+        }
+
+        // When tab becomes visible → stop flashing, redirect, remove listener
+        const onVisible = () => {
+          if (!document.hidden) {
+            clearInterval(flashInterval);
+            document.title = originalTitle;
+            document.removeEventListener('visibilitychange', onVisible);
+            // Small delay so the page paints before navigating
+            setTimeout(doNavigate, 150);
+          }
+        };
+        document.addEventListener('visibilitychange', onVisible);
+
+      } else {
+        // ── Tab is active: show a dismissible toast with a View button ──────────
+        toast(
+          (t) => (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Megaphone size={18} style={{ color: '#FCD34D', flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2 }}>New Announcement</div>
+                <div style={{ fontSize: 12, opacity: 0.85 }}>{ann.title}</div>
+              </div>
+              <button
+                onClick={() => { toast.dismiss(t.id); doNavigate(); }}
+                style={{
+                  flexShrink: 0, padding: '5px 10px', borderRadius: 8,
+                  background: '#F59E0B', color: '#1e293b', border: 'none',
+                  fontSize: 11, fontWeight: 800, cursor: 'pointer',
+                }}
+              >
+                View
+              </button>
+            </div>
+          ),
+          {
+            duration: 12000,
+            style: {
+              borderRadius: '14px', background: '#1e293b', color: '#f8fafc',
+              padding: '14px 18px', boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
+              border: '1px solid #F59E0B40', maxWidth: 380,
+            },
+          }
+        );
+      }
     });
 
     const emitTaskEvent = (type) => (payload) => setTaskEvents({ type, payload, ts: Date.now() });
@@ -80,19 +167,17 @@ export const NotificationProvider = ({ children }) => {
     socket.on('task:updated',       emitTaskEvent('updated'));
     socket.on('task:statusChanged', emitTaskEvent('statusChanged'));
     socket.on('task:deleted',       emitTaskEvent('deleted'));
-    // New: shared team task claimed by a teammate
     socket.on('task:claimed',       emitTaskEvent('claimed'));
 
-    // ── Pending user approval events ─────────────────────────────────────────
     socket.on('user:registered', () => {
       userAPI.getPending()
         .then(res => setPendingUsersCount((res.data.users || []).length))
         .catch(() => {});
     });
-    socket.on('user:approved', ({ userId }) => {
+    socket.on('user:approved', () => {
       setPendingUsersCount(prev => Math.max(0, prev - 1));
     });
-    socket.on('user:rejected', ({ userId }) => {
+    socket.on('user:rejected', () => {
       setPendingUsersCount(prev => Math.max(0, prev - 1));
     });
 
@@ -114,7 +199,12 @@ export const NotificationProvider = ({ children }) => {
   };
 
   return (
-    <NotificationContext.Provider value={{ notifications, unreadCount, taskEvents, bellRing, fetchNotifications, markRead, markAllRead, socketRef, pendingUsersCount, setPendingUsersCount }}>
+    <NotificationContext.Provider value={{
+      notifications, unreadCount, taskEvents, bellRing,
+      fetchNotifications, markRead, markAllRead,
+      socketRef, pendingUsersCount, setPendingUsersCount,
+      setNavigate,
+    }}>
       {children}
     </NotificationContext.Provider>
   );

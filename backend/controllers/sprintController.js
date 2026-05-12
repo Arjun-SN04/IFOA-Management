@@ -66,8 +66,11 @@ exports.deleteSprint = async (req, res) => {
     const sprint = await Sprint.findById(req.params.id);
     if (!sprint) return res.status(404).json({ success: false, message: 'Sprint not found' });
 
-    // Unlink tasks from this sprint (move to backlog)
-    await Task.updateMany({ sprint: sprint._id }, { $unset: { sprint: 1 }, status: 'backlog' });
+    // Unlink tasks from this sprint (move to backlog), stamp originSprint
+    await Task.updateMany(
+      { sprint: sprint._id },
+      { $unset: { sprint: 1 }, status: 'backlog', originSprint: sprint._id }
+    );
 
     await Sprint.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: `Sprint "${sprint.name}" deleted. Tasks moved to backlog.` });
@@ -117,7 +120,6 @@ exports.completeSprint = async (req, res) => {
 
     const { nextSprintId } = req.body;
 
-    // Count done/incomplete
     const allSprintTasks = await Task.find({ sprint: sprint._id });
     const doneTasks = allSprintTasks.filter(t => t.status === 'done');
     const incompleteTasks = allSprintTasks.filter(t => !['done', 'cancelled'].includes(t.status));
@@ -128,10 +130,9 @@ exports.completeSprint = async (req, res) => {
     await sprint.populate('project', 'name');
     await sprint.populate('createdBy', 'name');
 
-    // Move incomplete tasks
+    // Move incomplete tasks — stamp originSprint so UI can show badge
     if (incompleteTasks.length > 0) {
       if (nextSprintId) {
-        // Validate the next sprint belongs to the same project and is planned
         const nextSprint = await Sprint.findById(nextSprintId);
         if (!nextSprint) {
           return res.status(404).json({ success: false, message: 'Next sprint not found' });
@@ -139,14 +140,25 @@ exports.completeSprint = async (req, res) => {
         if (String(nextSprint.project) !== String(sprint.project._id || sprint.project)) {
           return res.status(400).json({ success: false, message: 'Next sprint must belong to the same project' });
         }
+        // Move to next sprint, keep originSprint as this sprint (set only if not already set)
+        const incompleteIds = incompleteTasks.map(t => t._id);
         await Task.updateMany(
-          { sprint: sprint._id, status: { $nin: ['done', 'cancelled'] } },
+          { _id: { $in: incompleteIds }, originSprint: null },
+          { sprint: nextSprintId, originSprint: sprint._id }
+        );
+        await Task.updateMany(
+          { _id: { $in: incompleteIds }, originSprint: { $ne: null } },
           { sprint: nextSprintId }
         );
       } else {
-        // Move to backlog (no sprint)
+        // Move to backlog — stamp originSprint so employee can see which sprint it came from
+        const incompleteIds = incompleteTasks.map(t => t._id);
         await Task.updateMany(
-          { sprint: sprint._id, status: { $nin: ['done', 'cancelled'] } },
+          { _id: { $in: incompleteIds }, originSprint: null },
+          { $unset: { sprint: 1 }, status: 'backlog', originSprint: sprint._id }
+        );
+        await Task.updateMany(
+          { _id: { $in: incompleteIds }, originSprint: { $ne: null } },
           { $unset: { sprint: 1 }, status: 'backlog' }
         );
       }
@@ -187,6 +199,7 @@ exports.getSprintBoard = async (req, res) => {
       .populate('assignee', 'name email avatar')
       .populate('reporter', 'name email')
       .populate('sprint', 'name status')
+      .populate('originSprint', 'name status startDate endDate')
       .sort({ order: 1 });
 
     const board = {
@@ -198,6 +211,57 @@ exports.getSprintBoard = async (req, res) => {
       done:          tasks.filter(t => t.status === 'done'),
     };
     res.json({ success: true, board, tasks, data: tasks });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// @desc  Get backlog tasks for a project (tasks with no sprint, or status=backlog)
+// @route GET /api/sprints/backlog?project=:id
+exports.getBacklogTasks = async (req, res) => {
+  try {
+    const { project } = req.query;
+    if (!project) return res.status(400).json({ success: false, message: 'project is required' });
+
+    const tasks = await Task.find({
+      project,
+      $or: [{ sprint: { $exists: false } }, { sprint: null }],
+      status: 'backlog',
+    })
+      .populate('assignee', 'name email avatar')
+      .populate('reporter', 'name email')
+      .populate('originSprint', 'name status startDate endDate')
+      .sort({ createdAt: -1 });
+
+    res.json({ success: true, tasks, data: tasks });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// @desc  Move a backlog task into an active sprint
+// @route PATCH /api/sprints/backlog/:taskId/move
+// @body  { sprintId }
+exports.moveBacklogTaskToSprint = async (req, res) => {
+  try {
+    const { sprintId } = req.body;
+    const task = await Task.findById(req.params.taskId);
+    if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
+
+    const sprint = await Sprint.findById(sprintId);
+    if (!sprint) return res.status(404).json({ success: false, message: 'Sprint not found' });
+    if (sprint.status !== 'active') return res.status(400).json({ success: false, message: 'Can only move tasks into an active sprint' });
+
+    task.sprint  = sprintId;
+    task.status  = 'todo';
+    await task.save();
+
+    await task.populate('assignee', 'name email avatar');
+    await task.populate('reporter', 'name email');
+    await task.populate('sprint', 'name status');
+    await task.populate('originSprint', 'name status startDate endDate');
+
+    res.json({ success: true, task, data: task });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

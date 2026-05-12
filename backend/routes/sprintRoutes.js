@@ -1,7 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const { createSprint, getSprints, updateSprint, deleteSprint, startSprint, completeSprint, getSprintBoard } = require('../controllers/sprintController');
+const {
+  createSprint, getSprints, updateSprint, deleteSprint,
+  startSprint, completeSprint, getSprintBoard,
+  getBacklogTasks, moveBacklogTaskToSprint,
+} = require('../controllers/sprintController');
 const { protect, managerOrAdmin } = require('../middleware/authMiddleware');
+
+// ── Specific static routes BEFORE wildcard /:id routes ──────────────────────
+router.get('/backlog',              protect, getBacklogTasks);
+router.patch('/backlog/:taskId/move', protect, moveBacklogTaskToSprint);
 
 router.post('/',                    protect, managerOrAdmin, createSprint);
 router.get('/',                     protect, getSprints);

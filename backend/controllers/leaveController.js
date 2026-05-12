@@ -1,11 +1,6 @@
 const Leave = require('../models/Leave');
 const User = require('../models/User');
-const LeaveSettings = require('../models/LeaveSettings');
 const { createAndEmit } = require('./notificationController');
-
-function getMonthKey(date = new Date()) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-}
 
 function resolveLeaveStatus(leaveDoc) {
   const managerStatus = leaveDoc?.managerDecision?.status || 'pending';
@@ -26,21 +21,11 @@ function getReviewActorRole(role) {
   return null;
 }
 
-async function runMonthlyResetIfDue() {
-  let settings = await LeaveSettings.findOne();
-  if (!settings) {
-    settings = await LeaveSettings.create({ resetDayOfMonth: 1, lastResetMonthKey: '' });
-  }
-
-  const now = new Date();
-  const monthKey = getMonthKey(now);
-  if (now.getDate() >= settings.resetDayOfMonth && settings.lastResetMonthKey !== monthKey) {
-    await Leave.deleteMany({});
-    settings.lastResetMonthKey = monthKey;
-    await settings.save();
-  }
-
-  return settings;
+function calcTotalDays(startDate, endDate, isHalfDay) {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (isHalfDay) return 0.5;
+  return Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
 }
 
 // @desc  Admin manually create leave for any user
@@ -57,11 +42,14 @@ exports.adminCreateLeave = async (req, res) => {
 
     const start = new Date(startDate);
     const end = new Date(endDate);
+
+    // Admin, Manager, and HR are allowed to create leave on past dates for record-keeping.
+    // Past-date restriction only applies to employees using the regular applyLeave route.
     if (end < start) {
       return res.status(400).json({ success: false, message: 'End date cannot be before start date' });
     }
 
-    const totalDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+    const totalDays = calcTotalDays(startDate, endDate, false);
 
     const leave = await Leave.create({
       employee: employeeId,
@@ -91,7 +79,6 @@ exports.adminCreateLeave = async (req, res) => {
     await leave.populate('employee', 'name email department employeeId');
     await leave.populate('reviewedBy', 'name email');
 
-    // Notify employee
     await createAndEmit({
       recipient: employeeId,
       sender: req.user.id,
@@ -107,27 +94,52 @@ exports.adminCreateLeave = async (req, res) => {
   }
 };
 
-// @desc  Apply for leave
+// @desc  Admin delete/remove any leave record (admin only)
+// @route DELETE /api/leaves/admin/:id
+exports.adminDeleteLeave = async (req, res) => {
+  try {
+    // Only admin can call this — enforced at route level via adminOnly middleware
+    const leave = await Leave.findById(req.params.id).populate('employee', 'name email');
+    if (!leave) return res.status(404).json({ success: false, message: 'Leave not found' });
+
+    const employeeId = leave.employee?._id || leave.employee;
+
+    await Leave.findByIdAndDelete(req.params.id);
+
+    // Notify the employee that their leave was removed
+    await createAndEmit({
+      recipient: employeeId,
+      sender: req.user.id,
+      type: 'leave_rejected',
+      title: 'Leave Record Removed',
+      message: `Your leave record (${new Date(leave.startDate).toLocaleDateString()} – ${new Date(leave.endDate).toLocaleDateString()}) has been removed by admin`,
+      link: '/leaves',
+    });
+
+    res.json({ success: true, message: 'Leave record removed successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// @desc  Apply for leave (employees & managers via form)
 // @route POST /api/leaves/apply
 exports.applyLeave = async (req, res) => {
   try {
-    await runMonthlyResetIfDue();
-
     const { startDate, endDate, reason, isHalfDay, halfDaySession, handoverNote, emergencyContact } = req.body;
     if (!startDate || !endDate || !reason) {
       return res.status(400).json({ success: false, message: 'startDate, endDate and reason are required' });
     }
 
-    // Calculate total days
     const start = new Date(startDate);
     const end = new Date(endDate);
     if (end < start) {
       return res.status(400).json({ success: false, message: 'End date cannot be before start date' });
     }
-    const totalDays = isHalfDay ? 0.5 : Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+
+    const totalDays = calcTotalDays(startDate, endDate, isHalfDay);
     const user = await User.findById(req.user.id);
 
-    // Check for overlapping leaves
     const overlap = await Leave.findOne({
       employee: req.user.id,
       status: { $in: ['pending', 'approved'] },
@@ -135,8 +147,9 @@ exports.applyLeave = async (req, res) => {
     });
     if (overlap) return res.status(400).json({ success: false, message: 'You already have a leave request for overlapping dates' });
 
-    const isManagerRequest = user?.role === 'manager';
-    const approvalFlow = isManagerRequest ? 'manager_request' : 'employee_request';
+    const isManagerUser = user?.role === 'manager';
+    const approvalFlow = isManagerUser ? 'manager_request' : 'employee_request';
+
     const leave = await Leave.create({
       employee: req.user.id,
       startDate,
@@ -149,16 +162,15 @@ exports.applyLeave = async (req, res) => {
       emergencyContact,
       approvalFlow,
       managerDecision: {
-        status: isManagerRequest ? 'approved' : 'pending',
+        status: isManagerUser ? 'approved' : 'pending',
       },
       hrDecision: {
         status: 'pending',
       },
     });
 
-    // Employee requests notify manager + HR. Manager requests notify HR/Admin only.
     const reviewers = await User.find({
-      role: { $in: isManagerRequest ? ['hr', 'admin'] : ['manager', 'hr', 'admin'] },
+      role: { $in: isManagerUser ? ['hr', 'admin'] : ['manager', 'hr', 'admin'] },
       isActive: true,
     });
     await Promise.all(
@@ -181,26 +193,22 @@ exports.applyLeave = async (req, res) => {
   }
 };
 
-// @desc  Get leaves (admin/manager/team_lead sees all, employee sees own)
+// @desc  Get leaves
 // @route GET /api/leaves
 exports.getLeaves = async (req, res) => {
   try {
-    await runMonthlyResetIfDue();
-
     const { status, employee, page = 1, limit = 500, scope } = req.query;
     const query = {};
 
-    // Employees only see their own leaves
     if (req.user.role === 'employee') {
       query.employee = req.user.id;
     } else if (scope === 'employees' && ['manager', 'hr', 'admin'].includes(req.user.role)) {
       const employeeUsers = await User.find({ role: 'employee', isActive: true }).select('_id');
       query.employee = { $in: employeeUsers.map((u) => u._id) };
     } else if (employee) {
-      // Elevated roles can filter by employee
       query.employee = employee;
     }
-    // status filter — if provided, filter; otherwise show ALL statuses (including pending)
+
     if (status) query.status = status;
 
     const leaves = await Leave.find(query)
@@ -211,6 +219,7 @@ exports.getLeaves = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(Number(limit));
+
     const total = await Leave.countDocuments(query);
     res.json({ success: true, total, leaves });
   } catch (err) {
@@ -238,19 +247,19 @@ exports.getLeaveById = async (req, res) => {
 // @route PUT /api/leaves/:id/review
 exports.reviewLeave = async (req, res) => {
   try {
-    await runMonthlyResetIfDue();
-
     const { status, reviewComment } = req.body;
     if (!['approved', 'rejected'].includes(status)) {
       return res.status(400).json({ success: false, message: 'status must be approved or rejected' });
     }
+
     const leave = await Leave.findById(req.params.id).populate('employee');
     if (!leave) return res.status(404).json({ success: false, message: 'Leave not found' });
 
     if (leave.status === 'cancelled') {
       return res.status(400).json({ success: false, message: 'Cancelled leave cannot be reviewed' });
     }
-    if (leave.status !== 'pending') {
+
+    if (['approved', 'rejected'].includes(leave.status)) {
       return res.status(400).json({ success: false, message: 'Leave already finalized' });
     }
 
@@ -286,7 +295,6 @@ exports.reviewLeave = async (req, res) => {
     leave.reviewComment = reviewComment;
     await leave.save();
 
-    // Notify employee
     await createAndEmit({
       recipient: leave.employee._id,
       sender: req.user.id,
@@ -309,12 +317,10 @@ exports.reviewLeave = async (req, res) => {
   }
 };
 
-// @desc  Cancel leave (employee cancels own pending leave)
+// @desc  Cancel leave
 // @route PUT /api/leaves/:id/cancel
 exports.cancelLeave = async (req, res) => {
   try {
-    await runMonthlyResetIfDue();
-
     const leave = await Leave.findById(req.params.id);
     if (!leave) return res.status(404).json({ success: false, message: 'Leave not found' });
     if (leave.employee.toString() !== req.user.id) return res.status(403).json({ success: false, message: 'Not authorized' });
@@ -331,7 +337,6 @@ exports.cancelLeave = async (req, res) => {
 // @route GET /api/leaves/balance
 exports.getLeaveBalance = async (req, res) => {
   try {
-    await runMonthlyResetIfDue();
     const [pending, approved, rejected, cancelled] = await Promise.all([
       Leave.countDocuments({ employee: req.user.id, status: 'pending' }),
       Leave.countDocuments({ employee: req.user.id, status: 'approved' }),
@@ -344,27 +349,25 @@ exports.getLeaveBalance = async (req, res) => {
   }
 };
 
-// @desc  Get leave calendar (all statuses for admin/manager/team_lead, only own for employee)
+// @desc  Get leave calendar
 // @route GET /api/leaves/calendar
 exports.getLeaveCalendar = async (req, res) => {
   try {
-    await runMonthlyResetIfDue();
-
     const { scope } = req.query;
     const query = {};
-    // Employees only see their own leaves in calendar; elevated roles see ALL leaves ALL statuses
+
     if (req.user.role === 'employee') {
       query.employee = req.user.id;
     } else if (scope === 'employees' && ['manager', 'hr', 'admin'].includes(req.user.role)) {
       const employeeUsers = await User.find({ role: 'employee', isActive: true }).select('_id');
       query.employee = { $in: employeeUsers.map((u) => u._id) };
     }
-    // No status filter — include pending, approved, rejected, cancelled
 
     const leaves = await Leave.find(query)
       .populate('employee', 'name department role')
       .select('employee startDate endDate totalDays status reason')
       .sort({ startDate: 1 });
+
     res.json({ success: true, leaves });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -375,8 +378,6 @@ exports.getLeaveCalendar = async (req, res) => {
 // @route GET /api/leaves/my
 exports.getMyLeaves = async (req, res) => {
   try {
-    await runMonthlyResetIfDue();
-
     const leaves = await Leave.find({ employee: req.user.id })
       .populate('employee', 'name email department designation employeeId avatar role')
       .populate('reviewedBy', 'name email')
@@ -390,7 +391,7 @@ exports.getMyLeaves = async (req, res) => {
   }
 };
 
-// @desc  HR/Manager mark their own day as leave directly (self-leave, approved instantly for HR; request flow for manager)
+// @desc  HR/Manager/Employee mark a day as leave by clicking calendar date
 // @route POST /api/leaves/self-mark
 exports.selfMarkLeave = async (req, res) => {
   try {
@@ -400,12 +401,23 @@ exports.selfMarkLeave = async (req, res) => {
     const end = endDate || startDate;
     const start = new Date(startDate);
     const endD = new Date(end);
-    if (endD < start) return res.status(400).json({ success: false, message: 'End date cannot be before start date' });
-
-    const totalDays = Math.ceil((endD - start) / (1000 * 60 * 60 * 24)) + 1;
     const role = req.user.role;
 
-    // Check overlap
+    // Block past-date self-marks for regular employees only.
+    // HR, Admin, and Managers are allowed to mark past dates for record-keeping.
+    const isPrivileged = role === 'hr' || role === 'admin' || role === 'manager';
+    if (!isPrivileged) {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      if (start < todayStart) {
+        return res.status(400).json({ success: false, message: 'Cannot mark leave for a past date' });
+      }
+    }
+
+    if (endD < start) return res.status(400).json({ success: false, message: 'End date cannot be before start date' });
+
+    const totalDays = calcTotalDays(startDate, end, false);
+
     const overlap = await Leave.findOne({
       employee: req.user.id,
       status: { $in: ['pending', 'approved'] },
@@ -413,14 +425,16 @@ exports.selfMarkLeave = async (req, res) => {
     });
     if (overlap) return res.status(400).json({ success: false, message: 'You already have a leave on overlapping dates' });
 
-    const isHR = role === 'hr' || role === 'admin';
-    const isManager = role === 'manager';
+    const isHRRole = role === 'hr' || role === 'admin';
+    const isManagerRole = role === 'manager';
+    const isEmployee = role === 'employee';
 
-    // HR/Admin: immediately approved self-leave (no approval needed)
-    // Manager with asRequest=false: immediately approved
-    // Manager with asRequest=true: goes through HR approval flow
-    const shouldAutoApprove = isHR || (isManager && !asRequest);
-    const approvalFlow = asRequest ? 'manager_request' : 'admin_created';
+    const shouldAutoApprove = isHRRole || (isManagerRole && !asRequest);
+
+    let approvalFlow;
+    if (isEmployee) approvalFlow = 'employee_request';
+    else if (asRequest) approvalFlow = 'manager_request';
+    else approvalFlow = isHRRole ? 'admin_created' : 'employee_request';
 
     const leave = await Leave.create({
       employee: req.user.id,
@@ -434,10 +448,10 @@ exports.selfMarkLeave = async (req, res) => {
       reviewedAt: shouldAutoApprove ? new Date() : undefined,
       reviewComment: shouldAutoApprove ? 'Self-marked leave' : undefined,
       managerDecision: {
-        status: shouldAutoApprove ? 'approved' : (isManager ? 'approved' : 'pending'),
-        reviewedBy: req.user.id,
-        reviewedAt: new Date(),
-        reviewComment: 'Self-marked',
+        status: shouldAutoApprove ? 'approved' : (isManagerRole ? 'approved' : 'pending'),
+        reviewedBy: shouldAutoApprove || isManagerRole ? req.user.id : undefined,
+        reviewedAt: shouldAutoApprove || isManagerRole ? new Date() : undefined,
+        reviewComment: shouldAutoApprove ? 'Self-marked' : undefined,
       },
       hrDecision: {
         status: shouldAutoApprove ? 'approved' : 'pending',
@@ -447,17 +461,17 @@ exports.selfMarkLeave = async (req, res) => {
       },
     });
 
-    // If asRequest (manager requesting HR approval), notify HR
-    if (asRequest && isManager) {
+    if (!shouldAutoApprove) {
       const user = await User.findById(req.user.id);
-      const hrUsers = await User.find({ role: { $in: ['hr', 'admin'] }, isActive: true });
-      await Promise.all(hrUsers.map(hr =>
+      const notifyRoles = isEmployee ? ['manager', 'hr', 'admin'] : ['hr', 'admin'];
+      const reviewers = await User.find({ role: { $in: notifyRoles }, isActive: true });
+      await Promise.all(reviewers.map(reviewer =>
         createAndEmit({
-          recipient: hr._id,
+          recipient: reviewer._id,
           sender: req.user.id,
           type: 'leave_applied',
-          title: 'Manager Leave Request',
-          message: `${user.name} (Manager) requested ${totalDays} day(s) leave`,
+          title: isManagerRole ? 'Manager Leave Request' : 'New Leave Request',
+          message: `${user.name} requested ${totalDays} day(s) leave`,
           link: '/leaves',
         })
       ));
@@ -465,48 +479,6 @@ exports.selfMarkLeave = async (req, res) => {
 
     await leave.populate('employee', 'name email department employeeId avatar role');
     res.status(201).json({ success: true, leave });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-// @desc  Get leave reset settings
-// @route GET /api/leaves/reset-settings
-exports.getLeaveResetSettings = async (req, res) => {
-  try {
-    const settings = await runMonthlyResetIfDue();
-    res.json({
-      success: true,
-      resetDayOfMonth: settings.resetDayOfMonth,
-      lastResetMonthKey: settings.lastResetMonthKey,
-      updatedAt: settings.updatedAt,
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-// @desc  Update leave reset settings (admin)
-// @route PUT /api/leaves/reset-settings
-exports.updateLeaveResetSettings = async (req, res) => {
-  try {
-    const resetDayOfMonth = Number(req.body.resetDayOfMonth);
-    if (!Number.isInteger(resetDayOfMonth) || resetDayOfMonth < 1 || resetDayOfMonth > 28) {
-      return res.status(400).json({ success: false, message: 'resetDayOfMonth must be an integer between 1 and 28' });
-    }
-
-    const settings = await LeaveSettings.findOneAndUpdate(
-      {},
-      { resetDayOfMonth, updatedBy: req.user.id },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
-
-    res.json({
-      success: true,
-      resetDayOfMonth: settings.resetDayOfMonth,
-      lastResetMonthKey: settings.lastResetMonthKey,
-      updatedAt: settings.updatedAt,
-    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

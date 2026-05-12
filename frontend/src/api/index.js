@@ -26,6 +26,7 @@ export const userAPI = {
   toggleStatus: (id) => API.patch(`/users/${id}/toggle-status`),
   approveUser: (id, approved, reason) => API.patch(`/users/${id}/approve`, { approved, reason }),
   getPending: () => API.get('/users/pending'),
+  updateEmployeeId: (id, employeeId) => API.patch(`/users/${id}/employee-id`, { employeeId }),
 };
 
 export const nocAPI = {
@@ -65,6 +66,7 @@ export const taskAPI = {
 export const leaveAPI = {
   apply: (data) => API.post('/leaves/apply', data),
   adminCreate: (data) => API.post('/leaves/admin/create', data),
+  adminDelete: (id) => API.delete(`/leaves/admin/${id}`),   // admin-only remove
   selfMark: (data) => API.post('/leaves/self-mark', data),
   getMy: () => API.get('/leaves/my'),
   getAll: (params) => API.get('/leaves', { params }),
@@ -84,6 +86,9 @@ export const sprintAPI = {
   start: (id) => API.patch(`/sprints/${id}/start`),
   complete: (id, body = {}) => API.patch(`/sprints/${id}/complete`, body),
   getBoard: (id) => API.get(`/sprints/${id}/board`),
+  // Backlog management
+  getBacklog: (projectId) => API.get('/sprints/backlog', { params: { project: projectId } }),
+  moveBacklogTask: (taskId, sprintId) => API.patch(`/sprints/backlog/${taskId}/move`, { sprintId }),
 };
 
 export const commentAPI = {

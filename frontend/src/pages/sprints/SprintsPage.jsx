@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { sprintAPI, projectAPI, taskAPI } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { Card, Button, Modal, Input, Textarea, Select, Empty, Spinner, PageHeader } from '../../components/ui';
@@ -74,7 +74,7 @@ function TaskStatusIcon({ status }) {
   return <Icon size={13} style={{ color: m.color, flexShrink: 0 }} />;
 }
 
-// ── Sprint Kanban Board (shown inside the active sprint panel) ─────────────────
+// ── Sprint Kanban Board ────────────────────────────────────────────────────────
 function SprintKanbanBoard({ tasks, onStatusChange, isManagerOrAdmin }) {
   const [dragTask, setDragTask] = useState(null);
   const [dragOver, setDragOver] = useState(null);
@@ -95,13 +95,11 @@ function SprintKanbanBoard({ tasks, onStatusChange, isManagerOrAdmin }) {
             onDragOver={e => { e.preventDefault(); setDragOver(col.key); }}
             onDragLeave={() => setDragOver(null)}
             onDrop={() => handleDrop(col.key)}>
-            {/* Column header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: '#fff', border: '1px solid #E2E8F0', borderLeft: `3px solid ${col.fill}` }}>
               <Icon size={12} style={{ color: col.fill }} />
               <span style={{ fontSize: 10, fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.07em', flex: 1 }}>{col.label}</span>
               <span style={{ fontSize: 10, fontWeight: 800, color: '#fff', background: col.fill, padding: '1px 6px', borderRadius: 999 }}>{colTasks.length}</span>
             </div>
-            {/* Cards */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minHeight: 60, borderRadius: 10, padding: 3, border: isOver ? `2px dashed ${col.fill}` : '2px solid transparent', background: isOver ? col.fill + '08' : 'transparent', transition: 'all 0.15s' }}>
               {colTasks.length === 0 && (
                 <div style={{ border: '1px dashed #CBD5E1', borderRadius: 8, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -120,12 +118,12 @@ function SprintKanbanBoard({ tasks, onStatusChange, isManagerOrAdmin }) {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <PriorityChip priority={task.priority} />
                     {task.assignee?.name && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <div style={{ width: 20, height: 20, borderRadius: 999, background: '#3b82f6', color: '#fff', fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {task.assignee.name.charAt(0).toUpperCase()}
-                    </div>
-                    <span style={{ fontSize: 10, color: '#64748B' }}>{task.assignee.name.split(' ')[0]}</span>
-                    </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <div style={{ width: 20, height: 20, borderRadius: 999, background: '#3b82f6', color: '#fff', fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {task.assignee.name.charAt(0).toUpperCase()}
+                        </div>
+                        <span style={{ fontSize: 10, color: '#64748B' }}>{task.assignee.name.split(' ')[0]}</span>
+                      </div>
                     )}
                   </div>
                 </motion.div>
@@ -156,7 +154,6 @@ function CompleteSprintModal({ sprint, sprintTasks, plannedSprints, onClose, onC
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
         {[
           { label: 'Completed', value: done.length, color: '#10b981', bg: '#ECFDF5', icon: CheckCircle2 },
@@ -180,12 +177,8 @@ function CompleteSprintModal({ sprint, sprintTasks, plannedSprints, onClose, onC
                 {incomplete.length} incomplete task{incomplete.length !== 1 ? 's' : ''} will be moved
               </span>
             </div>
-            <p style={{ margin: 0, fontSize: 12, color: '#92400E' }}>
-              Choose where to send them — move to a next sprint (like Jira) or back to the backlog.
-            </p>
+            <p style={{ margin: 0, fontSize: 12, color: '#92400E' }}>Choose where to send them — move to a next sprint or back to the backlog.</p>
           </div>
-
-          {/* Incomplete task list */}
           <div style={{ maxHeight: 150, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 14 }}>
             {incomplete.map(task => {
               const m = TASK_STATUS_META[task.status] || TASK_STATUS_META.backlog;
@@ -199,33 +192,19 @@ function CompleteSprintModal({ sprint, sprintTasks, plannedSprints, onClose, onC
               );
             })}
           </div>
-
-          {/* Next sprint selector */}
           <div>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>
-              Move incomplete tasks to
-            </label>
-            <select
-              value={nextSprintId}
-              onChange={e => setNextSprintId(e.target.value)}
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Move incomplete tasks to</label>
+            <select value={nextSprintId} onChange={e => setNextSprintId(e.target.value)}
               style={{ width: '100%', padding: '10px 14px', border: '1px solid #E2E8F0', borderRadius: 10, fontSize: 13, background: '#fff', outline: 'none', cursor: 'pointer' }}>
               <option value="">📥 Backlog (no sprint)</option>
               {plannedSprints.map(s => (
-                <option key={s._id} value={s._id}>
-                  ⚡ {s.name} ({s.project?.name || 'Same project'})
-                </option>
+                <option key={s._id} value={s._id}>⚡ {s.name} ({s.project?.name || 'Same project'})</option>
               ))}
             </select>
-            {nextSprintId && (
-              <p style={{ margin: '6px 0 0', fontSize: 11, color: '#2563EB', fontWeight: 600 }}>
-                ✓ {incomplete.length} task{incomplete.length !== 1 ? 's' : ''} will roll over to the selected sprint
-              </p>
-            )}
-            {!nextSprintId && (
-              <p style={{ margin: '6px 0 0', fontSize: 11, color: '#64748B' }}>
-                Tasks will return to backlog with no sprint assigned
-              </p>
-            )}
+            {nextSprintId
+              ? <p style={{ margin: '6px 0 0', fontSize: 11, color: '#2563EB', fontWeight: 600 }}>✓ {incomplete.length} task{incomplete.length !== 1 ? 's' : ''} will roll over</p>
+              : <p style={{ margin: '6px 0 0', fontSize: 11, color: '#64748B' }}>Tasks will return to backlog</p>
+            }
           </div>
         </div>
       )}
@@ -254,200 +233,6 @@ function CompleteSprintModal({ sprint, sprintTasks, plannedSprints, onClose, onC
 }
 
 // ── Active Sprint Panel ────────────────────────────────────────────────────────
-function ActiveSprintPanel({ sprint, tasks, allTasks, isManagerOrAdmin, isAdmin, onComplete, onDelete, onAssignTask, onStatusChange, assigning }) {
-  const [boardView, setBoardView] = useState('board'); // 'board' | 'list'
-  const [showCompleteModal, setShowCompleteModal] = useState(false);
-
-  const sprintTasks = tasks.filter(t => (t.sprint?._id || t.sprint) === sprint._id);
-  const done = sprintTasks.filter(t => t.status === 'done').length;
-  const total = sprintTasks.length;
-  const pct = total ? Math.round((done / total) * 100) : 0;
-  const dl = daysLeft(sprint.endDate);
-  const isOverdue = dl !== null && dl < 0;
-
-  // Backlog tasks for the same project
-  const backlogTasks = allTasks.filter(t => {
-    const tProject = t.project?._id || t.project;
-    const sProject = sprint.project?._id || sprint.project;
-    return !t.sprint && tProject === sProject;
-  });
-
-  return (
-    <>
-      <motion.div
-        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-        style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 18, overflow: 'hidden', boxShadow: '0 2px 16px rgba(15,23,42,0.06)' }}>
-        {/* Header bar */}
-        <div style={{ background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)', padding: '18px 24px' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Zap size={14} color="#fff" />
-                </div>
-                <span style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Active Sprint</span>
-                {dl !== null && (
-                  <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: isOverdue ? '#ef4444' : 'rgba(255,255,255,0.25)', color: '#fff' }}>
-                    {isOverdue ? `${Math.abs(dl)}d overdue` : dl === 0 ? 'Ends today' : `${dl}d left`}
-                  </span>
-                )}
-              </div>
-              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#fff' }}>{sprint.name}</h2>
-              {sprint.goal && <p style={{ margin: '4px 0 0', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Goal: {sprint.goal}</p>}
-              {sprint.project?.name && (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 8, fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
-                  <Tag size={10} /> {sprint.project.name}
-                </span>
-              )}
-            </div>
-            {/* Progress + actions */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {/* Board/list toggle */}
-                <div style={{ display: 'flex', background: 'rgba(255,255,255,0.15)', borderRadius: 8, padding: 2, gap: 1 }}>
-                  {[{ key: 'board', icon: LayoutGrid }, { key: 'list', icon: List }].map(({ key, icon: Icon }) => (
-                    <button key={key} onClick={() => setBoardView(key)}
-                      style={{ padding: '5px 8px', borderRadius: 6, border: 'none', cursor: 'pointer', background: boardView === key ? 'rgba(255,255,255,0.35)' : 'transparent', color: '#fff', display: 'flex', alignItems: 'center' }}>
-                      <Icon size={13} />
-                    </button>
-                  ))}
-                </div>
-                {isManagerOrAdmin && (
-                  <button onClick={() => setShowCompleteModal(true)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.15)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-                    <CheckCircle2 size={13} /> Complete Sprint
-                  </button>
-                )}
-                {isAdmin && (
-                  <button onClick={() => onDelete(sprint)} title="Delete sprint"
-                    style={{ padding: '7px 9px', borderRadius: 9, border: '1px solid rgba(239,68,68,0.4)', background: 'rgba(239,68,68,0.15)', color: '#fca5a5', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                    <Trash2 size={13} />
-                  </button>
-                )}
-              </div>
-              {/* Progress bar */}
-              <div style={{ minWidth: 180 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>
-                  <span>{done}/{total} done</span>
-                  <span style={{ fontWeight: 700 }}>{pct}%</span>
-                </div>
-                <div style={{ height: 6, background: 'rgba(255,255,255,0.25)', borderRadius: 999, overflow: 'hidden' }}>
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.8 }}
-                    style={{ height: '100%', background: '#fff', borderRadius: 999 }} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Board content */}
-        <div style={{ padding: '20px 24px' }}>
-          {/* Date range */}
-          {sprint.startDate && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16, fontSize: 12, color: '#64748B' }}>
-              <Calendar size={13} />
-              {new Date(sprint.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-              <span>→</span>
-              {sprint.endDate ? new Date(sprint.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-            </div>
-          )}
-
-          {/* Status summary pills */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-            {Object.entries(TASK_STATUS_META).filter(([k]) => k !== 'cancelled').map(([key, meta]) => {
-              const count = sprintTasks.filter(t => t.status === key).length;
-              if (!count) return null;
-              const Icon = meta.icon;
-              return (
-                <span key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: meta.color + '12', color: meta.color, border: `1px solid ${meta.color}30` }}>
-                  <Icon size={10} /> {meta.label}: {count}
-                </span>
-              );
-            })}
-          </div>
-
-          {sprintTasks.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 20px', border: '2px dashed #E2E8F0', borderRadius: 14 }}>
-              <ListTodo size={28} style={{ color: '#CBD5E1', margin: '0 auto 10px' }} />
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#94A3B8' }}>No tasks in this sprint yet</p>
-              {isManagerOrAdmin && <p style={{ margin: '4px 0 0', fontSize: 12, color: '#CBD5E1' }}>Add tasks from the backlog section below</p>}
-            </div>
-          ) : boardView === 'board' ? (
-            <SprintKanbanBoard tasks={sprintTasks} onStatusChange={onStatusChange} isManagerOrAdmin={isManagerOrAdmin} />
-          ) : (
-            /* LIST VIEW */
-            <div style={{ border: '1px solid #E2E8F0', borderRadius: 12, overflow: 'hidden' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 90px 110px', gap: 12, padding: '10px 14px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
-                {['Task', 'Assignee', 'Priority', 'Status'].map(h => (
-                  <span key={h} style={{ fontSize: 10, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{h}</span>
-                ))}
-              </div>
-              {sprintTasks.map((task, i) => {
-                const meta = TASK_STATUS_META[task.status] || TASK_STATUS_META.backlog;
-                const Icon = meta.icon;
-                return (
-                  <div key={task._id} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 90px 110px', gap: 12, padding: '11px 14px', borderBottom: i < sprintTasks.length - 1 ? '1px solid #F1F5F9' : 'none', alignItems: 'center', background: i % 2 === 0 ? '#fff' : '#FAFAFA' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
-                      <TaskStatusIcon status={task.status} />
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</span>
-                    </div>
-                    <span style={{ fontSize: 11, color: '#64748B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.assignee?.name || <span style={{ color: '#CBD5E1', fontStyle: 'italic' }}>Unassigned</span>}</span>
-                    <PriorityChip priority={task.priority} />
-                    {isManagerOrAdmin ? (
-                      <select value={task.status} onChange={e => onStatusChange(task._id, e.target.value)}
-                        style={{ fontSize: 11, border: '1px solid #E2E8F0', borderRadius: 7, padding: '3px 6px', background: '#fff', outline: 'none', cursor: 'pointer' }}>
-                        {Object.entries(TASK_STATUS_META).map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
-                      </select>
-                    ) : (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: meta.color }}><Icon size={10} />{meta.label}</span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Backlog for this project */}
-          {backlogTasks.length > 0 && (
-            <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid #F1F5F9' }}>
-              <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                Backlog — {backlogTasks.length} task{backlogTasks.length !== 1 ? 's' : ''} not in any sprint
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                {backlogTasks.map(task => (
-                  <div key={task._id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', background: '#F8FAFC', borderRadius: 10, border: '1px solid #E2E8F0' }}>
-                    <TaskStatusIcon status={task.status} />
-                    <span style={{ fontSize: 12, fontWeight: 600, color: '#0F172A', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</span>
-                    <PriorityChip priority={task.priority} />
-                    <button
-                      onClick={() => onAssignTask(task._id, sprint._id)}
-                      disabled={assigning === task._id}
-                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 7, border: '1px solid #BFDBFE', background: '#EFF6FF', color: '#2563EB', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
-                      {assigning === task._id ? <Spinner size="xs" /> : <ArrowRight size={11} />} Add to Sprint
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </motion.div>
-
-      {/* Complete Sprint Modal */}
-      <Modal open={showCompleteModal} onClose={() => setShowCompleteModal(false)} title={`Complete "${sprint.name}"`} size="md">
-        <CompleteSprintModal
-          sprint={sprint}
-          sprintTasks={sprintTasks}
-          plannedSprints={[]} // Passed from parent via onComplete — we'll handle this below
-          onClose={() => setShowCompleteModal(false)}
-          onComplete={onComplete}
-        />
-      </Modal>
-    </>
-  );
-}
-
-// ── Active Sprint Panel with planned sprints passed correctly ─────────────────
 function ActiveSprintPanelWrapper({ sprint, tasks, allTasks, plannedSprints, isManagerOrAdmin, isAdmin, onComplete, onDelete, onAssignTask, onStatusChange, assigning }) {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [boardView, setBoardView] = useState('board');
@@ -538,7 +323,6 @@ function ActiveSprintPanelWrapper({ sprint, tasks, allTasks, plannedSprints, isM
               {sprint.endDate ? new Date(sprint.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
             </div>
           )}
-          {/* Status pills */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
             {Object.entries(TASK_STATUS_META).filter(([k]) => k !== 'cancelled').map(([key, meta]) => {
               const count = sprintTasks.filter(t => t.status === key).length;
@@ -592,8 +376,7 @@ function ActiveSprintPanelWrapper({ sprint, tasks, allTasks, plannedSprints, isM
             </div>
           )}
 
-          {/* Backlog for this project */}
-          {backlogTasks.length > 0 && (
+          {backlogTasks.length > 0 && isManagerOrAdmin && (
             <div style={{ marginTop: 22, paddingTop: 18, borderTop: '1px solid #F1F5F9' }}>
               <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                 Backlog — {backlogTasks.length} task{backlogTasks.length !== 1 ? 's' : ''} not in any sprint
@@ -607,12 +390,10 @@ function ActiveSprintPanelWrapper({ sprint, tasks, allTasks, plannedSprints, isM
                       <span style={{ fontSize: 11, color: '#64748B', background: '#F1F5F9', padding: '2px 7px', borderRadius: 6 }}>{task.assignee.name}</span>
                     )}
                     <PriorityChip priority={task.priority} />
-                    {isManagerOrAdmin && (
-                      <button onClick={() => onAssignTask(task._id, sprint._id)} disabled={assigning === task._id}
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 7, border: '1px solid #BFDBFE', background: '#EFF6FF', color: '#2563EB', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
-                        {assigning === task._id ? <Spinner size="xs" /> : <ArrowRight size={11} />} Add to Sprint
-                      </button>
-                    )}
+                    <button onClick={() => onAssignTask(task._id, sprint._id)} disabled={assigning === task._id}
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 7, border: '1px solid #BFDBFE', background: '#EFF6FF', color: '#2563EB', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+                      {assigning === task._id ? <Spinner size="xs" /> : <ArrowRight size={11} />} Add to Sprint
+                    </button>
                   </div>
                 ))}
               </div>
@@ -738,7 +519,6 @@ function CompletedSprintCard({ sprint, tasks }) {
             {sprint.velocity > 0 && <span style={{ fontSize: 10, color: '#64748B' }}>{sprint.velocity} pts velocity</span>}
           </div>
         </div>
-        {/* Mini progress */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <div style={{ width: 80, height: 5, background: '#E2E8F0', borderRadius: 999, overflow: 'hidden' }}>
             <div style={{ width: `${pct}%`, height: '100%', background: '#10b981', borderRadius: 999 }} />
@@ -750,7 +530,6 @@ function CompletedSprintCard({ sprint, tasks }) {
         {expanded && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
             style={{ borderTop: '1px solid #F1F5F9', padding: '14px 18px', overflow: 'hidden' }}>
-            {/* Status breakdown */}
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
               {Object.entries(TASK_STATUS_META).map(([key, meta]) => {
                 const count = sprintTasks.filter(t => t.status === key).length;
@@ -793,23 +572,21 @@ export default function SprintsPage() {
   const { isManagerOrAdmin, user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
-  const [sprints, setSprints]         = useState([]);
-  const [projects, setProjects]       = useState([]);
-  const [allTasks, setAllTasks]       = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [showCreate, setShowCreate]   = useState(false);
-  const [form, setForm]               = useState({ name: '', goal: '', project: '', startDate: '', endDate: '' });
-  const [saving, setSaving]           = useState(false);
+  const [sprints, setSprints]             = useState([]);
+  const [projects, setProjects]           = useState([]);
+  const [allTasks, setAllTasks]           = useState([]);
+  const [loading, setLoading]             = useState(true);
+  const [showCreate, setShowCreate]       = useState(false);
+  const [form, setForm]                   = useState({ name: '', goal: '', project: '', startDate: '', endDate: '' });
+  const [saving, setSaving]               = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [deleting, setDeleting]       = useState(false);
-  const [assigning, setAssigning]     = useState(null);
-  const [activeTab, setActiveTab]     = useState('board'); // 'board' | 'history'
+  const [deleting, setDeleting]           = useState(false);
+  const [assigning, setAssigning]         = useState(null);
 
   useEffect(() => {
     Promise.all([
       sprintAPI.getAll(),
       projectAPI.getAll().catch(() => ({ data: { data: [] } })),
-      // All roles fetch all tasks so backlog (unassigned sprint) is visible
       taskAPI.getAll().catch(() => ({ data: { data: [] } })),
     ]).then(([sRes, pRes, tRes]) => {
       setSprints(resolveSprints(sRes));
@@ -869,7 +646,7 @@ export default function SprintsPage() {
       setAllTasks(prev => prev.map(t =>
         (t.sprint?._id || t.sprint) === deleteConfirm._id ? { ...t, sprint: null } : t
       ));
-      toast.success(`Sprint deleted. Tasks moved to backlog.`);
+      toast.success('Sprint deleted. Tasks moved to backlog.');
       setDeleteConfirm(null);
     } catch (e) { toast.error(e.response?.data?.message || 'Failed'); }
     finally { setDeleting(false); }
@@ -880,9 +657,7 @@ export default function SprintsPage() {
     try {
       const res = await taskAPI.assignSprint(taskId, sprintId);
       const updated = res.data?.task;
-      if (updated) {
-        setAllTasks(prev => prev.map(t => t._id === taskId ? { ...t, sprint: updated.sprint } : t));
-      }
+      if (updated) setAllTasks(prev => prev.map(t => t._id === taskId ? { ...t, sprint: updated.sprint } : t));
       toast.success(sprintId ? 'Task added to sprint!' : 'Task moved to backlog');
     } catch (e) { toast.error(e.response?.data?.message || 'Failed'); }
     finally { setAssigning(null); }
@@ -892,7 +667,7 @@ export default function SprintsPage() {
     try {
       await taskAPI.updateStatus(taskId, newStatus);
       setAllTasks(prev => prev.map(t => t._id === taskId ? { ...t, status: newStatus } : t));
-      toast.success(`Status updated`, { duration: 1500 });
+      toast.success('Status updated', { duration: 1500 });
     } catch { toast.error('Status update failed'); }
   };
 
@@ -908,13 +683,11 @@ export default function SprintsPage() {
   const activeSprint     = sprints.find(s => s.status === 'active');
   const plannedSprints   = sprints.filter(s => s.status === 'planned');
   const completedSprints = sprints.filter(s => s.status === 'completed').sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-
-  // Velocity trend (last 5 completed sprints)
-  const velocityData = completedSprints.slice(0, 5).reverse();
+  const velocityData     = completedSprints.slice(0, 5).reverse();
 
   return (
     <div className="space-y-6">
-      {/* ── Page Header ───────────────────────────────────────────────── */}
+      {/* ── Page Header ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <p style={{ margin: 0, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#64748B' }}>Project Management</p>
@@ -925,138 +698,109 @@ export default function SprintsPage() {
             {sprints.length} sprint{sprints.length !== 1 ? 's' : ''} · {activeSprint ? '1 active' : 'no active sprint'} · {completedSprints.length} completed
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {/* Tab switcher */}
-          <div style={{ display: 'flex', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 3, gap: 2 }}>
-            {[{ key: 'board', label: 'Board', icon: LayoutGrid }, { key: 'history', label: 'Sprint History', icon: Archive }].map(({ key, label, icon: Icon }) => (
-              <button key={key} onClick={() => setActiveTab(key)}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 9, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: activeTab === key ? '#0F172A' : 'transparent', color: activeTab === key ? '#fff' : '#64748B', transition: 'all 0.15s' }}>
-                <Icon size={13} /> {label}
-              </button>
-            ))}
-          </div>
-          {isManagerOrAdmin && (
-            <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
-              onClick={() => setShowCreate(true)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 12, background: '#2563EB', color: '#fff', border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(37,99,235,0.3)' }}>
-              <Plus size={15} /> New Sprint
-            </motion.button>
-          )}
-        </div>
+        {isManagerOrAdmin && (
+          <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
+            onClick={() => setShowCreate(true)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 12, background: '#2563EB', color: '#fff', border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(37,99,235,0.3)' }}>
+            <Plus size={15} /> New Sprint
+          </motion.button>
+        )}
       </div>
 
-      {/* ══ BOARD TAB ════════════════════════════════════════════════════ */}
-      {activeTab === 'board' && (
+      {/* ── Current Sprint ── */}
+      {sprints.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '80px 20px', background: '#fff', borderRadius: 18, border: '1px solid #E2E8F0' }}>
+          <Zap size={40} style={{ color: '#CBD5E1', margin: '0 auto 16px' }} />
+          <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#64748B' }}>No sprints yet</p>
+          <p style={{ margin: '6px 0 0', fontSize: 13, color: '#94A3B8' }}>Create your first sprint to start tracking work</p>
+          {isManagerOrAdmin && (
+            <button onClick={() => setShowCreate(true)} style={{ marginTop: 20, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px', borderRadius: 10, background: '#2563EB', color: '#fff', border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              <Plus size={14} /> Create Sprint
+            </button>
+          )}
+        </div>
+      ) : (
         <div className="space-y-6">
-          {sprints.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '80px 20px', background: '#fff', borderRadius: 18, border: '1px solid #E2E8F0' }}>
-              <Zap size={40} style={{ color: '#CBD5E1', margin: '0 auto 16px' }} />
-              <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#64748B' }}>No sprints yet</p>
-              <p style={{ margin: '6px 0 0', fontSize: 13, color: '#94A3B8' }}>Create your first sprint to start tracking work</p>
-              {isManagerOrAdmin && (
-                <button onClick={() => setShowCreate(true)} style={{ marginTop: 20, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px', borderRadius: 10, background: '#2563EB', color: '#fff', border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-                  <Plus size={14} /> Create Sprint
-                </button>
-              )}
+          {activeSprint && (
+            <ActiveSprintPanelWrapper
+              sprint={activeSprint}
+              tasks={allTasks}
+              allTasks={allTasks}
+              plannedSprints={plannedSprints}
+              isManagerOrAdmin={isManagerOrAdmin}
+              isAdmin={isAdmin}
+              onComplete={handleComplete}
+              onDelete={setDeleteConfirm}
+              onAssignTask={handleAssignTask}
+              onStatusChange={handleStatusChange}
+              assigning={assigning}
+            />
+          )}
+
+          {plannedSprints.length > 0 && (
+            <div>
+              <h2 style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                Upcoming Sprints ({plannedSprints.length})
+              </h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {plannedSprints.map(s => (
+                  <PlannedSprintRow key={s._id} sprint={s} tasks={allTasks}
+                    isManagerOrAdmin={isManagerOrAdmin} isAdmin={isAdmin}
+                    onStart={handleStart} onDelete={setDeleteConfirm}
+                    onAssignTask={handleAssignTask} assigning={assigning} />
+                ))}
+              </div>
             </div>
-          ) : (
-            <>
-              {/* Active Sprint */}
-              {activeSprint && (
-                <div>
-                  <ActiveSprintPanelWrapper
-                    sprint={activeSprint}
-                    tasks={allTasks}
-                    allTasks={allTasks}
-                    plannedSprints={plannedSprints}
-                    isManagerOrAdmin={isManagerOrAdmin}
-                    isAdmin={isAdmin}
-                    onComplete={handleComplete}
-                    onDelete={setDeleteConfirm}
-                    onAssignTask={handleAssignTask}
-                    onStatusChange={handleStatusChange}
-                    assigning={assigning}
-                  />
-                </div>
-              )}
+          )}
 
-              {/* Planned Sprints */}
-              {plannedSprints.length > 0 && (
-                <div>
-                  <h2 style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                    Upcoming Sprints ({plannedSprints.length})
-                  </h2>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {plannedSprints.map(s => (
-                      <PlannedSprintRow key={s._id} sprint={s} tasks={allTasks}
-                        isManagerOrAdmin={isManagerOrAdmin} isAdmin={isAdmin}
-                        onStart={handleStart} onDelete={setDeleteConfirm}
-                        onAssignTask={handleAssignTask} assigning={assigning} />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* No active, no planned */}
-              {!activeSprint && plannedSprints.length === 0 && (
-                <div style={{ textAlign: 'center', padding: '50px 20px', background: '#fff', borderRadius: 18, border: '2px dashed #E2E8F0' }}>
-                  <Play size={28} style={{ color: '#CBD5E1', margin: '0 auto 12px' }} />
-                  <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#64748B' }}>No active or upcoming sprints</p>
-                  {isManagerOrAdmin && <p style={{ margin: '5px 0 0', fontSize: 12, color: '#94A3B8' }}>Create a sprint and start it to begin tracking work</p>}
-                </div>
-              )}
-            </>
+          {!activeSprint && plannedSprints.length === 0 && completedSprints.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '50px 20px', background: '#fff', borderRadius: 18, border: '2px dashed #E2E8F0' }}>
+              <Play size={28} style={{ color: '#CBD5E1', margin: '0 auto 12px' }} />
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#64748B' }}>No active or upcoming sprints</p>
+              {isManagerOrAdmin && <p style={{ margin: '5px 0 0', fontSize: 12, color: '#94A3B8' }}>Create a sprint and start it to begin tracking work</p>}
+            </div>
           )}
         </div>
       )}
 
-      {/* ══ HISTORY TAB ══════════════════════════════════════════════════ */}
-      {activeTab === 'history' && (
+      {/* ── Sprint History — always visible ── */}
+      {completedSprints.length > 0 && (
         <div className="space-y-5">
-          {/* Velocity summary (if any completed sprints) */}
-          {completedSprints.length > 0 && (
-            <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 16, padding: '20px 24px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                <TrendingUp size={16} style={{ color: '#2563EB' }} />
-                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Sprint Velocity</h3>
-                <span style={{ fontSize: 11, color: '#94A3B8' }}>last {Math.min(completedSprints.length, 5)} sprints</span>
-              </div>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', height: 60 }}>
-                {velocityData.map((s, i) => {
-                  const sprintTasks = allTasks.filter(t => (t.sprint?._id || t.sprint) === s._id);
-                  const done = sprintTasks.filter(t => t.status === 'done').length;
-                  const maxDone = Math.max(...velocityData.map(vs => allTasks.filter(t => (t.sprint?._id || t.sprint) === vs._id && t.status === 'done').length), 1);
-                  const h = Math.max(8, (done / maxDone) * 52);
-                  return (
-                    <div key={s._id} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: '#2563EB' }}>{done}</span>
-                      <motion.div initial={{ height: 0 }} animate={{ height: h }} transition={{ duration: 0.5, delay: i * 0.1 }}
-                        style={{ width: '100%', background: i === velocityData.length - 1 ? '#2563EB' : '#BFDBFE', borderRadius: '4px 4px 0 0' }} />
-                      <span style={{ fontSize: 9, color: '#94A3B8', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{s.name.split(' ').slice(0, 2).join(' ')}</span>
-                    </div>
-                  );
-                })}
-              </div>
+          {/* Velocity chart */}
+          <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 16, padding: '20px 24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <TrendingUp size={16} style={{ color: '#2563EB' }} />
+              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Sprint Velocity</h3>
+              <span style={{ fontSize: 11, color: '#94A3B8' }}>last {Math.min(completedSprints.length, 5)} sprints</span>
             </div>
-          )}
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', height: 60 }}>
+              {velocityData.map((s, i) => {
+                const sprintTasks = allTasks.filter(t => (t.sprint?._id || t.sprint) === s._id);
+                const done = sprintTasks.filter(t => t.status === 'done').length;
+                const maxDone = Math.max(...velocityData.map(vs => allTasks.filter(t => (t.sprint?._id || t.sprint) === vs._id && t.status === 'done').length), 1);
+                const h = Math.max(8, (done / maxDone) * 52);
+                return (
+                  <div key={s._id} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#2563EB' }}>{done}</span>
+                    <motion.div initial={{ height: 0 }} animate={{ height: h }} transition={{ duration: 0.5, delay: i * 0.1 }}
+                      style={{ width: '100%', background: i === velocityData.length - 1 ? '#2563EB' : '#BFDBFE', borderRadius: '4px 4px 0 0' }} />
+                    <span style={{ fontSize: 9, color: '#94A3B8', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{s.name.split(' ').slice(0, 2).join(' ')}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
-          {/* Completed sprints list */}
+          {/* Completed sprint list */}
           <div>
             <h2 style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              Completed Sprints ({completedSprints.length})
+              Sprint History ({completedSprints.length})
             </h2>
-            {completedSprints.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '50px', background: '#fff', borderRadius: 18, border: '1px solid #E2E8F0' }}>
-                <Archive size={28} style={{ color: '#CBD5E1', margin: '0 auto 10px' }} />
-                <p style={{ margin: 0, fontSize: 14, color: '#94A3B8', fontWeight: 600 }}>No completed sprints yet</p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {completedSprints.map(s => (
-                  <CompletedSprintCard key={s._id} sprint={s} tasks={allTasks} />
-                ))}
-              </div>
-            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {completedSprints.map(s => (
+                <CompletedSprintCard key={s._id} sprint={s} tasks={allTasks} />
+              ))}
+            </div>
           </div>
         </div>
       )}

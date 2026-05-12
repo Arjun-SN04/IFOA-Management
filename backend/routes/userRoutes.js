@@ -4,7 +4,7 @@ const {
   getAllUsers, getUserById, updateUser, deleteUser,
   changeUserRole, updateLeaveBalance, getMyProfile, updateMyProfile,
   toggleUserStatus, getMyAccessories, getUserAccessories, addUserAccessory, removeUserAccessory, updateUserAccessory,
-  approveUser, getPendingUsers,
+  approveUser, getPendingUsers, updateEmployeeId,
 } = require('../controllers/userController');
 const { protect, adminOnly, managerOrAdmin, hrOrAbove } = require('../middleware/authMiddleware');
 
@@ -28,6 +28,9 @@ router.delete('/:id',                          protect, adminOnly, deleteUser);
 router.put('/:id/role',                        protect, adminOnly, changeUserRole);
 router.put('/:id/leave-balance',               protect, hrOrAbove, updateLeaveBalance);
 router.patch('/:id/toggle-status',             protect, adminOnly, toggleUserStatus);
+
+// ── Employee ID update — admin / manager / HR can edit, uniqueness enforced ───
+router.patch('/:id/employee-id',               protect, hrOrAbove, updateEmployeeId);
 
 // ── Approval flow: admin / manager / HR can approve or reject pending users ───
 router.patch('/:id/approve',                   protect, hrOrAbove, approveUser);

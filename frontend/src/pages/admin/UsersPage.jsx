@@ -112,7 +112,75 @@ function ActionBtn({ icon: Icon, label, accent, accentBg, onClick }) {
   );
 }
 
-function UserCard({ u, me, canManageAssets, canRaiseNoc, onRoleClick, onAccessories, onRaiseNoc, onToggleStatus, onDelete }) {
+// ── Edit Employee ID Modal ─────────────────────────────────────────────────────
+function EditEmployeeIdModal({ open, onClose, user, onSave }) {
+  const [value, setValue] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (open) { setValue(user?.employeeId || ''); setError(''); setSaving(false); }
+  }, [open, user]);
+
+  const handleSave = async () => {
+    const trimmed = value.trim();
+    if (!trimmed) { setError('Employee ID cannot be empty.'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      const res = await userAPI.updateEmployeeId(user._id, trimmed);
+      onSave(res.data.user);
+      toast.success('Employee ID updated');
+      onClose();
+    } catch (e) {
+      setError(e?.response?.data?.message || 'Failed to update Employee ID.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="Edit Employee ID" size="sm">
+      {user && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <UserAvatar name={user.name} role={user.role} size={36} />
+            <div>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0F172A' }}>{user.name}</p>
+              <p style={{ margin: '2px 0 0', fontSize: 11, color: '#64748B' }}>{user.email}</p>
+            </div>
+          </div>
+          <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, padding: '9px 12px' }}>
+            <p style={{ margin: 0, fontSize: 11, color: '#92400E', fontWeight: 600 }}>
+              Employee IDs must be unique across all users. The system will reject duplicates.
+            </p>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#0F172A', marginBottom: 6 }}>
+              Employee ID <span style={{ color: '#DC2626' }}>*</span>
+            </label>
+            <input
+              value={value}
+              onChange={e => { setValue(e.target.value); setError(''); }}
+              onKeyDown={e => e.key === 'Enter' && handleSave()}
+              maxLength={30}
+              placeholder="e.g. EMP-0042"
+              style={{ width: '100%', padding: '9px 12px', border: `1.5px solid ${error ? '#EF4444' : '#E2E8F0'}`, borderRadius: 9, fontSize: 14, fontFamily: 'monospace', letterSpacing: '0.05em', outline: 'none', boxSizing: 'border-box', color: '#0F172A' }}
+              autoFocus
+            />
+            {error && <p style={{ margin: '5px 0 0', fontSize: 12, color: '#DC2626', fontWeight: 600 }}>{error}</p>}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <Button variant="secondary" onClick={onClose}>Cancel</Button>
+            <Button onClick={handleSave} loading={saving}>Save ID</Button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function UserCard({ u, me, canManageAssets, canRaiseNoc, canEditEmpId, onRoleClick, onAccessories, onRaiseNoc, onToggleStatus, onDelete, onEditEmpId }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [flipped, setFlipped] = useState(false);
   const [showItemsPopup, setShowItemsPopup] = useState(false);
@@ -166,6 +234,7 @@ function UserCard({ u, me, canManageAssets, canRaiseNoc, onRoleClick, onAccessor
                 onMouseLeave={() => setMenuOpen(false)}>
                 <MenuItem icon={Shield}    label="Change Role"  color="#7C3AED" onClick={() => { setMenuOpen(false); onRoleClick(u); }} />
                 <MenuItem icon={Package}   label="Accessories"  color="#0284C7" onClick={() => { setMenuOpen(false); setFlipped(true); }} />
+                {canEditEmpId && <MenuItem icon={IdCard} label="Edit Employee ID" color="#0284C7" onClick={() => { setMenuOpen(false); onEditEmpId(u); }} />}
                 {u.isActive
                   ? <MenuItem icon={UserX}      label="Deactivate" color="#D97706" onClick={() => { setMenuOpen(false); onToggleStatus(u._id, true); }} />
                   : <MenuItem icon={RotateCcw}  label="Reactivate" color="#059669" onClick={() => { setMenuOpen(false); onToggleStatus(u._id, false); }} />
@@ -180,7 +249,7 @@ function UserCard({ u, me, canManageAssets, canRaiseNoc, onRoleClick, onAccessor
           {u.department && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 600, color: '#475569', background: '#F8FAFC', border: '1px solid #E2E8F0', padding: '3px 8px', borderRadius: 999 }}><Building2 size={9} />{u.department}</span>}
           {u.designation && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 600, color: '#475569', background: '#F8FAFC', border: '1px solid #E2E8F0', padding: '3px 8px', borderRadius: 999 }}><Briefcase size={9} />{u.designation}</span>}
         </div>
-        {u.employeeId && <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 5 }}><IdCard size={10} style={{ color: '#94A3B8' }} /><span style={{ fontSize: 10, color: '#94A3B8', fontFamily: 'monospace', letterSpacing: '.05em' }}>{u.employeeId}</span></div>}
+        {u.employeeId && <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 5 }}><IdCard size={10} style={{ color: '#94A3B8' }} /><span style={{ fontSize: 10, color: '#94A3B8', fontFamily: 'monospace', letterSpacing: '.05em' }}>{u.employeeId}</span>{canEditEmpId && <button onClick={() => onEditEmpId(u)} title="Edit Employee ID" style={{ marginLeft: 4, padding: '1px 6px', border: '1px solid #BAE6FD', borderRadius: 5, background: '#F0F9FF', color: '#0369A1', fontSize: 9, fontWeight: 700, cursor: 'pointer', lineHeight: '16px' }}>Edit</button>}</div>}
         <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid #F1F5F9', display: 'flex', gap: 6 }}>
           <ActionBtn icon={Shield}  label="Role"       accent={cfg.accent}  accentBg={cfg.accentBg} onClick={() => onRoleClick(u)} />
           <ActionBtn icon={Package} label="Assets"     accent="#0284C7"     accentBg="#F0F9FF"       onClick={() => setFlipped(true)} />
@@ -240,7 +309,7 @@ function UserCard({ u, me, canManageAssets, canRaiseNoc, onRoleClick, onAccessor
   );
 }
 
-function RoleSection({ role, users, me, canManageAssets, canRaiseNoc, onRoleClick, onAccessories, onRaiseNoc, onToggleStatus, onDelete }) {
+function RoleSection({ role, users, me, canManageAssets, canRaiseNoc, canEditEmpId, onRoleClick, onAccessories, onRaiseNoc, onToggleStatus, onDelete, onEditEmpId }) {
   const [collapsed, setCollapsed] = useState(false);
   const cfg  = ROLE_CFG[role];
   const Icon = cfg.icon;
@@ -263,9 +332,11 @@ function RoleSection({ role, users, me, canManageAssets, canRaiseNoc, onRoleClic
             <UserCard key={u._id} u={u} me={me}
               canManageAssets={canManageAssets}
               canRaiseNoc={canRaiseNoc}
+              canEditEmpId={canEditEmpId}
               onRoleClick={onRoleClick} onAccessories={onAccessories}
               onRaiseNoc={onRaiseNoc}
-              onToggleStatus={onToggleStatus} onDelete={onDelete} />
+              onToggleStatus={onToggleStatus} onDelete={onDelete}
+              onEditEmpId={onEditEmpId} />
           ))}
         </div>
       )}
@@ -280,6 +351,7 @@ export default function UsersPage() {
   const canManageAssets = isAdmin || isManager || isHR;
   const canRaiseNoc = isAdmin || isManager;
   const canReviewNoc = isAdmin || isHR;
+  const canEditEmpId = isAdmin || isManager || isHR;
   const [users, setUsers]           = useState([]);
   const [pendingUsers, setPendingUsers] = useState([]);
   const [approvingId, setApprovingId] = useState(null);
@@ -300,6 +372,7 @@ export default function UsersPage() {
   const [showDeleteModal, setShowDeleteModal]   = useState(null);
   const [deleting, setDeleting]                 = useState(false);
   const [showNocPanel, setShowNocPanel]         = useState(false);
+  const [showEditEmpIdModal, setShowEditEmpIdModal] = useState(null); // user object or null
 
   const loadUsers = useCallback(() => {
     userAPI.getAll({ search, department: deptFilter })
@@ -559,11 +632,13 @@ export default function UsersPage() {
     me,
     canManageAssets,
     canRaiseNoc,
+    canEditEmpId,
     onRoleClick:     u => { setShowRoleModal(u); setNewRole(u.role); },
     onAccessories:   openAccessories,
     onRaiseNoc:      u => setShowNocModal(u),
     onToggleStatus:  handleToggleStatus,
     onDelete:        setShowDeleteModal,
+    onEditEmpId:     u => setShowEditEmpIdModal(u),
   };
 
   return (
@@ -714,9 +789,9 @@ export default function UsersPage() {
                 <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#94A3B8' }}>No NOC requests yet</p>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 320, overflowY: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 320, overflowY: 'auto', paddingRight: 4 }}>
                 {nocs.map(n => (
-                  <div key={n._id} style={{ border: `1px solid ${n.status === 'approved' ? '#A7F3D0' : n.status === 'rejected' ? '#FECACA' : '#FDE68A'}`, borderRadius: 12, padding: '12px 14px', background: n.status === 'approved' ? '#F0FDF4' : n.status === 'rejected' ? '#FEF2F2' : '#FFFBEB', borderLeft: `4px solid ${n.status === 'approved' ? '#059669' : n.status === 'rejected' ? '#DC2626' : '#F59E0B'}` }}>
+                  <div key={n._id} style={{ border: `1px solid ${n.status === 'approved' ? '#A7F3D0' : n.status === 'rejected' ? '#FECACA' : '#FDE68A'}`, borderRadius: 12, padding: '12px 14px', background: n.status === 'approved' ? '#F0FDF4' : n.status === 'rejected' ? '#FEF2F2' : '#FFFBEB' }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
@@ -897,6 +972,16 @@ export default function UsersPage() {
           </div>
         )}
       </Modal>
+
+      {/* Edit Employee ID Modal — admin / manager / HR */}
+      <EditEmployeeIdModal
+        open={!!showEditEmpIdModal}
+        onClose={() => setShowEditEmpIdModal(null)}
+        user={showEditEmpIdModal}
+        onSave={updatedUser => {
+          setUsers(prev => prev.map(u => u._id === updatedUser._id ? { ...u, employeeId: updatedUser.employeeId } : u));
+        }}
+      />
 
       {/* Delete Modal — admin only */}
       <Modal open={!!showDeleteModal} onClose={() => setShowDeleteModal(null)} title="Permanently Remove User" size="sm">

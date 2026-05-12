@@ -491,10 +491,8 @@ function TeamCard({ team, onEdit, onDelete, onSwitchMember, onChangeLead, onView
           boxShadow: '0 2px 10px rgba(15,23,42,0.06)',
           overflow: 'hidden',
         }}>
-          {/* color bar */}
-          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, background: teamColor, borderRadius: '16px 0 0 16px' }} />
 
-          <div style={{ padding: '12px 14px 12px 18px', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
+          <div style={{ padding: '12px 14px 12px 14px', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -588,14 +586,12 @@ function TeamCard({ team, onEdit, onDelete, onSwitchMember, onChangeLead, onView
           backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden',
           transform: 'rotateY(180deg)',
           background: '#fff', borderRadius: 16,
-          border: `1px solid ${teamColor}40`,
+          border: `1px solid #E2E8F0`,
           boxShadow: '0 2px 10px rgba(15,23,42,0.06)',
           overflow: 'hidden',
         }}>
-          {/* color bar */}
-          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, background: teamColor }} />
 
-          <div style={{ padding: '14px 14px 14px 20px', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
+          <div style={{ padding: '14px 14px 14px 14px', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
             {/* Back header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <div>

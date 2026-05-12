@@ -4,10 +4,11 @@ import { useAuth } from '../../context/AuthContext';
 import { Button, Modal, Input, Textarea } from '../../components/ui';
 import {
   Plus, Megaphone, Pin, Trash2, Clock, AlertTriangle,
-  Zap, Users, Globe, UserCheck, Calendar,
+  Zap, Users, Globe, UserCheck, Calendar, AlertCircle,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Spinner } from '../../components/ui';
+import toast from 'react-hot-toast';
 
 const B = {
   blue: '#2563EB', blueBg: '#EFF6FF', blueBorder: '#BFDBFE',
@@ -52,25 +53,35 @@ export default function AnnouncementsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm]             = useState(EMPTY_FORM);
   const [saving, setSaving]         = useState(false);
+  const [error, setError]           = useState('');
 
-  useEffect(() => {
+  const fetchAnnouncements = () =>
     announcementAPI.getAll()
       .then(res => setItems(res.data.data || []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .catch(() => {});
+
+  useEffect(() => {
+    fetchAnnouncements().finally(() => setLoading(false));
+    // Poll every 60 s so scheduled announcements appear automatically
+    const interval = setInterval(fetchAnnouncements, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleCreate = async () => {
+    if (!form.title.trim()) { setError('Title is required.'); return; }
+    if (!form.content.trim()) { setError('Content is required.'); return; }
     setSaving(true);
+    setError('');
     try {
       const payload = { ...form };
-      if (!payload.expiresAt)    delete payload.expiresAt;
+      if (!payload.expiresAt) delete payload.expiresAt;   // backend defaults to 24 h
       if (!payload.scheduledFor) delete payload.scheduledFor;
       const res = await announcementAPI.create(payload);
       setItems(p => [res.data.data, ...p]);
       setShowCreate(false);
       setForm(EMPTY_FORM);
-    } catch (e) { alert(e.response?.data?.message || 'Failed'); }
+      setError('');
+    } catch (e) { setError(e.response?.data?.message || 'Failed to post announcement.'); }
     finally { setSaving(false); }
   };
 
@@ -78,7 +89,8 @@ export default function AnnouncementsPage() {
     try {
       const res = await announcementAPI.togglePin(id);
       setItems(prev => prev.map(a => a._id === id ? (res.data.data || { ...a, isPinned: !a.isPinned }) : a));
-    } catch (e) { alert(e.response?.data?.message || 'Not allowed'); }
+      toast.success('Pin status updated');
+    } catch (e) { toast.error(e.response?.data?.message || 'Not allowed'); }
   };
 
   const handleDelete = async (id) => {
@@ -86,7 +98,8 @@ export default function AnnouncementsPage() {
     try {
       await announcementAPI.delete(id);
       setItems(prev => prev.filter(a => a._id !== id));
-    } catch (e) { alert(e.response?.data?.message || 'Not allowed'); }
+      toast.success('Announcement deleted');
+    } catch (e) { toast.error(e.response?.data?.message || 'Not allowed'); }
   };
 
   const set = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
@@ -209,8 +222,14 @@ export default function AnnouncementsPage() {
       )}
 
       {/* ── Create Modal ── */}
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Post Announcement">
+      <Modal open={showCreate} onClose={() => { setShowCreate(false); setError(''); setForm(EMPTY_FORM); }} title="Post Announcement">
         <div className="space-y-4">
+          {error && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, background: '#FEF2F2', border: '1px solid #FECACA' }}>
+              <AlertCircle size={14} style={{ color: B.red, flexShrink: 0 }} />
+              <p style={{ margin: 0, fontSize: 13, color: B.red, fontWeight: 600 }}>{error}</p>
+            </div>
+          )}
           <Input label="Title" value={form.title} onChange={set('title')} placeholder="Announcement title" required />
           <Textarea label="Content" value={form.content} onChange={set('content')} placeholder="Write your announcement…" rows={4} />
 
@@ -287,12 +306,14 @@ export default function AnnouncementsPage() {
             )}
           </div>
 
-          {/* Optional expiry — now with datetime-local so time can be set */}
+          {/* Optional expiry */}
           <div>
             <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#0F172A', marginBottom: 4 }}>
               Expires At{' '}
-              <span style={{ fontWeight: 400, color: '#94A3B8' }}>(optional — pick date &amp; time)</span>
+              <span style={{ fontWeight: 400, color: '#94A3B8' }}>(optional — defaults to 24 h if not set)</span>
             </label>
+            <p style={{ margin: '0 0 6px', fontSize: 11, color: '#D97706', fontWeight: 600 }}
+            >⚠️ Announcements auto-expire after 24 hours unless you set a custom date &amp; time here.</p>
             <input
               type="datetime-local"
               value={form.expiresAt}

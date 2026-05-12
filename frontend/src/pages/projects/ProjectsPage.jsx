@@ -323,7 +323,7 @@ function ProjectCard({ project: p, onClick, canDelete, onDelete }) {
       onClick={onClick}
       style={{
         background: '#fff', borderRadius: 18, border: '1px solid #E2E8F0',
-        borderTop: `3px solid ${sc.color}`, padding: '18px 20px 16px',
+        padding: '18px 20px 16px',
         cursor: 'pointer', boxShadow: '0 2px 10px rgba(15,23,42,0.06)',
         display: 'flex', flexDirection: 'column', gap: 14, height: '100%',
         position: 'relative',

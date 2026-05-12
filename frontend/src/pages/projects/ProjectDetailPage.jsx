@@ -61,13 +61,21 @@ function StatusBreakdown({ tasks }) {
   );
 }
 
-// ── Team Selector (multi-select pill UI for manager) ───────────────────────
+// ── Team Selector (multi-select checkbox UI for manager/HR/admin) ──────────
 function TeamSelector({ projectTeams, selectedTeamIds, onChange }) {
   const toggle = (teamId) => {
     if (selectedTeamIds.includes(teamId)) {
       onChange(selectedTeamIds.filter(id => id !== teamId));
     } else {
       onChange([...selectedTeamIds, teamId]);
+    }
+  };
+
+  const toggleAll = () => {
+    if (selectedTeamIds.length === projectTeams.length) {
+      onChange([]);
+    } else {
+      onChange(projectTeams.map(t => String(t._id)));
     }
   };
 
@@ -80,61 +88,69 @@ function TeamSelector({ projectTeams, selectedTeamIds, onChange }) {
     );
   }
 
+  const allSelected = selectedTeamIds.length === projectTeams.length;
+
   return (
-    <div className="space-y-1.5">
-      <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide">
-        Assign to Team(s){' '}
-        <span className="text-slate-400 font-normal normal-case">(all team members will be assigned)</span>
-      </label>
-      <div className="flex flex-wrap gap-2">
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide">
+          Assign to Team(s){' '}
+          <span className="text-slate-400 font-normal normal-case">(all team members will be assigned)</span>
+        </label>
+        <button
+          type="button"
+          onClick={toggleAll}
+          className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+        >
+          {allSelected ? 'Deselect All' : 'Select All'}
+        </button>
+      </div>
+
+      <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100">
         {projectTeams.map(team => {
           const selected = selectedTeamIds.includes(String(team._id));
-          // members array from populated team may or may not include teamLead
           const memberCount = team.members?.length || 0;
           return (
-            <button
+            <label
               key={team._id}
-              type="button"
-              onClick={() => toggle(String(team._id))}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-all
-                ${selected
-                  ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-                  : 'border-slate-200 bg-white text-slate-700 hover:border-blue-400 hover:bg-blue-50'
-                }`}
+              className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors select-none
+                ${selected ? 'bg-blue-50' : 'bg-white hover:bg-slate-50'}`}
             >
+              <input
+                type="checkbox"
+                checked={selected}
+                onChange={() => toggle(String(team._id))}
+                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-400 cursor-pointer"
+              />
               <span
-                className="w-2 h-2 rounded-full shrink-0"
+                className="w-3 h-3 rounded-full shrink-0"
                 style={{ background: team.color || '#3B82F6' }}
               />
-              {team.name}
-              <span className={`text-xs ${selected ? 'text-blue-200' : 'text-slate-400'}`}>
-                · {memberCount} member{memberCount !== 1 ? 's' : ''}
+              <span className={`flex-1 text-sm font-semibold ${selected ? 'text-blue-800' : 'text-slate-800'}`}>
+                {team.name}
               </span>
-            </button>
+              <span className="text-xs text-slate-400 font-medium">
+                {memberCount} member{memberCount !== 1 ? 's' : ''}
+              </span>
+              {selected && (
+                <span className="text-xs font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
+                  ✓
+                </span>
+              )}
+            </label>
           );
         })}
       </div>
 
       {selectedTeamIds.length > 0 && (
-        <div className="mt-2 p-2.5 bg-blue-50 border border-blue-100 rounded-lg">
-          <p className="text-xs font-semibold text-blue-700 mb-1.5">Task will be assigned to all members of:</p>
-          <div className="flex flex-wrap gap-2">
-            {selectedTeamIds.map(tid => {
-              const team = projectTeams.find(t => String(t._id) === tid);
-              if (!team) return null;
-              const memberCount = team.members?.length || 0;
-              return (
-                <div key={tid} className="inline-flex items-center gap-1.5 px-2 py-1 bg-white border border-blue-200 rounded-lg text-xs">
-                  <span className="w-2 h-2 rounded-full" style={{ background: team.color || '#3B82F6' }} />
-                  <span className="font-medium text-slate-800">{team.name}</span>
-                  <span className="text-slate-400">({memberCount} member{memberCount !== 1 ? 's' : ''})</span>
-                </div>
-              );
-            })}
-          </div>
-          <p className="text-xs text-blue-500 mt-1.5">
-            Each team member will receive their own copy of this task.
+        <div className="p-2.5 bg-blue-50 border border-blue-100 rounded-lg">
+          <p className="text-xs font-semibold text-blue-700 mb-0.5">
+            Assigning to {selectedTeamIds.length} team{selectedTeamIds.length !== 1 ? 's' : ''}:{' '}
+            <span className="font-normal text-blue-600">
+              {selectedTeamIds.map(tid => projectTeams.find(t => String(t._id) === tid)?.name).filter(Boolean).join(', ')}
+            </span>
           </p>
+          <p className="text-xs text-blue-400 mt-0.5">Each team member will receive their own copy of this task.</p>
         </div>
       )}
     </div>
@@ -241,7 +257,7 @@ function TeamManager({ projectId, currentTeams, allTeams, onChange }) {
 export default function ProjectDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { isManagerOrAdmin, isAdmin, isManagement, user } = useAuth();
+  const { isManagerOrAdmin, isAdmin, isManagement, isHR, user } = useAuth();
   const [project, setProject]   = useState(null);
   const [tasks, setTasks]       = useState([]);
   const [allUsers, setAllUsers] = useState([]);
@@ -317,13 +333,14 @@ export default function ProjectDetailPage() {
   const canEditProject = isManagerOrAdmin;
   const canDeleteTask = isManagerOrAdmin;
 
-  // Manager-only (not admin): uses team-based task assignment
-  const isManagerOnly = isManagement && !isAdmin;
+  // Manager OR HR (not just manager): uses team-based task assignment
+  // Admin uses individual assignee dropdown, but also can use team selector
+  const useTeamAssignment = (isManagement || isHR) && !isAdmin;
 
   const handleCreateTask = async () => {
     setSaving(true);
     try {
-      if (isManagerOnly && selectedTeamIds.length > 0) {
+      if (useTeamAssignment && selectedTeamIds.length > 0) {
         for (const teamId of selectedTeamIds) {
           await taskAPI.create({
             ...taskForm,
@@ -437,15 +454,12 @@ export default function ProjectDetailPage() {
 
   // Called by TeamManager when teams change — refresh project teams from server
   const handleTeamsChanged = async (updatedTeams) => {
-    // updatedTeams is already the populated teams array from the API response
-    // But to be safe, reload the project to get fresh populated data
     try {
       const pRes = await projectAPI.getById(id);
       const proj = pRes.data.project || pRes.data.data;
       setProject(proj);
       setProjectTeams(deriveProjectTeams(proj));
     } catch {
-      // fallback: just set what we got
       setProjectTeams(updatedTeams);
     }
   };
@@ -874,8 +888,8 @@ export default function ProjectDetailPage() {
               <option value="high">High</option>
               <option value="critical">Critical</option>
             </Select>
-            {/* Admin sees full user list; Manager uses team picker */}
-            {!isManagerOnly && (
+            {/* Admin sees full user list; Manager/HR uses team picker */}
+            {!useTeamAssignment && (
               <Select label="Assignee" value={taskForm.assignee} onChange={set('assignee')}>
                 <option value="">Unassigned</option>
                 {allUsers.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
@@ -883,8 +897,8 @@ export default function ProjectDetailPage() {
             )}
           </div>
 
-          {/* Team picker for manager — only shows teams assigned to this project */}
-          {isManagerOnly && (
+          {/* Team picker for manager/HR — only shows teams assigned to this project */}
+          {useTeamAssignment && (
             <TeamSelector
               projectTeams={projectTeams}
               selectedTeamIds={selectedTeamIds}
@@ -898,8 +912,8 @@ export default function ProjectDetailPage() {
             <Button
               onClick={handleCreateTask}
               loading={saving}
-              disabled={!taskForm.title || (isManagerOnly && selectedTeamIds.length === 0)}>
-              {isManagerOnly && selectedTeamIds.length > 0
+              disabled={!taskForm.title || (useTeamAssignment && selectedTeamIds.length === 0)}>
+              {useTeamAssignment && selectedTeamIds.length > 0
                 ? `Assign to ${selectedTeamIds.length} Team(s)`
                 : 'Add Task'}
             </Button>

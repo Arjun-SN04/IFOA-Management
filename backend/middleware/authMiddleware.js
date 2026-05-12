@@ -28,11 +28,10 @@ exports.adminOnly = (req, res, next) => {
   next();
 };
 
-// ── Admin + Manager only (can create projects, assign projects, create teams) ──
-// HR is explicitly excluded from project/team management
+// ── Admin + Manager + HR only (can create projects, assign projects, create teams) ──
 exports.managerOrAdmin = (req, res, next) => {
-  if (!['admin', 'manager'].includes(req.user.role)) {
-    return res.status(403).json({ success: false, message: 'Manager or Admin access required' });
+  if (!['admin', 'manager', 'hr'].includes(req.user.role)) {
+    return res.status(403).json({ success: false, message: 'HR, Manager or Admin access required' });
   }
   next();
 };

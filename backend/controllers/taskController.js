@@ -42,9 +42,9 @@ const isHR         = (u) => u.role === 'hr';
 const isTeamLead   = (u) => u.role === 'team_lead';
 const isEmployee   = (u) => u.role === 'employee';
 // Elevated = can assign tasks to others
-const isElevated   = (u) => ['admin', 'manager', 'team_lead'].includes(u.role);
-// Management = admin + manager (not HR — HR cannot create/assign projects/teams)
-const isManagement = (u) => ['admin', 'manager'].includes(u.role);
+const isElevated   = (u) => ['admin', 'manager', 'hr', 'team_lead'].includes(u.role);
+// Management = admin + manager + hr
+const isManagement = (u) => ['admin', 'manager', 'hr'].includes(u.role);
 
 const isValidObjectId = (v) => mongoose.Types.ObjectId.isValid(v);
 
@@ -203,10 +203,7 @@ exports.createTask = async (req, res) => {
       }
     }
 
-    // HR: can create tasks but cannot assign to teams as shared tasks
-    if (isHR(user) && assignee === '__all__') {
-      return res.status(403).json({ success: false, message: 'HR cannot assign tasks to all employees' });
-    }
+    // HR restriction removed as per request: HR can now assign to all like managers
 
     const task = await createTaskWithRetry({
       ...body,

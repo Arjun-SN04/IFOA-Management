@@ -1,5 +1,7 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import { useAuth } from './context/AuthContext'
+import { useNotifications } from './context/NotificationContext'
 import Layout from './components/layout/Layout'
 
 import LandingPage from './pages/landing/LandingPage'
@@ -31,6 +33,14 @@ function AuthLoader() {
   )
 }
 
+// ── Inject navigate into NotificationContext so announcement:new can redirect ──
+function NavigateInjector() {
+  const navigate = useNavigate()
+  const { setNavigate } = useNotifications()
+  useEffect(() => { setNavigate(navigate) }, [navigate, setNavigate])
+  return null
+}
+
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) return <AuthLoader />
@@ -38,8 +48,6 @@ function ProtectedRoute({ children }) {
   return children
 }
 
-// My Board + Backlog — Employee + Team Lead only
-// HR and Manager are redirected to Team Board
 function EmployeeBoardRoute({ children }) {
   const { user, loading, isHR, isManagerOrAdmin } = useAuth()
   if (loading) return <AuthLoader />
@@ -74,13 +82,14 @@ function GuestRoute({ children }) {
 export default function App() {
   return (
     <BrowserRouter>
+      {/* Inject navigate into NotificationContext — must be inside BrowserRouter */}
+      <NavigateInjector />
       <Routes>
         <Route index element={<LandingPage />} />
         <Route path="login"    element={<GuestRoute><Login /></GuestRoute>} />
         <Route path="register" element={<GuestRoute><Register /></GuestRoute>} />
 
         <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-          {/* All authenticated users */}
           <Route path="dashboard"     element={<DashboardPage />} />
           <Route path="projects"      element={<ProjectsPage />} />
           <Route path="projects/:id"  element={<ProjectDetailPage />} />
@@ -90,14 +99,12 @@ export default function App() {
           <Route path="announcements" element={<AnnouncementsPage />} />
           <Route path="profile"       element={<ProfilePage />} />
 
-          {/* Employee + Team Lead ONLY — HR/Manager redirect to /admin/teams */}
           <Route path="tasks"   element={<EmployeeBoardRoute><TasksPage /></EmployeeBoardRoute>} />
           <Route path="backlog" element={<EmployeeBoardRoute><BacklogPage /></EmployeeBoardRoute>} />
 
-          {/* HR + Manager + Admin */}
           <Route path="admin/teams"  element={<HRRoute><TeamsPage /></HRRoute>} />
           <Route path="reports"      element={<HRRoute><ReportsPage /></HRRoute>} />
-          <Route path="admin/users"  element={<HRRoute><UsersPage /></HRRoute>} /> {/* HR + Manager + Admin */}
+          <Route path="admin/users"  element={<HRRoute><UsersPage /></HRRoute>} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
