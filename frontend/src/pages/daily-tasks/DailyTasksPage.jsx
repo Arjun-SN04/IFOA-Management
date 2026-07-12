@@ -570,74 +570,76 @@ function ManagementView() {
           </div>
 
           {/* Employee list */}
-          <div style={{ background: '#fff', borderRadius: 20, border: '1px solid #f1f5f9', overflow: 'hidden', boxShadow: '0 1px 8px rgba(15,23,42,.04)' }}>
-            {loadingSettings ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 80 }}><Spinner /></div>
-            ) : (
-              <>
-                {/* Table header */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 600, color: '#64748b', cursor: 'pointer' }}>
-                    <input type="checkbox"
-                      checked={settings.length > 0 && selectedEmployeeIds.length === settings.length}
-                      onChange={e => setSelectedEmployeeIds(e.target.checked ? settings.map(u => u._id) : [])}
-                      style={{ width: 15, height: 15, accentColor: '#2563eb' }} />
-                    Select all
-                  </label>
-                  <span style={{ fontSize: 11, color: '#94a3b8' }}>{selectedEmployeeIds.length} selected</span>
-                </div>
+          <div style={{ overflowX: 'auto' }}>
+            <div style={{ background: '#fff', borderRadius: 20, border: '1px solid #f1f5f9', overflow: 'hidden', boxShadow: '0 1px 8px rgba(15,23,42,.04)', minWidth: 600 }}>
+              {loadingSettings ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 80 }}><Spinner /></div>
+              ) : (
+                <>
+                  {/* Table header */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 600, color: '#64748b', cursor: 'pointer' }}>
+                      <input type="checkbox"
+                        checked={settings.length > 0 && selectedEmployeeIds.length === settings.length}
+                        onChange={e => setSelectedEmployeeIds(e.target.checked ? settings.map(u => u._id) : [])}
+                        style={{ width: 15, height: 15, accentColor: '#2563eb' }} />
+                      Select all
+                    </label>
+                    <span style={{ fontSize: 11, color: '#94a3b8' }}>{selectedEmployeeIds.length} selected</span>
+                  </div>
 
-                {/* Rows */}
-                <div>
-                  {settings.map((u, idx) => {
-                    // Did this employee submit today?
-                    const submitted = allEntries.some(e => e.employee?._id === u._id || e.employee?.toString() === u._id);
-                    return (
-                      <div key={u._id}
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: idx < settings.length - 1 ? '1px solid #f8fafc' : 'none', transition: 'background .1s' }}
-                        onMouseEnter={e => e.currentTarget.style.background = '#fafbfc'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                          <input type="checkbox"
-                            checked={selectedEmployeeIds.includes(u._id)}
-                            onChange={e => setSelectedEmployeeIds(prev => e.target.checked ? [...new Set([...prev, u._id])] : prev.filter(id => id !== u._id))}
-                            style={{ width: 15, height: 15, accentColor: '#2563eb' }} />
-                          <Avatar name={u.name} size="sm" />
-                          <div>
-                            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{u.name}</p>
-                            <p style={{ margin: 0, fontSize: 11, color: '#94a3b8' }}>{u.department || u.email}</p>
+                  {/* Rows */}
+                  <div>
+                    {settings.map((u, idx) => {
+                      // Did this employee submit today?
+                      const submitted = allEntries.some(e => e.employee?._id === u._id || e.employee?.toString() === u._id);
+                      return (
+                        <div key={u._id}
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: idx < settings.length - 1 ? '1px solid #f8fafc' : 'none', transition: 'background .1s' }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#fafbfc'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <input type="checkbox"
+                              checked={selectedEmployeeIds.includes(u._id)}
+                              onChange={e => setSelectedEmployeeIds(prev => e.target.checked ? [...new Set([...prev, u._id])] : prev.filter(id => id !== u._id))}
+                              style={{ width: 15, height: 15, accentColor: '#2563eb' }} />
+                            <Avatar name={u.name} size="sm" />
+                            <div>
+                              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{u.name}</p>
+                              <p style={{ margin: 0, fontSize: 11, color: '#94a3b8' }}>{u.department || u.email}</p>
+                            </div>
+                            {u.isRequired && submitted && (
+                              <span style={{ fontSize: 10, fontWeight: 700, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', padding: '2px 7px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                <CheckCircle2 size={9} /> Submitted
+                              </span>
+                            )}
+                            {u.isRequired && !submitted && (
+                              <span style={{ fontSize: 10, fontWeight: 700, background: '#fffbeb', color: '#d97706', border: '1px solid #fde68a', padding: '2px 7px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                <Clock size={9} /> Pending
+                              </span>
+                            )}
                           </div>
-                          {u.isRequired && submitted && (
-                            <span style={{ fontSize: 10, fontWeight: 700, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', padding: '2px 7px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                              <CheckCircle2 size={9} /> Submitted
-                            </span>
-                          )}
-                          {u.isRequired && !submitted && (
-                            <span style={{ fontSize: 10, fontWeight: 700, background: '#fffbeb', color: '#d97706', border: '1px solid #fde68a', padding: '2px 7px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                              <Clock size={9} /> Pending
-                            </span>
-                          )}
+                          <button
+                            onClick={() => handleToggle(u._id, u.isRequired)}
+                            disabled={togglingId === u._id}
+                            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 10, border: u.isRequired ? '1px solid #a7f3d0' : '1px solid #e2e8f0', background: u.isRequired ? '#ecfdf5' : '#f8fafc', color: u.isRequired ? '#065f46' : '#64748b', fontSize: 12, fontWeight: 600, cursor: togglingId === u._id ? 'not-allowed' : 'pointer', opacity: togglingId === u._id ? 0.5 : 1, transition: 'all .15s' }}>
+                            {u.isRequired
+                              ? <><ToggleRight size={15} style={{ color: '#059669' }} /> Enrolled</>
+                              : <><ToggleLeft size={15} /> Not enrolled</>}
+                          </button>
                         </div>
-                        <button
-                          onClick={() => handleToggle(u._id, u.isRequired)}
-                          disabled={togglingId === u._id}
-                          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 10, border: u.isRequired ? '1px solid #a7f3d0' : '1px solid #e2e8f0', background: u.isRequired ? '#ecfdf5' : '#f8fafc', color: u.isRequired ? '#065f46' : '#64748b', fontSize: 12, fontWeight: 600, cursor: togglingId === u._id ? 'not-allowed' : 'pointer', opacity: togglingId === u._id ? 0.5 : 1, transition: 'all .15s' }}>
-                          {u.isRequired
-                            ? <><ToggleRight size={15} style={{ color: '#059669' }} /> Enrolled</>
-                            : <><ToggleLeft size={15} /> Not enrolled</>}
-                        </button>
+                      );
+                    })}
+                    {settings.length === 0 && (
+                      <div style={{ padding: '48px 24px', textAlign: 'center' }}>
+                        <Users size={32} style={{ color: '#e2e8f0', margin: '0 auto 8px' }} />
+                        <p style={{ margin: 0, fontSize: 13, color: '#94a3b8' }}>No employees found</p>
                       </div>
-                    );
-                  })}
-                  {settings.length === 0 && (
-                    <div style={{ padding: '48px 24px', textAlign: 'center' }}>
-                      <Users size={32} style={{ color: '#e2e8f0', margin: '0 auto 8px' }} />
-                      <p style={{ margin: 0, fontSize: 13, color: '#94a3b8' }}>No employees found</p>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}

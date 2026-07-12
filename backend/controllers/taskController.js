@@ -611,8 +611,19 @@ exports.logTime = async (req, res) => {
   try {
     const { hours } = req.body;
     if (!hours || hours <= 0) return res.status(400).json({ success: false, message: 'Hours must be positive' });
+
+    const existing = await Task.findById(req.params.id);
+    if (!existing) return res.status(404).json({ success: false, message: 'Task not found' });
+
+    const user = req.user;
+    if (!isManagement(user)) {
+      const isOwner = String(existing.assignee) === String(user.id)
+        || String(existing.reporter) === String(user.id)
+        || String(existing.claimedBy) === String(user.id);
+      if (!isOwner) return res.status(403).json({ success: false, message: 'Not authorized to log time on this task' });
+    }
+
     const task = await Task.findByIdAndUpdate(req.params.id, { $inc: { loggedHours: hours } }, { new: true });
-    if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
     res.json({ success: true, task });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -669,10 +680,38 @@ exports.assignTask = async (req, res) => {
 exports.updateTaskSprint = async (req, res) => {
   try {
     const { sprintId } = req.body;
+    const user = req.user;
+
+    const existing = await Task.findById(req.params.id);
+    if (!existing) return res.status(404).json({ success: false, message: 'Task not found' });
+
+    // Authorization: only elevated roles (admin/manager/hr/team_lead) or the task
+    // owner (reporter/assignee/claimedBy) may move a task in/out of a sprint.
+    if (!isElevated(user)) {
+      const isOwner = String(existing.assignee) === String(user.id)
+        || String(existing.reporter) === String(user.id)
+        || String(existing.claimedBy) === String(user.id);
+      if (!isOwner) return res.status(403).json({ success: false, message: 'Not authorized to change this task\'s sprint' });
+    }
+
+    // Sprints are global — a task from any project may join any sprint.
+    if (sprintId) {
+      if (!isValidObjectId(sprintId)) return res.status(400).json({ success: false, message: 'Invalid sprint id' });
+      const Sprint = require('../models/Sprint');
+      const sprint = await Sprint.findById(sprintId).select('_id');
+      if (!sprint) return res.status(404).json({ success: false, message: 'Sprint not found' });
+    }
+
+    // Jira-style status transition:
+    //   backlog task → sprint  ⇒ becomes 'todo' (committed to the sprint)
+    //   task → backlog (removed from sprint) ⇒ reset to 'backlog'
+    const update = { sprint: sprintId || null };
+    if (sprintId && existing.status === 'backlog') update.status = 'todo';
+    if (!sprintId) { update.status = 'backlog'; update.completedDate = null; }
+
     const task = await populateTask(
-      Task.findByIdAndUpdate(req.params.id, { sprint: sprintId || null }, { new: true })
+      Task.findByIdAndUpdate(req.params.id, update, { new: true })
     );
-    if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
     try { getIO().to('admin').emit('task:updated', task); } catch {}
     res.json({ success: true, task });
   } catch (err) {

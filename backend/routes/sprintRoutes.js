@@ -9,7 +9,7 @@ const { protect, managerOrAdmin } = require('../middleware/authMiddleware');
 
 // ── Specific static routes BEFORE wildcard /:id routes ──────────────────────
 router.get('/backlog',              protect, getBacklogTasks);
-router.patch('/backlog/:taskId/move', protect, moveBacklogTaskToSprint);
+router.patch('/backlog/:taskId/move', protect, managerOrAdmin, moveBacklogTaskToSprint);
 
 router.post('/',                    protect, managerOrAdmin, createSprint);
 router.get('/',                     protect, getSprints);

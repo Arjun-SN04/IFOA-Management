@@ -18,7 +18,19 @@ const notifyProjectTeam = async ({ projectId, actorId, type, title, message, lin
 // @route POST /api/sprints
 exports.createSprint = async (req, res) => {
   try {
-    let sprint = await Sprint.create({ ...req.body, createdBy: req.user.id });
+    const { name, startDate, endDate } = req.body;
+    if (!name || !startDate || !endDate) {
+      return res.status(400).json({ success: false, message: 'name, startDate and endDate are required' });
+    }
+    if (new Date(endDate) < new Date(startDate)) {
+      return res.status(400).json({ success: false, message: 'End date cannot be before start date' });
+    }
+
+    // Sprints are global — `project` is optional. Drop empty string to keep it unset.
+    const payload = { ...req.body, createdBy: req.user.id };
+    if (!payload.project) delete payload.project;
+
+    let sprint = await Sprint.create(payload);
     sprint = await Sprint.findById(sprint._id)
       .populate('project', 'name')
       .populate('createdBy', 'name');
@@ -50,7 +62,16 @@ exports.getSprints = async (req, res) => {
 // @route PUT /api/sprints/:id
 exports.updateSprint = async (req, res) => {
   try {
-    const sprint = await Sprint.findByIdAndUpdate(req.params.id, req.body, { new: true })
+    const { startDate, endDate } = req.body;
+    const current = await Sprint.findById(req.params.id).select('startDate endDate');
+    if (!current) return res.status(404).json({ success: false, message: 'Sprint not found' });
+    const s = startDate ? new Date(startDate) : current.startDate;
+    const e = endDate ? new Date(endDate) : current.endDate;
+    if (s && e && e < s) {
+      return res.status(400).json({ success: false, message: 'End date cannot be before start date' });
+    }
+
+    const sprint = await Sprint.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true })
       .populate('project', 'name');
     if (!sprint) return res.status(404).json({ success: false, message: 'Sprint not found' });
     res.json({ success: true, sprint, data: sprint });
@@ -86,22 +107,24 @@ exports.startSprint = async (req, res) => {
     const sprint = await Sprint.findById(req.params.id);
     if (!sprint) return res.status(404).json({ success: false, message: 'Sprint not found' });
 
-    const activeSprint = await Sprint.findOne({ project: sprint.project, status: 'active' });
-    if (activeSprint) return res.status(400).json({ success: false, message: 'Another sprint is already active for this project' });
+    const activeSprint = await Sprint.findOne({ status: 'active' });
+    if (activeSprint) return res.status(400).json({ success: false, message: 'Another sprint is already active. Complete it before starting a new one.' });
 
     sprint.status = 'active';
     await sprint.save();
     await sprint.populate('project', 'name');
     await sprint.populate('createdBy', 'name');
 
-    await notifyProjectTeam({
-      projectId: sprint.project._id || sprint.project,
-      actorId: req.user.id,
-      type: 'sprint_started',
-      title: 'Sprint Started',
-      message: `Sprint "${sprint.name}" has started`,
-      link: '/sprints',
-    });
+    if (sprint.project) {
+      await notifyProjectTeam({
+        projectId: sprint.project._id || sprint.project,
+        actorId: req.user.id,
+        type: 'sprint_started',
+        title: 'Sprint Started',
+        message: `Sprint "${sprint.name}" has started`,
+        link: '/sprints',
+      });
+    }
 
     res.json({ success: true, sprint, data: sprint });
   } catch (err) {
@@ -137,9 +160,7 @@ exports.completeSprint = async (req, res) => {
         if (!nextSprint) {
           return res.status(404).json({ success: false, message: 'Next sprint not found' });
         }
-        if (String(nextSprint.project) !== String(sprint.project._id || sprint.project)) {
-          return res.status(400).json({ success: false, message: 'Next sprint must belong to the same project' });
-        }
+        // Sprints are global — incomplete tasks (any project) roll into the next sprint.
         // Move to next sprint, keep originSprint as this sprint (set only if not already set)
         const incompleteIds = incompleteTasks.map(t => t._id);
         await Task.updateMany(
@@ -164,14 +185,16 @@ exports.completeSprint = async (req, res) => {
       }
     }
 
-    await notifyProjectTeam({
-      projectId: sprint.project._id || sprint.project,
-      actorId: req.user.id,
-      type: 'sprint_ended',
-      title: 'Sprint Completed',
-      message: `Sprint "${sprint.name}" completed. ${doneTasks.length} done, ${incompleteTasks.length} moved to ${nextSprintId ? 'next sprint' : 'backlog'}.`,
-      link: '/sprints',
-    });
+    if (sprint.project) {
+      await notifyProjectTeam({
+        projectId: sprint.project._id || sprint.project,
+        actorId: req.user.id,
+        type: 'sprint_ended',
+        title: 'Sprint Completed',
+        message: `Sprint "${sprint.name}" completed. ${doneTasks.length} done, ${incompleteTasks.length} moved to ${nextSprintId ? 'next sprint' : 'backlog'}.`,
+        link: '/sprints',
+      });
+    }
 
     res.json({
       success: true,

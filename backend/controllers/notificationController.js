@@ -61,6 +61,16 @@ exports.deleteNotification = async (req, res) => {
   }
 };
 
+// @desc  Delete all notifications for the current user
+exports.deleteAllNotifications = async (req, res) => {
+  try {
+    await Notification.deleteMany({ recipient: req.user._id });
+    res.json({ success: true, message: 'All notifications cleared' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 // @desc  Create a notification (internal helper used by other controllers)
 // Exposed so other controllers can call this if they don't import socket directly
 exports.createAndEmit = async ({ recipient, sender, type, title, message, link }) => {

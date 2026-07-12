@@ -105,6 +105,7 @@ export const notificationAPI = {
   markRead: (id) => API.patch(`/notifications/${id}/read`),
   markAllRead: () => API.patch('/notifications/mark-all-read'),
   delete: (id) => API.delete(`/notifications/${id}`),
+  clearAll: () => API.delete('/notifications/clear-all'),
 };
 
 export const announcementAPI = {

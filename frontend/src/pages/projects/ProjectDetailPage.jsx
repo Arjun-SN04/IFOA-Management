@@ -122,10 +122,6 @@ function TeamSelector({ projectTeams, selectedTeamIds, onChange }) {
                 onChange={() => toggle(String(team._id))}
                 className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-400 cursor-pointer"
               />
-              <span
-                className="w-3 h-3 rounded-full shrink-0"
-                style={{ background: team.color || '#3B82F6' }}
-              />
               <span className={`flex-1 text-sm font-semibold ${selected ? 'text-blue-800' : 'text-slate-800'}`}>
                 {team.name}
               </span>
@@ -209,7 +205,6 @@ function TeamManager({ projectId, currentTeams, allTeams, onChange }) {
           {currentTeams.map(team => (
             <div key={team._id} className="flex items-center justify-between gap-2 px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg">
               <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: team.color || '#3B82F6' }} />
                 <span className="text-sm font-semibold text-slate-800">{team.name}</span>
                 <span className="text-xs text-slate-400">· {team.members?.length || 0} member(s)</span>
               </div>
@@ -238,7 +233,6 @@ function TeamManager({ projectId, currentTeams, allTeams, onChange }) {
                 disabled={adding}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border border-slate-200 bg-white text-slate-700 hover:border-blue-400 hover:bg-blue-50 transition-all disabled:opacity-50"
               >
-                <span className="w-2 h-2 rounded-full" style={{ background: team.color || '#3B82F6' }} />
                 + {team.name}
               </button>
             ))}
@@ -639,8 +633,8 @@ export default function ProjectDetailPage() {
               )}
             />
           ) : (
-            <Card className="overflow-hidden">
-              <table className="w-full text-sm">
+            <Card className="overflow-hidden" style={{ overflowX: 'auto' }}>
+              <table className="w-full text-sm min-w-[680px]">
                 <thead>
                   <tr className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     <th className="text-left px-5 py-3">Task</th>
@@ -850,7 +844,6 @@ export default function ProjectDetailPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {projectTeams.map(team => (
                   <div key={team._id} className="flex items-center gap-3 p-3 border border-slate-100 rounded-xl bg-slate-50">
-                    <span className="w-3 h-3 rounded-full shrink-0" style={{ background: team.color || '#3B82F6' }} />
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-slate-900 truncate">{team.name}</p>
                       {team.teamLead?.name && (

@@ -92,12 +92,20 @@ export default function LandingPage() {
         .btn-ghost:hover { background: rgba(255,255,255,0.9); border-color: white; }
 
         .pill {
-          display: inline-flex; align-items: center; gap: 6px;
-          padding: 5px 12px; border-radius: 6px;
-          background: rgba(255,255,255,0.6);
-          border: 1px solid rgba(255,255,255,0.85);
-          backdrop-filter: blur(8px);
-          font-size: 12px; color: ${C.navy}; font-weight: 500;
+          display: inline-flex; align-items: center; gap: 8px;
+          padding: 6px 14px; border-radius: 999px;
+          background: rgba(255,255,255,0.75);
+          border: 1px solid rgba(37,99,235,0.12);
+          backdrop-filter: blur(12px);
+          font-size: 12.5px; color: ${C.navy}; font-weight: 600;
+          box-shadow: 0 2px 8px rgba(37,99,235,0.02);
+          transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .pill:hover {
+          background: rgba(255,255,255,0.95);
+          border-color: ${C.blue};
+          transform: translateY(-1.5px);
+          box-shadow: 0 4px 12px rgba(37,99,235,0.1);
         }
 
         .cloud-wrap {
@@ -143,10 +151,7 @@ export default function LandingPage() {
             {user ? (
               <Link to="/dashboard" className="btn-primary">Dashboard <ArrowRight size={14} /></Link>
             ) : (
-              <>
-                <Link to="/login"    className="btn-ghost">Sign in</Link>
-                <Link to="/register" className="btn-primary">Get access <ArrowRight size={13} /></Link>
-              </>
+              <Link to="/login" className="btn-primary">Sign in <ArrowRight size={13} /></Link>
             )}
           </div>
         </div>
@@ -201,7 +206,6 @@ export default function LandingPage() {
             <Link to={user ? '/dashboard' : '/login'} className="btn-primary">
               {user ? 'Open Dashboard' : 'Sign In'} <ArrowRight size={15} />
             </Link>
-            {!user && <Link to="/register" className="btn-ghost">Request Access</Link>}
           </div>
 
           {/* feature pills */}

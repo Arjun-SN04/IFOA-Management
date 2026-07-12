@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(node -e \"require\\('./controllers/taskController'\\);require\\('./controllers/sprintController'\\);require\\('./routes/sprintRoutes'\\);require\\('./routes/taskRoutes'\\);console.log\\('backend syntax OK'\\)\")",
+      "Bash(node -e \"require\\('./controllers/taskController'\\);console.log\\('OK'\\)\")",
+      "Bash(node -e \"require\\('./controllers/sprintController'\\);require\\('./controllers/taskController'\\);require\\('./models/Sprint'\\);console.log\\('OK'\\)\")",
+      "Bash(node -e \"require\\('./controllers/notificationController'\\);require\\('./routes/notificationRoutes'\\);console.log\\('OK'\\)\")"
+    ]
+  }
+}

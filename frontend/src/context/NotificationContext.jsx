@@ -198,10 +198,26 @@ export const NotificationProvider = ({ children }) => {
     setUnreadCount(0);
   };
 
+  const deleteNotif = async (id) => {
+    await notificationAPI.delete(id);
+    setNotifications(prev => {
+      const removed = prev.find(n => n._id === id);
+      const next = prev.filter(n => n._id !== id);
+      if (removed && !removed.isRead) setUnreadCount(c => Math.max(0, c - 1));
+      return next;
+    });
+  };
+
+  const clearAllNotifs = async () => {
+    await notificationAPI.clearAll();
+    setNotifications([]);
+    setUnreadCount(0);
+  };
+
   return (
     <NotificationContext.Provider value={{
       notifications, unreadCount, taskEvents, bellRing,
-      fetchNotifications, markRead, markAllRead,
+      fetchNotifications, markRead, markAllRead, deleteNotif, clearAllNotifs,
       socketRef, pendingUsersCount, setPendingUsersCount,
       setNavigate,
     }}>

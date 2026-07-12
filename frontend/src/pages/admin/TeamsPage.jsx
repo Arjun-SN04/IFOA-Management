@@ -111,7 +111,6 @@ function TeamKanbanModal({ team, onClose }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 10, height: 10, borderRadius: 999, background: team.color || '#3B82F6' }} />
               <span style={{ fontSize: 12, color: '#64748B', fontWeight: 600 }}>
                 {memberFilter === TEAM_VIEW_KEY
                   ? `${tasks.length} tasks in team board`
@@ -237,12 +236,11 @@ function TeamDashboardModal({ team, onClose, onAssignTask }) {
       ) : dashboard ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 10, height: 10, borderRadius: 999, background: team.color || '#3B82F6' }} />
-              <span style={{ fontSize: 12, color: '#64748B', fontWeight: 600 }}>
-                {dashboard.team?.members?.length || 0} members · {dashboard.taskStats?.total || 0} tasks
-              </span>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, color: '#64748B', fontWeight: 600 }}>
+              {dashboard.team?.members?.length || 0} members · {dashboard.taskStats?.total || 0} tasks
+            </span>
+          </div>
             <button onClick={() => load(true)} disabled={refreshing}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: '1px solid #E2E8F0', background: '#fff', color: '#475569', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
               <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} /> Refresh
@@ -462,24 +460,22 @@ function AssignTaskModal({ team, projects, onClose, onSaved }) {
   );
 }
 
-// ── Team Card with 3D flip — fully self-contained, no shared state ─────────────
+// ── Team Card — professional flat design ──────────────────────────────────────
 function TeamCard({ team, onEdit, onDelete, onSwitchMember, onChangeLead, onViewBoard, onViewDashboard, canManage }) {
   const [flipped, setFlipped] = useState(false);
 
-  const lead = team.teamLead;
-  const teamColor = team.color || '#3B82F6';
-  const allMembers = (team.members || []);
+  const lead           = team.teamLead;
+  const teamColor      = team.color || '#3B82F6';
+  const allMembers     = team.members || [];
   const nonLeadMembers = allMembers.filter(m => String(m._id) !== String(lead?._id));
 
   return (
-    <div style={{ perspective: '1200px', minHeight: 260 }}>
+    <div style={{ perspective: '1200px', minHeight: 240 }}>
       <div style={{
-        position: 'relative',
-        width: '100%',
-        minHeight: 260,
+        position: 'relative', width: '100%', minHeight: 240,
         transformStyle: 'preserve-3d',
         transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-        transition: 'transform 0.55s cubic-bezier(0.4,0.2,0.2,1)',
+        transition: 'transform 0.5s cubic-bezier(0.4,0.2,0.2,1)',
       }}>
 
         {/* ─── FRONT FACE ─── */}
@@ -487,96 +483,113 @@ function TeamCard({ team, onEdit, onDelete, onSwitchMember, onChangeLead, onView
           position: 'absolute', inset: 0,
           backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden',
           background: '#fff', borderRadius: 16,
-          border: '1px solid #E2E8F0',
-          boxShadow: '0 2px 10px rgba(15,23,42,0.06)',
+          border: '1px solid #E8EDF4',
+          boxShadow: '0 2px 12px rgba(15,23,42,0.06)',
           overflow: 'hidden',
+          zIndex: flipped ? 0 : 1,
+          opacity: flipped ? 0 : 1,
+          pointerEvents: flipped ? 'none' : 'auto',
+          transition: 'opacity 0.15s',
         }}>
 
-          <div style={{ padding: '12px 14px 12px 14px', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
+          <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12, height: '100%', boxSizing: 'border-box' }}>
+
+            {/* Header — name + member count */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{team.name}</h3>
-                {team.description && <p style={{ margin: '2px 0 0', fontSize: 11, color: '#94A3B8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{team.description}</p>}
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{team.name}</h3>
+                {team.description && <p style={{ margin: '3px 0 0', fontSize: 11.5, color: '#94A3B8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{team.description}</p>}
               </div>
-              <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: '#64748B', background: '#F8FAFC', border: '1px solid #E2E8F0', padding: '3px 10px', borderRadius: 999 }}>
-                {allMembers.length} members
+              <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: '#94A3B8' }}>
+                {allMembers.length} member{allMembers.length !== 1 ? 's' : ''}
               </span>
             </div>
 
             {/* Team Lead */}
             {lead ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, padding: '7px 10px', marginBottom: 8 }}>
-                <MemberAvatar name={lead.name} size={32} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0F172A' }}>{lead.name}</p>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                    <Diamond size={10} style={{ color: teamColor }} />
-                    <span style={{ fontSize: 10, color: '#64748B', fontWeight: 600 }}>Team Lead</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <MemberAvatar name={lead.name} size={34} />
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.name}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                    <Diamond size={9} style={{ color: teamColor, flexShrink: 0 }} />
+                    <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Team Lead</span>
                   </div>
                 </div>
               </div>
             ) : (
-              <div style={{ marginBottom: 8, padding: '7px 10px', borderRadius: 8, background: '#FFFBEB', border: '1px solid #FDE68A' }}>
-                <p style={{ margin: 0, fontSize: 12, color: '#92400E', fontWeight: 600 }}>⚠ No team lead assigned</p>
-              </div>
+              <p style={{ margin: 0, fontSize: 12, color: '#D97706', fontWeight: 600 }}>⚠ No team lead assigned</p>
             )}
 
             {/* Member pips */}
             {nonLeadMembers.length > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
-                {nonLeadMembers.slice(0, 4).map((m, i) => (
-                  <div key={m._id} title={m.name} style={{ marginLeft: i === 0 ? 0 : -8, zIndex: 4 - i }}>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                {nonLeadMembers.slice(0, 5).map((m, i) => (
+                  <div key={m._id} title={m.name} style={{ marginLeft: i === 0 ? 0 : -8, zIndex: 5 - i, border: '2px solid #fff', borderRadius: '50%' }}>
                     <MemberAvatar name={m.name} size={26} />
                   </div>
                 ))}
-                {nonLeadMembers.length > 4 && (
-                  <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 600, color: '#64748B' }}>+{nonLeadMembers.length - 4} more</span>
+                {nonLeadMembers.length > 5 && (
+                  <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: '#94A3B8' }}>+{nonLeadMembers.length - 5}</span>
                 )}
               </div>
             )}
 
-            {/* Action buttons */}
-            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}>
+            {/* Action buttons — ghost style, no backgrounds */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 0, borderTop: '1px solid #F1F5F9', paddingTop: 10, marginTop: 'auto' }}>
               <button onClick={() => onViewBoard(team)}
-                style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid #BFDBFE', background: '#EFF6FF', cursor: 'pointer', color: '#2563EB', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700 }}>
-                <LayoutGrid size={11} /> Board
+                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '6px 4px', background: 'none', border: 'none', cursor: 'pointer', color: '#2563EB', fontSize: 11.5, fontWeight: 700, borderRadius: 8, transition: 'background .15s' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#F0F6FF'}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                <LayoutGrid size={12} /> Board
               </button>
+              <div style={{ width: 1, height: 16, background: '#E8EDF4' }} />
               <button onClick={() => onViewDashboard(team)}
-                style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid #A7F3D0', background: '#ECFDF5', cursor: 'pointer', color: '#059669', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700 }}>
-                <Activity size={11} /> Dashboard
+                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '6px 4px', background: 'none', border: 'none', cursor: 'pointer', color: '#059669', fontSize: 11.5, fontWeight: 700, borderRadius: 8, transition: 'background .15s' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#F0FDF4'}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                <Activity size={12} /> Dashboard
               </button>
               {canManage && (
                 <>
+                  <div style={{ width: 1, height: 16, background: '#E8EDF4' }} />
                   <button onClick={() => onChangeLead(team)}
-                    style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid #FDE68A', background: '#FFFBEB', cursor: 'pointer', color: '#D97706', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600 }}>
-                    <Diamond size={11} /> Lead
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '6px 4px', background: 'none', border: 'none', cursor: 'pointer', color: '#D97706', fontSize: 11.5, fontWeight: 700, borderRadius: 8, transition: 'background .15s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#FFFBEB'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                    <Diamond size={12} /> Lead
                   </button>
+                  <div style={{ width: 1, height: 16, background: '#E8EDF4' }} />
                   <button onClick={() => onEdit(team)}
-                    style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid #E2E8F0', background: '#F8FAFC', cursor: 'pointer', color: '#64748B', display: 'flex', alignItems: 'center' }}>
-                    <Edit2 size={12} />
+                    style={{ padding: '6px 8px', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex', alignItems: 'center', borderRadius: 8, transition: 'color .15s, background .15s' }}
+                    onMouseEnter={e => { e.currentTarget.style.color = '#475569'; e.currentTarget.style.background = '#F8FAFC'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = '#94A3B8'; e.currentTarget.style.background = 'none'; }}>
+                    <Edit2 size={13} />
                   </button>
                   <button onClick={() => onDelete(team)}
-                    style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid #FCA5A5', background: '#FEF2F2', cursor: 'pointer', color: '#DC2626', display: 'flex', alignItems: 'center' }}>
-                    <Trash2 size={12} />
+                    style={{ padding: '6px 8px', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex', alignItems: 'center', borderRadius: 8, transition: 'color .15s, background .15s' }}
+                    onMouseEnter={e => { e.currentTarget.style.color = '#DC2626'; e.currentTarget.style.background = '#FEF2F2'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = '#94A3B8'; e.currentTarget.style.background = 'none'; }}>
+                    <Trash2 size={13} />
                   </button>
                 </>
               )}
-            </div>
-
-            {/* Footer: projects + flip button */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 8, borderTop: '1px solid #F1F5F9', marginTop: 'auto' }}>
-              {team.projects?.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <Briefcase size={11} style={{ color: '#94A3B8' }} />
-                  <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>{team.projects.length} project{team.projects.length !== 1 ? 's' : ''}</span>
-                </div>
-              )}
+              <div style={{ width: 1, height: 16, background: '#E8EDF4' }} />
               <button onClick={() => setFlipped(true)}
-                style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: '#2563EB', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0' }}>
-                <Users size={13} /> View members
+                style={{ padding: '6px 8px', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, borderRadius: 8, transition: 'color .15s, background .15s' }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#475569'; e.currentTarget.style.background = '#F8FAFC'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = '#94A3B8'; e.currentTarget.style.background = 'none'; }}>
+                <Users size={12} />
               </button>
             </div>
+
+            {/* Footer */}
+            {team.projects?.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: -8 }}>
+                <Briefcase size={11} style={{ color: '#CBD5E1' }} />
+                <span style={{ fontSize: 11, color: '#94A3B8' }}>{team.projects.length} project{team.projects.length !== 1 ? 's' : ''}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -586,12 +599,16 @@ function TeamCard({ team, onEdit, onDelete, onSwitchMember, onChangeLead, onView
           backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden',
           transform: 'rotateY(180deg)',
           background: '#fff', borderRadius: 16,
-          border: `1px solid #E2E8F0`,
-          boxShadow: '0 2px 10px rgba(15,23,42,0.06)',
+          border: '1px solid #E8EDF4',
+          boxShadow: '0 2px 12px rgba(15,23,42,0.06)',
           overflow: 'hidden',
+          zIndex: flipped ? 1 : 0,
+          opacity: flipped ? 1 : 0,
+          pointerEvents: flipped ? 'auto' : 'none',
+          transition: 'opacity 0.15s',
         }}>
-
-          <div style={{ padding: '14px 14px 14px 14px', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
+          <div style={{ height: 3, background: teamColor, borderRadius: '16px 16px 0 0' }} />
+          <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', height: 'calc(100% - 3px)', boxSizing: 'border-box' }}>
             {/* Back header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <div>
@@ -604,11 +621,10 @@ function TeamCard({ team, onEdit, onDelete, onSwitchMember, onChangeLead, onView
               </button>
             </div>
 
-            {/* Members list — scrollable */}
+            {/* Members list */}
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 2 }}>
-              {/* Team lead first */}
               {lead && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10, background: `${teamColor}10`, border: `1px solid ${teamColor}30` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10, background: `${teamColor}0D`, border: `1px solid ${teamColor}30` }}>
                   <MemberAvatar name={lead.name} size={30} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#0F172A' }}>{lead.name}</p>
@@ -620,7 +636,6 @@ function TeamCard({ team, onEdit, onDelete, onSwitchMember, onChangeLead, onView
                 </div>
               )}
 
-              {/* Other members */}
               {nonLeadMembers.length === 0 && !lead && (
                 <p style={{ fontSize: 12, color: '#94A3B8', textAlign: 'center', padding: '20px 0' }}>No members yet</p>
               )}
@@ -641,7 +656,6 @@ function TeamCard({ team, onEdit, onDelete, onSwitchMember, onChangeLead, onView
                 </div>
               ))}
 
-              {/* Projects */}
               {team.projects?.length > 0 && (
                 <div style={{ marginTop: 4 }}>
                   <p style={{ margin: '0 0 5px', fontSize: 10, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Projects</p>
@@ -662,6 +676,8 @@ function TeamCard({ team, onEdit, onDelete, onSwitchMember, onChangeLead, onView
     </div>
   );
 }
+
+
 // ─── Assign Project to Team Modal ─────────────────────────────────────────────
 function AssignProjectToTeamModal({ team, projects, onClose, onSaved }) {
   const [selectedProjectId, setSelectedProjectId] = useState('');
@@ -947,7 +963,7 @@ export default function TeamsPage() {
           )}
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
           {teams.map((team) => (
             // key must be stable and unique — team._id from MongoDB is guaranteed
             <TeamCard

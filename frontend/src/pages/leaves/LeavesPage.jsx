@@ -6,7 +6,7 @@ import {
   Plus, CalendarDays, Clock, CheckCircle, XCircle,
   AlertCircle, RotateCcw, ChevronRight, ChevronLeft,
   CalendarRange, Users, RefreshCw, ChevronUp, ChevronDown,
-  Send, MousePointerClick, Search, X, Trash2, Mail, UserCheck,
+  Send, MousePointerClick, Search, X, Trash2, UserCheck,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -365,9 +365,96 @@ function StatusBadge({ status }) {
   const sv = STATUS_V[status] || STATUS_V.pending;
   const Icon = sv.icon;
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 999, background: sv.bg, color: sv.color, border: `1px solid ${sv.border}`, fontSize: 11, fontWeight: 700 }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: sv.color }}>
       <Icon size={11} />{sv.label}
     </span>
+  );
+}
+
+// ── Month & Year Picker Modal ──
+function MonthYearPickerModal({ open, onClose, currentDate, onChange }) {
+  const [year, setYear] = useState(currentDate.getFullYear());
+  const selectedMonth = currentDate.getMonth();
+
+  useEffect(() => {
+    if (open) {
+      setYear(currentDate.getFullYear());
+    }
+  }, [open, currentDate]);
+
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  ];
+
+  const handleMonthSelect = (monthIdx) => {
+    onChange(new Date(year, monthIdx, 1));
+    onClose();
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="Select Month & Year" size="sm">
+      <div style={{ padding: '8px 4px' }}>
+        {/* Year Selector Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <button 
+            type="button"
+            onClick={() => setYear(y => y - 1)}
+            style={{ padding: '6px 10px', borderRadius: 8, border: `1px solid ${B.border}`, background: '#fff', cursor: 'pointer', color: B.slate, display: 'flex', alignItems: 'center' }}
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <span style={{ fontSize: 18, fontWeight: 800, color: B.black }}>{year}</span>
+          <button 
+            type="button"
+            onClick={() => setYear(y => y + 1)}
+            style={{ padding: '6px 10px', borderRadius: 8, border: `1px solid ${B.border}`, background: '#fff', cursor: 'pointer', color: B.slate, display: 'flex', alignItems: 'center' }}
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+
+        {/* Months Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+          {months.map((m, idx) => {
+            const isSelected = selectedMonth === idx && currentDate.getFullYear() === year;
+            return (
+              <button
+                key={m}
+                type="button"
+                onClick={() => handleMonthSelect(idx)}
+                style={{
+                  padding: '12px 8px',
+                  borderRadius: 10,
+                  border: isSelected ? `2.5px solid ${B.blue}` : `1px solid ${B.border}`,
+                  background: isSelected ? B.blueBg : '#fff',
+                  color: isSelected ? B.blue : B.blackMid,
+                  fontWeight: isSelected ? 800 : 600,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                  outline: 'none'
+                }}
+                onMouseEnter={e => {
+                  if (!isSelected) {
+                    e.currentTarget.style.background = B.surfaceAlt;
+                    e.currentTarget.style.borderColor = B.slateLight;
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!isSelected) {
+                    e.currentTarget.style.background = '#fff';
+                    e.currentTarget.style.borderColor = B.border;
+                  }
+                }}
+              >
+                {m}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -377,6 +464,7 @@ function SelfLeaveCalendar({ leaves, onMarkLeave, onRefresh, refreshing, isManag
   const todayBase = useMemo(() => new Date(today.getFullYear(), today.getMonth(), today.getDate()), []);
   const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDay, setSelectedDay] = useState(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [markModal, setMarkModal] = useState(null);
   const [markReason, setMarkReason] = useState('');
   const [marking, setMarking] = useState(false);
@@ -476,57 +564,73 @@ function SelfLeaveCalendar({ leaves, onMarkLeave, onRefresh, refreshing, isManag
           </div>
         ))}
       </div>
-      <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${B.border}`, overflow: 'hidden', boxShadow: '0 3px 12px rgba(15,23,42,0.05)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: `1px solid ${B.border}`, background: B.surfaceAlt, flexWrap: 'wrap', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: B.blueBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <CalendarRange size={16} style={{ color: B.blue }} />
-            </div>
-            <div>
-              <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: B.black }}>{monthName}</p>
-              <p style={{ margin: 0, fontSize: 11, color: B.slateMid }}>My Leave Calendar · {(leaves || []).length} total</p>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {onRefresh && <button onClick={onRefresh} style={{ padding: '7px 9px', borderRadius: 9, border: `1px solid ${B.border}`, background: '#fff', cursor: 'pointer', color: B.blue, display: 'flex', opacity: refreshing ? 0.6 : 1 }}><RefreshCw size={14} /></button>}
-            <button onClick={prevMonth} style={{ padding: '7px 9px', borderRadius: 9, border: `1px solid ${B.border}`, background: '#fff', cursor: 'pointer', color: B.slate, display: 'flex' }}><ChevronLeft size={15} /></button>
-            <button onClick={() => { setSelectedDay(null); setCurrentDate(new Date(today.getFullYear(), today.getMonth(), 1)); }} style={{ padding: '6px 12px', borderRadius: 9, border: `1px solid ${B.border}`, background: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: B.blue }}>Today</button>
-            <button onClick={nextMonth} style={{ padding: '7px 9px', borderRadius: 9, border: `1px solid ${B.border}`, background: '#fff', cursor: 'pointer', color: B.slate, display: 'flex' }}><ChevronRight size={15} /></button>
-          </div>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: B.surfaceAlt, borderBottom: `1px solid ${B.border}` }}>
-          {DAYS_OF_WEEK.map(d => <div key={d} style={{ textAlign: 'center', padding: '8px 0', fontSize: 10, fontWeight: 800, color: B.slateLight, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{d}</div>)}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
-          {cells.map((day, idx) => {
-            if (!day) return <div key={`blank-${idx}`} style={{ minHeight: 90, borderBottom: `1px solid ${B.border}`, borderRight: (idx+1)%7===0 ? 'none' : `1px solid ${B.border}`, background: '#FAFAFA' }} />;
-            const dayLeaves = dayMap[day] || [];
-            const hasLeaves = dayLeaves.length > 0;
-            const isTod = isToday(day);
-            const isSelected = selectedDay === day;
-            const isPastDay = new Date(year, month, day) < todayBase;
-            const hasPending = dayLeaves.some(l => l.status === 'pending');
-            const hasApproved = dayLeaves.some(l => l.status === 'approved');
-            const bgColor = isSelected ? '#DBEAFE' : hasApproved ? '#ECFDF5' : hasPending ? '#FFFBEB' : isPastDay ? '#F8FAFC' : '#fff';
-            return (
-              <div key={day} onClick={() => handleDayClick(day)}
-                style={{ minHeight: 80, padding: '5px 4px', borderBottom: `1px solid ${B.border}`, borderRight: (idx+1)%7===0 ? 'none' : `1px solid ${B.border}`, background: bgColor, cursor: hasLeaves ? 'pointer' : isPastDay ? 'not-allowed' : 'pointer', outline: isSelected ? `2px solid ${B.blue}` : 'none', outlineOffset: -2, boxSizing: 'border-box', transition: 'background 0.1s', opacity: isPastDay && !hasLeaves ? 0.45 : 1 }}
-                onMouseEnter={e => { if (!isSelected && !isPastDay) e.currentTarget.style.background = hasLeaves ? '#F0F9FF' : '#F0FDF4'; }}
-                onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = bgColor; }}>
-                <div style={{ width: 24, height: 24, borderRadius: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: isTod ? B.blue : 'transparent', color: isTod ? '#fff' : B.black, fontSize: 11, fontWeight: isTod ? 800 : 600, marginBottom: 4 }}>{day}</div>
-                {dayLeaves.slice(0, 2).map((leave, li) => {
-                  const sv = getCalendarStatusView(leave, todayBase);
-                  return (
-                    <div key={(leave._id || li)} style={{ marginBottom: 3, borderRadius: 5, background: sv.bg, border: `1px solid ${sv.border}`, padding: '2px 4px' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', padding: '1px 5px', borderRadius: 3, background: sv.color, color: '#fff', fontSize: 8, fontWeight: 800, lineHeight: '14px', whiteSpace: 'nowrap' }}>{sv.label}</div>
-                    </div>
-                  );
-                })}
-                {dayLeaves.length > 2 && <div style={{ fontSize: 9, fontWeight: 700, color: B.blue, padding: '1px 4px', background: B.blueBg, borderRadius: 3, display: 'inline-block' }}>+{dayLeaves.length - 2}</div>}
-                {!hasLeaves && !isPastDay && <div style={{ fontSize: 11, color: '#CBD5E1', fontWeight: 700, textAlign: 'center', paddingTop: 4 }}>+</div>}
+      <div style={{ overflowX: 'auto' }}>
+        <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${B.border}`, overflow: 'hidden', boxShadow: '0 3px 12px rgba(15,23,42,0.05)', minWidth: 680 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: `1px solid ${B.border}`, background: B.surfaceAlt, flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: B.blueBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <CalendarRange size={16} style={{ color: B.blue }} />
               </div>
-            );
-          })}
+              <div 
+                onClick={() => setShowDatePicker(true)}
+                style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', padding: '4px 8px', borderRadius: 8, transition: 'all 0.2s', border: `1.5px solid transparent` }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = '#F1F5F9';
+                  e.currentTarget.style.borderColor = B.border;
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.borderColor = 'transparent';
+                }}
+                title="Click to select month & year"
+              >
+                <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: B.black, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {monthName} <ChevronDown size={14} style={{ color: B.slateMid }} />
+                </p>
+                <p style={{ margin: 0, fontSize: 11, color: B.slateMid }}>My Leave Calendar · {(leaves || []).length} total</p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {onRefresh && <button onClick={onRefresh} style={{ padding: '7px 9px', borderRadius: 9, border: `1px solid ${B.border}`, background: '#fff', cursor: 'pointer', color: B.blue, display: 'flex', opacity: refreshing ? 0.6 : 1 }}><RefreshCw size={14} /></button>}
+              <button onClick={prevMonth} style={{ padding: '7px 9px', borderRadius: 9, border: `1px solid ${B.border}`, background: '#fff', cursor: 'pointer', color: B.slate, display: 'flex' }}><ChevronLeft size={15} /></button>
+              <button onClick={() => { setSelectedDay(null); setCurrentDate(new Date(today.getFullYear(), today.getMonth(), 1)); }} style={{ padding: '6px 12px', borderRadius: 9, border: `1px solid ${B.border}`, background: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: B.blue }}>Today</button>
+              <button onClick={nextMonth} style={{ padding: '7px 9px', borderRadius: 9, border: `1px solid ${B.border}`, background: '#fff', cursor: 'pointer', color: B.slate, display: 'flex' }}><ChevronRight size={15} /></button>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: B.surfaceAlt, borderBottom: `1px solid ${B.border}` }}>
+            {DAYS_OF_WEEK.map(d => <div key={d} style={{ textAlign: 'center', padding: '8px 0', fontSize: 10, fontWeight: 800, color: B.slateLight, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{d}</div>)}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+            {cells.map((day, idx) => {
+              if (!day) return <div key={`blank-${idx}`} style={{ minHeight: 90, borderBottom: `1px solid ${B.border}`, borderRight: (idx+1)%7===0 ? 'none' : `1px solid ${B.border}`, background: '#FAFAFA' }} />;
+              const dayLeaves = dayMap[day] || [];
+              const hasLeaves = dayLeaves.length > 0;
+              const isTod = isToday(day);
+              const isSelected = selectedDay === day;
+              const isPastDay = new Date(year, month, day) < todayBase;
+              const hasPending = dayLeaves.some(l => l.status === 'pending');
+              const hasApproved = dayLeaves.some(l => l.status === 'approved');
+              const bgColor = isSelected ? '#DBEAFE' : hasApproved ? '#ECFDF5' : hasPending ? '#FFFBEB' : isPastDay ? '#F8FAFC' : '#fff';
+              return (
+                <div key={day} onClick={() => handleDayClick(day)}
+                  style={{ minHeight: 80, padding: '5px 4px', borderBottom: `1px solid ${B.border}`, borderRight: (idx+1)%7===0 ? 'none' : `1px solid ${B.border}`, background: bgColor, cursor: hasLeaves ? 'pointer' : isPastDay ? 'not-allowed' : 'pointer', outline: isSelected ? `2px solid ${B.blue}` : 'none', outlineOffset: -2, boxSizing: 'border-box', transition: 'background 0.1s', opacity: isPastDay && !hasLeaves ? 0.45 : 1 }}
+                  onMouseEnter={e => { if (!isSelected && !isPastDay) e.currentTarget.style.background = hasLeaves ? '#F0F9FF' : '#F0FDF4'; }}
+                  onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = bgColor; }}>
+                  <div style={{ width: 24, height: 24, borderRadius: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: isTod ? B.blue : 'transparent', color: isTod ? '#fff' : B.black, fontSize: 11, fontWeight: isTod ? 800 : 600, marginBottom: 4 }}>{day}</div>
+                  {dayLeaves.slice(0, 2).map((leave, li) => {
+                    const sv = getCalendarStatusView(leave, todayBase);
+                    return (
+                      <div key={(leave._id || li)} style={{ marginBottom: 3, borderRadius: 5, background: sv.bg, border: `1px solid ${sv.border}`, padding: '2px 4px' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', padding: '1px 5px', borderRadius: 3, background: sv.color, color: '#fff', fontSize: 8, fontWeight: 800, lineHeight: '14px', whiteSpace: 'nowrap' }}>{sv.label}</div>
+                      </div>
+                    );
+                  })}
+                  {dayLeaves.length > 2 && <div style={{ fontSize: 9, fontWeight: 700, color: B.blue, padding: '1px 4px', background: B.blueBg, borderRadius: 3, display: 'inline-block' }}>+{dayLeaves.length - 2}</div>}
+                  {!hasLeaves && !isPastDay && <div style={{ fontSize: 11, color: '#CBD5E1', fontWeight: 700, textAlign: 'center', paddingTop: 4 }}>+</div>}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
       <AnimatePresence>
@@ -608,16 +712,27 @@ function SelfLeaveCalendar({ leaves, onMarkLeave, onRefresh, refreshing, isManag
           </div>
         )}
       </Modal>
+      <MonthYearPickerModal
+        open={showDatePicker}
+        onClose={() => setShowDatePicker(false)}
+        currentDate={currentDate}
+        onChange={(newDate) => {
+          setSelectedDay(null);
+          setCurrentDate(newDate);
+        }}
+      />
     </div>
   );
 }
 
 // ── Team / Employee Leave Calendar ────────────────────────────────────────────
-function LeaveCalendar({ leaves, allLeaves, onRefresh, refreshing, showEmployeeNames = true, onApplyLeave, onReview, onSetEmployeeLeave }) {
+function LeaveCalendar({ leaves, allLeaves, onRefresh, refreshing, showEmployeeNames = true, onApplyLeave, onReview, onSetEmployeeLeave, reopenDaySignal }) {
   const today = new Date();
   const todayBase = useMemo(() => new Date(today.getFullYear(), today.getMonth(), today.getDate()), []);
   const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDay, setSelectedDay] = useState(null);
+  useEffect(() => { if (reopenDaySignal?.day != null) setSelectedDay(reopenDaySignal.day); }, [reopenDaySignal]);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [empFilter, setEmpFilter] = useState('all');
@@ -715,16 +830,7 @@ function LeaveCalendar({ leaves, allLeaves, onRefresh, refreshing, showEmployeeN
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {/* HR/Admin hint */}
-      {onSetEmployeeLeave && (
-        <div style={{ background: B.purpleBg, border: `1px solid ${B.purpleBorder}`, borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <UserCheck size={16} style={{ color: B.purple, flexShrink: 0 }} />
-          <div>
-            <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: B.purple }}>HR/Admin: Click any empty date to set leave on behalf of an employee.</p>
-            <p style={{ margin: '1px 0 0', fontSize: 11, color: '#7C3AED' }}>Click a day with leave chips to view or review requests. Past dates are allowed.</p>
-          </div>
-        </div>
-      )}
+
       {!onSetEmployeeLeave && onApplyLeave && (
         <div style={{ background: B.blueBg, border: `1px solid ${B.blueBorder}`, borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
           <MousePointerClick size={16} style={{ color: B.blue, flexShrink: 0 }} />
@@ -749,12 +855,27 @@ function LeaveCalendar({ leaves, allLeaves, onRefresh, refreshing, showEmployeeN
           </div>
         ))}
       </div>
-      <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${B.border}`, overflow: 'hidden', boxShadow: '0 3px 12px rgba(15,23,42,0.05)' }}>
+      <div style={{ overflowX: 'auto' }}>
+        <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${B.border}`, overflow: 'hidden', boxShadow: '0 3px 12px rgba(15,23,42,0.05)', minWidth: 680 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: `1px solid ${B.border}`, background: B.surfaceAlt, flexWrap: 'wrap', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, background: B.blueBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CalendarRange size={16} style={{ color: B.blue }} /></div>
-            <div>
-              <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: B.black }}>{monthName}</p>
+            <div 
+              onClick={() => setShowDatePicker(true)}
+              style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', padding: '4px 8px', borderRadius: 8, transition: 'all 0.2s', border: `1.5px solid transparent` }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = '#F1F5F9';
+                e.currentTarget.style.borderColor = B.border;
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.borderColor = 'transparent';
+              }}
+              title="Click to select month & year"
+            >
+              <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: B.black, display: 'flex', alignItems: 'center', gap: 6 }}>
+                {monthName} <ChevronDown size={14} style={{ color: B.slateMid }} />
+              </p>
               <p style={{ margin: 0, fontSize: 11, color: B.slateMid }}>Team Leave Calendar · {sourceLeaves.length} total</p>
             </div>
           </div>
@@ -852,54 +973,71 @@ function LeaveCalendar({ leaves, allLeaves, onRefresh, refreshing, showEmployeeN
           })}
         </div>
       </div>
+    </div>
       <AnimatePresence>
         {selectedDay && (
-          <motion.div key={`day-${selectedDay}-${month}-${year}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-            style={{ background: '#fff', borderRadius: 16, border: `1px solid ${B.border}`, padding: 14, boxShadow: '0 4px 14px rgba(15,23,42,0.06)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: B.blueBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CalendarDays size={16} style={{ color: B.blue }} /></div>
-                <div>
-                  <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: B.black }}>{new Date(year, month, selectedDay).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
-                  <p style={{ margin: 0, fontSize: 11, color: B.slateMid }}>{selectedDayLeaves.length} leave request{selectedDayLeaves.length !== 1 ? 's' : ''}</p>
+          <motion.div
+            key={`day-modal-${selectedDay}-${month}-${year}`}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(3px)' }}
+            onClick={() => setSelectedDay(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              onClick={e => e.stopPropagation()}
+              style={{ background: '#fff', borderRadius: 18, width: '100%', maxWidth: 560, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(15,23,42,0.22)', border: `1px solid ${B.border}` }}
+            >
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px', borderBottom: `1px solid ${B.border}`, flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 11, background: B.blueBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CalendarDays size={17} style={{ color: B.blue }} /></div>
+                  <div>
+                    <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: B.black }}>{new Date(year, month, selectedDay).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                    <p style={{ margin: 0, fontSize: 11, color: B.slateMid }}>{selectedDayLeaves.length} leave request{selectedDayLeaves.length !== 1 ? 's' : ''}</p>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  {onSetEmployeeLeave && (
+                    <button onClick={() => { setSelectedDay(null); onSetEmployeeLeave(dateStr(selectedDay)); }} style={{ padding: '6px 12px', borderRadius: 8, border: `1px solid ${B.purpleBorder}`, background: B.purpleBg, color: B.purple, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <UserCheck size={11} /> Set Employee Leave
+                    </button>
+                  )}
+                  {onApplyLeave && (
+                    <button onClick={() => { setSelectedDay(null); onApplyLeave(dateStr(selectedDay)); }} style={{ padding: '6px 12px', borderRadius: 8, border: `1px solid ${B.blue}`, background: B.blueBg, color: B.blue, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Plus size={11} /> Apply Leave
+                    </button>
+                  )}
+                  <button onClick={() => setSelectedDay(null)} style={{ background: '#F1F5F9', border: 'none', cursor: 'pointer', color: B.slate, width: 30, height: 30, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><X size={14} /></button>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                {/* HR/Admin: set leave for employee from expanded day panel */}
-                {onSetEmployeeLeave && (
-                  <button onClick={() => onSetEmployeeLeave(dateStr(selectedDay))} style={{ padding: '5px 12px', borderRadius: 8, border: `1px solid ${B.purpleBorder}`, background: B.purpleBg, color: B.purple, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <UserCheck size={11} /> Set Employee Leave
-                  </button>
-                )}
-                {onApplyLeave && <button onClick={() => onApplyLeave(dateStr(selectedDay))} style={{ padding: '5px 12px', borderRadius: 8, border: `1px solid ${B.blue}`, background: B.blueBg, color: B.blue, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}><Plus size={11} /> Apply Leave</button>}
-                <button onClick={() => setSelectedDay(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: B.slateLight, fontSize: 18, fontWeight: 700, padding: '4px 8px', borderRadius: 8 }}>×</button>
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {selectedDayLeaves.map(leave => {
-                const sv = getCalendarStatusView(leave, todayBase);
-                const empName = leave.employee?.name || 'Unknown';
-                const start = new Date(leave.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                const end = new Date(leave.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                const isPending = leave.status === 'pending';
-                return (
-                  <div key={leave._id}
-                    onClick={() => handleLeaveCardClick(leave)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, background: sv.bg, border: `1.5px solid ${isPending && onReview ? B.blue : sv.border}`, cursor: isPending && onReview ? 'pointer' : 'default', transition: 'box-shadow 0.15s' }}
-                    onMouseEnter={e => { if (isPending && onReview) e.currentTarget.style.boxShadow = '0 4px 14px rgba(37,99,235,0.18)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; }}>
-                    {showEmployeeNames && <div style={{ width: 36, height: 36, borderRadius: 999, flexShrink: 0, background: nameColor(empName), color: '#fff', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{initials(empName)}</div>}
-                    <div style={{ flex: 1 }}>
-                      {showEmployeeNames && <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: B.black }}>{empName}</p>}
-                      <p style={{ margin: 0, fontSize: 11, color: B.slate }}>{start} → {end} · {leave.totalDays} day{leave.totalDays !== 1 ? 's' : ''}</p>
-                      {leave.reason && <p style={{ margin: '2px 0 0', fontSize: 11, color: B.slateMid, fontStyle: 'italic' }}>"{leave.reason}"</p>}
-                      {isPending && onReview && <p style={{ margin: '4px 0 0', fontSize: 10, color: B.blue, fontWeight: 700 }}>Click to Review →</p>}
+              {/* Leave list */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '12px 18px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {selectedDayLeaves.map(leave => {
+                  const sv = getCalendarStatusView(leave, todayBase);
+                  const empName = leave.employee?.name || 'Unknown';
+                  const start = new Date(leave.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                  const end = new Date(leave.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                  const isPending = leave.status === 'pending';
+                  return (
+                    <div key={leave._id}
+                      onClick={() => { if (isPending && onReview) { onReview(leave, selectedDay); setSelectedDay(null); } }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, background: sv.bg, border: `1.5px solid ${isPending && onReview ? B.blue : sv.border}`, cursor: isPending && onReview ? 'pointer' : 'default', transition: 'box-shadow 0.15s' }}
+                      onMouseEnter={e => { if (isPending && onReview) e.currentTarget.style.boxShadow = '0 4px 14px rgba(37,99,235,0.18)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; }}>
+                      {showEmployeeNames && <div style={{ width: 36, height: 36, borderRadius: 999, flexShrink: 0, background: nameColor(empName), color: '#fff', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{initials(empName)}</div>}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        {showEmployeeNames && <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: B.black }}>{empName}</p>}
+                        <p style={{ margin: 0, fontSize: 11, color: B.slate }}>{start} → {end} · {leave.totalDays} day{leave.totalDays !== 1 ? 's' : ''}</p>
+                        {leave.reason && <p style={{ margin: '2px 0 0', fontSize: 11, color: B.slateMid, fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>"{leave.reason}"</p>}
+                        {isPending && onReview && <p style={{ margin: '4px 0 0', fontSize: 10, color: B.blue, fontWeight: 700 }}>Click to Review →</p>}
+                      </div>
+                      <span style={{ padding: '3px 8px', borderRadius: 4, background: sv.color, color: '#fff', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>{sv.label}</span>
                     </div>
-                    <span style={{ padding: '2px 8px', borderRadius: 4, background: sv.color, color: '#fff', fontSize: 10, fontWeight: 800 }}>{sv.label}</span>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -917,6 +1055,15 @@ function LeaveCalendar({ leaves, allLeaves, onRefresh, refreshing, showEmployeeN
         ))}
       </div>
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      <MonthYearPickerModal
+        open={showDatePicker}
+        onClose={() => setShowDatePicker(false)}
+        currentDate={currentDate}
+        onChange={(newDate) => {
+          setSelectedDay(null);
+          setCurrentDate(newDate);
+        }}
+      />
     </div>
   );
 }
@@ -946,6 +1093,8 @@ export default function LeavesPage() {
 
   const [reviewModal, setReviewModal] = useState(null);
   const [reviewNote, setReviewNote] = useState('');
+  const [reviewBackDay, setReviewBackDay] = useState(null);
+  const [calendarSignal, setCalendarSignal] = useState(null);
 
   const [resetDayOfMonth, setResetDayOfMonth] = useState(1);
   const [lastResetMonthKey, setLastResetMonthKey] = useState('');
@@ -1214,11 +1363,11 @@ export default function LeavesPage() {
         </div>
       )}
 
-      <div style={{ borderBottom: `1px solid ${B.border}` }}>
+      <div style={{ borderBottom: `1px solid ${B.border}`, overflowX: 'auto', whiteSpace: 'nowrap', WebkitOverflowScrolling: 'touch' }}>
         <div style={{ display: 'flex', gap: 4 }}>
           {tabs.map(({ key, label, icon: Icon }) => (
             <button key={key} onClick={() => setTab(key)}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', fontSize: 13, fontWeight: 600, border: 'none', borderBottom: `2px solid ${tab === key ? B.blue : 'transparent'}`, background: 'none', cursor: 'pointer', color: tab === key ? B.blue : B.slateMid, marginBottom: -1, transition: 'all 0.15s' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', fontSize: 13, fontWeight: 600, border: 'none', borderBottom: `2px solid ${tab === key ? B.blue : 'transparent'}`, background: 'none', cursor: 'pointer', color: tab === key ? B.blue : B.slateMid, marginBottom: -1, transition: 'all 0.15s', flexShrink: 0 }}>
               {Icon && <Icon size={14} />}{label}
             </button>
           ))}
@@ -1254,8 +1403,9 @@ export default function LeavesPage() {
               onRefresh={handleRefresh}
               refreshing={refreshing}
               onApplyLeave={!isHR ? openApplyModal : undefined}
-              onReview={setReviewModal}
+              onReview={(leave, day) => { setReviewModal(leave); setReviewNote(''); setReviewBackDay(day ?? null); }}
               onSetEmployeeLeave={openSetEmpLeave}
+              reopenDaySignal={calendarSignal}
             />
           </motion.div>
         )}
@@ -1361,10 +1511,20 @@ export default function LeavesPage() {
               <textarea value={reviewNote} onChange={e => setReviewNote(e.target.value)} rows={2} placeholder="Add a note…"
                 style={{ width: '100%', padding: '10px 14px', border: `1px solid ${B.border}`, borderRadius: 10, fontSize: 13, resize: 'none', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }} />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, paddingTop: 4 }}>
-              <Button variant="secondary" onClick={() => setReviewModal(null)}>Cancel</Button>
-              <Button variant="danger" onClick={() => handleReview('rejected')}>Reject</Button>
-              <Button variant="success" onClick={() => handleReview('approved')}>Approve</Button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, paddingTop: 4 }}>
+              <Button variant="secondary" onClick={() => {
+                setReviewModal(null);
+                if (reviewBackDay != null) {
+                  setCalendarSignal({ day: reviewBackDay });
+                  setReviewBackDay(null);
+                }
+              }}>
+                {reviewBackDay != null ? '← Back' : 'Cancel'}
+              </Button>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <Button variant="danger" onClick={() => handleReview('rejected')}>Reject</Button>
+                <Button variant="success" onClick={() => handleReview('approved')}>Approve</Button>
+              </div>
             </div>
           </div>
         )}
@@ -1410,35 +1570,6 @@ function LeaveList({ leaves, onCancel, onReview, onAdminDelete, showUser, mine }
       return true;
     });
   }, [leaves, statusFilter, empFilter, search]);
-
-  const buildMailtoHR = (leave) => {
-    const empName = leave.employee?.name || user?.name || 'Employee';
-    const dept = leave.employee?.department || user?.department || '';
-    const start = new Date(leave.startDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-    const end   = new Date(leave.endDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-    const days  = leave.totalDays;
-    const reason = leave.reason || 'N/A';
-    const status = leave.status?.charAt(0).toUpperCase() + leave.status?.slice(1);
-
-    const subject = encodeURIComponent(`Leave Request – ${empName} (${start})`);
-    const body = encodeURIComponent(
-`Dear HR Team,
-
-I am writing regarding the following leave request:
-
-Employee  : ${empName}${dept ? ` (${dept})` : ''}
-Period    : ${start} → ${end}
-Duration  : ${days} working day${days !== 1 ? 's' : ''}
-Reason    : ${reason}
-Status    : ${status}
-
-Kindly review and confirm the approval at your earliest convenience.
-
-Thank you,
-${empName}`
-    );
-    return `mailto:hr@company.com?subject=${subject}&body=${body}`;
-  };
 
   const clearAll = () => { setSearch(''); setStatusFilter('all'); setEmpFilter('all'); };
   const hasFilters = statusFilter !== 'all' || empFilter !== 'all' || search;
@@ -1515,7 +1646,7 @@ ${empName}`
           {hasFilters && <button onClick={clearAll} style={{ marginTop: 12, padding: '7px 16px', borderRadius: 8, border: `1px solid ${B.border}`, background: '#fff', fontSize: 12, fontWeight: 600, color: B.slateMid, cursor: 'pointer' }}>Clear all filters</button>}
         </div>
       ) : (
-        <div style={{ height: 'clamp(300px, 56vh, 680px)', overflowY: 'scroll', overflowX: 'hidden', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ maxHeight: '480px', overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain', padding: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
           {filtered.map((leave, idx) => {
             const sv = STATUS_V[leave.status] || STATUS_V.pending;
             const Icon = sv.icon;
@@ -1570,14 +1701,6 @@ ${empName}`
                           style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: '#2563EB', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, boxShadow: '0 2px 8px rgba(37,99,235,0.3)', whiteSpace: 'nowrap' }}>
                           Review <ChevronRight size={12} />
                         </motion.button>
-                      )}
-                      {mine && (
-                        <button
-                          onClick={() => { window.location.href = buildMailtoHR(leave); }}
-                          title="Email HR about this leave"
-                          style={{ width: 30, height: 30, borderRadius: 8, border: `1px solid ${B.blueBorder}`, background: B.blueBg, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <Mail size={13} style={{ color: B.blue }} />
-                        </button>
                       )}
                       {isAdmin && onAdminDelete && (
                         <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={() => onAdminDelete(leave._id)}

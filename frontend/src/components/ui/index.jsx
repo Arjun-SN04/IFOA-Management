@@ -115,7 +115,7 @@ export function Modal({ open, onClose, title, children, size = 'md' }) {
   if (!open) return null
   const sizes = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' }
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fadeIn" onClick={onClose} />
       <div className={`relative bg-white rounded-2xl shadow-2xl w-full ${sizes[size]} max-h-[90vh] overflow-y-auto scrollbar-thin animate-scaleIn`}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
@@ -132,17 +132,18 @@ export function Modal({ open, onClose, title, children, size = 'md' }) {
 
 // ─── Badge ────────────────────────────────────────────────────────────────────
 export function Badge({ children, variant = 'default', className = '' }) {
-  const variants = {
-    default:  'bg-slate-100 text-slate-600',
-    primary:  'bg-blue-700 text-white',
-    success:  'bg-emerald-50 text-emerald-700',
-    warning:  'bg-amber-50 text-amber-700',
-    danger:   'bg-red-50 text-red-700',
-    info:     'bg-sky-50 text-sky-700',
-    purple:   'bg-purple-50 text-purple-700',
+  const colors = {
+    default: { dot: '#94a3b8', text: '#64748b' },
+    primary: { dot: '#2563eb', text: '#2563eb' },
+    success: { dot: '#10b981', text: '#059669' },
+    warning: { dot: '#f59e0b', text: '#d97706' },
+    danger:  { dot: '#ef4444', text: '#dc2626' },
+    info:    { dot: '#0ea5e9', text: '#0284c7' },
+    purple:  { dot: '#8b5cf6', text: '#7c3aed' },
   }
+  const c = colors[variant] || colors.default;
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium ${variants[variant]} ${className}`}>
+    <span className={`text-xs font-semibold ${className}`} style={{ color: c.text }}>
       {children}
     </span>
   )

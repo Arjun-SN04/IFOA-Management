@@ -2,7 +2,9 @@ const mongoose = require('mongoose');
 
 const sprintSchema = new mongoose.Schema({
   name: { type: String, required: true },
-  project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true },
+  // Sprints are global (span all projects). `project` kept optional for backward
+  // compatibility / optional scoping, but no longer required.
+  project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project' },
   goal: { type: String },
   status: { type: String, enum: ['planned', 'active', 'completed'], default: 'planned' },
   startDate: { type: Date, required: true },

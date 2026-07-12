@@ -165,13 +165,13 @@ function Metric({ icon: Icon, label, value, hint, accentIndex = 0 }) {
 
 function StatusBadge({ status }) {
   const s = (status || 'todo').replace('-', ' ');
-  let bg, color;
-  if (status === 'done')             { bg = C.emeraldBg;  color = C.emerald; }
-  else if (status === 'in-progress') { bg = C.skyBg;      color = C.sky;     }
-  else if (status === 'in-review')   { bg = C.indigoBg;   color = C.indigo;  }
-  else                               { bg = C.surfaceAlt; color = C.slate;   }
+  let color;
+  if (status === 'done')             color = C.emerald;
+  else if (status === 'in-progress') color = C.sky;
+  else if (status === 'in-review')   color = C.indigo;
+  else                               color = C.slate;
   return (
-    <span style={{ background: bg, color, fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 999, textTransform: 'capitalize', whiteSpace: 'nowrap' }}>
+    <span style={{ fontSize: 10, fontWeight: 600, color, textTransform: 'capitalize', whiteSpace: 'nowrap' }}>
       {s}
     </span>
   );
@@ -356,7 +356,6 @@ export default function DashboardPage() {
 
       <div style={{ border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
         <div style={{ padding: '9px 12px', borderBottom: `1px solid ${C.border}`, background: C.surfaceAlt, fontSize: 12, fontWeight: 700, color: C.blackMid, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 8, height: 8, borderRadius: 999, background: C.indigo, display: 'inline-block' }} />
           Upcoming deadlines and ownership
         </div>
         <div style={{ overflowX: 'auto' }}>
@@ -410,7 +409,7 @@ export default function DashboardPage() {
 
   /* ── Slide 2 : Activity ── */
   const slide2 = (
-    <div key="activity" style={{ display: 'grid', gridTemplateColumns: '1.15fr 1fr', gap: 12 }}>
+    <div key="activity" className="grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-3">
       <div style={{ border: `1px solid ${C.border}`, borderRadius: 14, padding: 12, background: C.surface }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
           <div>
@@ -473,16 +472,16 @@ export default function DashboardPage() {
 
   /* ── Slide 3 : Capacity / Action Queue ── */
   const slide3 = (
-    <div key="capacity" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+    <div key="capacity" className="grid grid-cols-1 lg:grid-cols-2 gap-3">
       <div style={{ border: `1px solid ${C.border}`, borderRadius: 14, padding: 12, background: C.surface }}>
-        <h3 style={{ margin: 0, fontSize: 16, color: C.black, fontWeight: 700 }}>Capacity and Leave</h3>
+        <h3 style={{ margin: 0, fontSize: 16, color: C.black, fontWeight: 700 }}>Leave</h3>
         <p style={{ margin: '4px 0 14px', fontSize: 12, color: C.slateMid }}>Current leave ledger and request status.</p>
         {leaveBalance ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
             {leaveSummaryItems.map(([label, value]) => {
               const acc = leaveTileAccent[label] || { bg: C.surfaceAlt, color: C.slate };
               return (
-                <div key={label} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, background: acc.bg }}>
+                <div key={label} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, background: C.surface, boxShadow: '0 1px 2px rgba(15,23,42,0.02)' }}>
                   <p style={{ margin: 0, fontSize: 11, color: acc.color, fontWeight: 700 }}>{label}</p>
                   <p style={{ margin: '8px 0 0', fontSize: 24, color: C.black, fontWeight: 700 }}>{value}</p>
                 </div>

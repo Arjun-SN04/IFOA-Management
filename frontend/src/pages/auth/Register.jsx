@@ -160,9 +160,9 @@ export default function Register() {
         .reg-card { animation: regSlideUp 0.55s cubic-bezier(.22,1,.36,1) both; }
 
         .rf-input {
-          width: 100%; padding: 13px 13px 13px 42px;
-          border: 1.5px solid #E8ECF4; border-radius: 12px;
-          font-size: 14px; font-family: 'Outfit', sans-serif;
+          width: 100%; padding: 10px 10px 10px 38px;
+          border: 1.5px solid #E8ECF4; border-radius: 10px;
+          font-size: 13.5px; font-family: 'Outfit', sans-serif;
           color: #1A1F36; background: #FAFBFF; outline: none;
           transition: border-color 0.22s, box-shadow 0.22s, background 0.22s;
         }
@@ -171,9 +171,9 @@ export default function Register() {
 
         .rf-select-wrap { position: relative; }
         .rf-select {
-          width: 100%; padding: 12px 36px 12px 14px;
-          border: 1.5px solid #E8ECF4; border-radius: 12px;
-          font-size: 14px; font-family: 'Outfit', sans-serif;
+          width: 100%; padding: 9px 32px 9px 12px;
+          border: 1.5px solid #E8ECF4; border-radius: 10px;
+          font-size: 13.5px; font-family: 'Outfit', sans-serif;
           color: #1A1F36; background: #FAFBFF; outline: none;
           appearance: none; cursor: pointer;
           transition: border-color 0.22s, box-shadow 0.22s;
@@ -293,10 +293,11 @@ export default function Register() {
           </div>
         </div>
 
-        {/* ── Right: Form (scrollable) ── */}
+        {/* ── Right: Form ── */}
         <div style={{
-          flex: 1, display: 'flex', alignItems: 'flex-start',
-          justifyContent: 'center', padding: '40px 20px 56px',
+          flex: 1, display: 'flex', alignItems: 'center',
+          justifyContent: 'center', padding: '24px 20px',
+          background: '#FFFFFF',
           overflowY: 'auto',
         }}>
           <div className="reg-card" style={{ width: '100%', maxWidth: 520 }}>
@@ -359,7 +360,7 @@ export default function Register() {
                 </div>
 
                 {/* Name + Email */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 7 }}>Full Name</label>
                     <div style={{ position: 'relative' }}>
@@ -394,41 +395,35 @@ export default function Register() {
                   </div>
                 </div>
 
-                {/* Role selector — column layout, properly contained */}
+                {/* Role selector — compact toggle button row */}
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10 }}>Your Role</label>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    {ROLE_OPTIONS.map(({ value, label, icon: Icon, color, bg, desc }) => {
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>Your Role</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {ROLE_OPTIONS.map(({ value, label, icon: Icon, color, bg }) => {
                       const isSel = form.role === value;
                       return (
                         <button
-                          key={value} type="button" className="role-card"
+                          key={value} type="button"
                           onClick={() => setRole(value)}
                           style={{
-                            borderColor: isSel ? color : '#E8ECF4',
-                            background: isSel ? bg : '#FAFBFF',
-                            boxShadow: isSel ? `0 0 0 3px ${color}22` : 'none',
+                            flex: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 8,
+                            padding: '9px 12px',
+                            borderRadius: 10,
+                            border: `1.5px solid ${isSel ? color : '#E8ECF4'}`,
+                            background: isSel ? bg : '#fff',
+                            cursor: 'pointer',
+                            fontSize: 13,
+                            fontWeight: 700,
+                            color: isSel ? color : '#475569',
+                            transition: 'all 0.15s',
                           }}
                         >
-                          <div style={{
-                            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                            background: isSel ? color : '#F1F5F9',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            transition: 'background 0.2s',
-                          }}>
-                            <Icon size={15} color={isSel ? '#fff' : '#94A3B8'} />
-                          </div>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: isSel ? color : '#374151', lineHeight: 1 }}>{label}</div>
-                          <div style={{ fontSize: 10, color: '#94A3B8', lineHeight: 1.3, textAlign: 'center' }}>{desc}</div>
-                          <div style={{
-                            width: 14, height: 14, borderRadius: '50%',
-                            border: `2px solid ${isSel ? color : '#D1D5DB'}`,
-                            background: isSel ? color : 'transparent',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            transition: 'all 0.2s',
-                          }}>
-                            {isSel && <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#fff' }} />}
-                          </div>
+                          <Icon size={14} />
+                          {label}
                         </button>
                       );
                     })}
@@ -436,26 +431,26 @@ export default function Register() {
                 </div>
 
                 {/* Additional info */}
-                <div style={{ padding: '16px 18px', background: '#F8FAFF', border: '1.5px solid #E8ECF4', borderRadius: 16 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: '#1D4ED8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Additional Information</span>
-                    <span style={{ fontSize: 10, color: '#94A3B8', padding: '2px 8px', background: '#EEF2FF', borderRadius: 999 }}>Optional</span>
+                <div style={{ padding: '12px 14px', background: '#F8FAFF', border: '1.5px solid #E8ECF4', borderRadius: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: '#1D4ED8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Additional Information</span>
+                    <span style={{ fontSize: 9, color: '#94A3B8', padding: '1px 6px', background: '#EEF2FF', borderRadius: 999 }}>Optional</span>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 7 }}>Department</label>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Department</label>
                       <div className="rf-select-wrap">
                         <select className="rf-select" value={form.department} onChange={set('department')}>
-                          <option value="">Select department…</option>
+                          <option value="">Select...</option>
                           {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                         </select>
                       </div>
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 7 }}>Designation</label>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Designation</label>
                       <div className="rf-select-wrap">
                         <select className="rf-select" value={form.designation} onChange={set('designation')}>
-                          <option value="">Select designation…</option>
+                          <option value="">Select...</option>
                           {designationOptions.map(d => <option key={d} value={d}>{d}</option>)}
                         </select>
                       </div>

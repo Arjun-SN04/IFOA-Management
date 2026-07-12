@@ -52,7 +52,7 @@ function PriorityBadge({ priority }) {
   const m = PRIORITY_META[priority] || PRIORITY_META.medium;
   const Icon = m.icon;
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold" style={{ background: m.bg, color: m.color }}>
+    <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: m.color }}>
       <Icon size={10} strokeWidth={2.5} />{m.label}
     </span>
   );
@@ -62,7 +62,7 @@ function StatusPill({ status }) {
   const col = COLUMNS.find(c => c.key === status) || COLUMNS[0];
   const Icon = col.icon;
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${col.color} ${col.border}`}>
+    <span className="inline-flex items-center gap-1.5 text-xs font-semibold" style={{ color: col.fill }}>
       <Icon className="w-3 h-3" />{col.label}
     </span>
   );
@@ -101,7 +101,7 @@ function TypeChip({ type }) {
   const m = TYPE_META[type] || TYPE_META.task;
   const Icon = m.icon;
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5, background: m.bg, color: m.color, border: `1px solid ${m.border}` }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 600, color: m.color }}>
       <Icon size={9} /> {m.label}
     </span>
   );
@@ -112,16 +112,17 @@ function ClaimBadge({ task, myId }) {
   if (!task.isTeamTask) return null;
   if (task.claimedBy) {
     const isMine = String(task.claimedBy?._id || task.claimedBy) === myId;
+    const color = isMine ? '#059669' : '#92400e';
     return (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: isMine ? '#ecfdf5' : '#fef9c3', color: isMine ? '#059669' : '#92400e', border: `1px solid ${isMine ? '#a7f3d0' : '#fde68a'}` }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, fontWeight: 600, color }}>
         <UserCheck size={9} />
         {isMine ? 'Claimed by you' : `Claimed by ${task.claimedBy?.name?.split(' ')[0] || 'teammate'}`}
       </span>
     );
   }
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
-      <Users size={9} /> Team task · unclaimed
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, fontWeight: 600, color: '#64748b' }}>
+      <Users size={9} /> Team · unclaimed
     </span>
   );
 }
@@ -458,6 +459,16 @@ export default function TasksPage() {
       setSearchParams(next, { replace: true });
     }
   }, [searchParams, tasks, setSearchParams]);
+
+  // Open create modal when ?create=true is in URL
+  useEffect(() => {
+    if (searchParams.get('create') === 'true') {
+      setShowCreate(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('create');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   // ── Socket events ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -990,50 +1001,54 @@ export default function TasksPage() {
 
           {/* ── HIERARCHY ────────────────────────────────────────────────── */}
           {view === 'hierarchy' && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <HierarchyView tasks={filtered} onSelect={setSelected} onCreateChild={handleCreateChild} canCreate={canCreateTask} handleStatusChange={handleStatusChange} />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ overflowX: 'auto' }}>
+              <div style={{ minWidth: 680 }}>
+                <HierarchyView tasks={filtered} onSelect={setSelected} onCreateChild={handleCreateChild} canCreate={canCreateTask} handleStatusChange={handleStatusChange} />
+              </div>
             </motion.div>
           )}
 
           {/* ── LIST ────────────────────────────────────────────────────── */}
           {view === 'list' && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
-              {filtered.length === 0 ? (
-                <div className="p-16 text-center"><CheckSquare className="w-10 h-10 text-slate-200 mx-auto mb-3" /><p className="text-slate-500 font-medium">No tasks found</p></div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-[1fr_130px_100px_160px_100px] gap-4 px-5 py-3.5 bg-slate-50 border-b border-slate-100">
-                    {['Task','Project','Priority','Status','Due'].map(h => <span key={h} className="text-[10px] font-black uppercase tracking-widest text-slate-400">{h}</span>)}
-                  </div>
-                  <div className="divide-y divide-slate-50">
-                    {filtered.map((task, idx) => (
-                      <motion.div key={task._id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * .02 }}
-                        onClick={() => setSelected(task)}
-                        className="grid grid-cols-[1fr_130px_100px_160px_100px] gap-4 px-5 py-4 cursor-pointer hover:bg-slate-50/70 transition-all items-center group">
-                        <div className="flex items-center gap-3 min-w-0">
-                          {(task.claimedBy || task.assignee) && <Avatar name={(task.claimedBy || task.assignee)?.name} size="xs" />}
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-slate-800 truncate group-hover:text-blue-700">{task.title}</p>
-                            {task.isTeamTask && <ClaimBadge task={task} myId={myId} />}
-                            {!task.isTeamTask && task.assignee && isHROrAbove && <p className="text-xs text-slate-400 truncate">{task.assignee.name}</p>}
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ overflowX: 'auto' }}>
+              <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm" style={{ minWidth: 680 }}>
+                {filtered.length === 0 ? (
+                  <div className="p-16 text-center"><CheckSquare className="w-10 h-10 text-slate-200 mx-auto mb-3" /><p className="text-slate-500 font-medium">No tasks found</p></div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-[1fr_130px_100px_160px_100px] gap-4 px-5 py-3.5 bg-slate-50 border-b border-slate-100">
+                      {['Task','Project','Priority','Status','Due'].map(h => <span key={h} className="text-[10px] font-black uppercase tracking-widest text-slate-400">{h}</span>)}
+                    </div>
+                    <div className="divide-y divide-slate-50">
+                      {filtered.map((task, idx) => (
+                        <motion.div key={task._id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * .02 }}
+                          onClick={() => setSelected(task)}
+                          className="grid grid-cols-[1fr_130px_100px_160px_100px] gap-4 px-5 py-4 cursor-pointer hover:bg-slate-50/70 transition-all items-center group">
+                          <div className="flex items-center gap-3 min-w-0">
+                            {(task.claimedBy || task.assignee) && <Avatar name={(task.claimedBy || task.assignee)?.name} size="xs" />}
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-slate-800 truncate group-hover:text-blue-700">{task.title}</p>
+                              {task.isTeamTask && <ClaimBadge task={task} myId={myId} />}
+                              {!task.isTeamTask && task.assignee && isHROrAbove && <p className="text-xs text-slate-400 truncate">{task.assignee.name}</p>}
+                            </div>
                           </div>
-                        </div>
-                        <p className="text-xs text-slate-500 truncate">{task.project?.name || '—'}</p>
-                        <PriorityBadge priority={task.priority} />
-                        <span onClick={e => e.stopPropagation()}>
-                          {isHR ? <StatusPill status={task.status} /> : (
-                            <select value={task.status} onChange={e => handleStatusChange(task._id, e.target.value)}
-                              className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-300 w-full cursor-pointer">
-                              {COLUMNS.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
-                            </select>
-                          )}
-                        </span>
-                        <DueLabel dueDate={task.dueDate} />
-                      </motion.div>
-                    ))}
-                  </div>
-                </>
-              )}
+                          <p className="text-xs text-slate-500 truncate">{task.project?.name || '—'}</p>
+                          <PriorityBadge priority={task.priority} />
+                          <span onClick={e => e.stopPropagation()}>
+                            {isHR ? <StatusPill status={task.status} /> : (
+                              <select value={task.status} onChange={e => handleStatusChange(task._id, e.target.value)}
+                                className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-300 w-full cursor-pointer">
+                                {COLUMNS.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+                              </select>
+                            )}
+                          </span>
+                          <DueLabel dueDate={task.dueDate} />
+                        </motion.div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </motion.div>
           )}
         </>

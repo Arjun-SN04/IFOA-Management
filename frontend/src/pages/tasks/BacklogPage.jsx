@@ -293,23 +293,24 @@ export default function BacklogPage() {
       {personalBacklog.length > 0 && (
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <div style={{ width: 8, height: 8, borderRadius: 999, background: '#2563EB' }} />
             <span style={{ fontSize: 11, fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '.07em' }}>Personal Backlog</span>
             <span style={{ fontSize: 11, fontWeight: 700, color: '#2563EB', background: '#EFF6FF', padding: '1px 8px', borderRadius: 999 }}>{personalBacklog.length}</span>
             <span style={{ fontSize: 11, color: '#94A3B8', marginLeft: 4 }}>· You can edit or delete your tasks here</span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {personalBacklog.map(task => (
-              <BacklogRow
-                key={task._id}
-                task={task}
-                myId={myId}
-                onClaim={handleClaim}
-                onEdit={openEdit}
-                onDelete={handleDelete}
-                isManagerOrAdmin={isManagerOrAdmin}
-              />
-            ))}
+          <div style={{ overflowX: 'auto' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 650 }}>
+              {personalBacklog.map(task => (
+                <BacklogRow
+                  key={task._id}
+                  task={task}
+                  myId={myId}
+                  onClaim={handleClaim}
+                  onEdit={openEdit}
+                  onDelete={handleDelete}
+                  isManagerOrAdmin={isManagerOrAdmin}
+                />
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -318,23 +319,24 @@ export default function BacklogPage() {
       {teamBacklog.length > 0 && (
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <div style={{ width: 8, height: 8, borderRadius: 999, background: '#7C3AED' }} />
             <span style={{ fontSize: 11, fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '.07em' }}>Team Backlog</span>
             <span style={{ fontSize: 11, fontWeight: 700, color: '#7C3AED', background: '#F5F3FF', padding: '1px 8px', borderRadius: 999 }}>{teamBacklog.length}</span>
             <span style={{ fontSize: 11, color: '#94A3B8', marginLeft: 4 }}>· Claim a task to move it to your board</span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {teamBacklog.map(task => (
-              <BacklogRow
-                key={task._id}
-                task={task}
-                myId={myId}
-                onClaim={handleClaim}
-                onEdit={isManagerOrAdmin ? openEdit : undefined}
-                onDelete={isManagerOrAdmin ? handleDelete : undefined}
-                isManagerOrAdmin={isManagerOrAdmin}
-              />
-            ))}
+          <div style={{ overflowX: 'auto' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 650 }}>
+              {teamBacklog.map(task => (
+                <BacklogRow
+                  key={task._id}
+                  task={task}
+                  myId={myId}
+                  onClaim={handleClaim}
+                  onEdit={isManagerOrAdmin ? openEdit : undefined}
+                  onDelete={isManagerOrAdmin ? handleDelete : undefined}
+                  isManagerOrAdmin={isManagerOrAdmin}
+                />
+              ))}
+            </div>
           </div>
         </div>
       )}

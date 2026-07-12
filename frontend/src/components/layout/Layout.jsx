@@ -8,6 +8,19 @@ import { useNotifications } from '../../context/NotificationContext';
 
 export default function Layout() {
   const [collapsed, setCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      if (!mobile) setMobileOpen(false);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const [activeAnnouncement, setActiveAnnouncement] = useState(null);
   const { user } = useAuth();
   const { notifications, markRead } = useNotifications();
@@ -104,10 +117,23 @@ export default function Layout() {
 
   return (
     <>
-      <div className="flex h-screen overflow-hidden" style={{ background: 'var(--surface-2)' }}>
-        <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
+      <div className="flex h-screen overflow-hidden" style={{ background: 'var(--surface-2)', position: 'relative' }}>
+        {isMobile && mobileOpen && (
+          <div
+            onClick={() => setMobileOpen(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(15, 23, 42, 0.4)',
+              zIndex: 85,
+              backdropFilter: 'blur(1px)',
+              transition: 'opacity 0.2s ease',
+            }}
+          />
+        )}
+        <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} isMobile={isMobile} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
         <main className="flex-1 overflow-y-auto scrollbar-thin" style={{ background: '#F8FAFC' }}>
-          <DashboardTopbar />
+          <DashboardTopbar isMobile={isMobile} onToggleSidebar={() => setMobileOpen(prev => !prev)} />
           <div className="px-6 py-5 lg:px-10 lg:py-7">
             <Outlet />
           </div>

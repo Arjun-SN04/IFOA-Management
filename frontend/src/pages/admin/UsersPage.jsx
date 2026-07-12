@@ -327,7 +327,7 @@ function RoleSection({ role, users, me, canManageAssets, canRaiseNoc, canEditEmp
       </button>
       {!collapsed && <div style={{ height: 2, background: `linear-gradient(90deg,${cfg.accent}40,transparent)`, borderRadius: 999, marginBottom: 14 }} />}
       {!collapsed && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(340px,1fr))', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 14 }}>
           {users.map(u => (
             <UserCard key={u._id} u={u} me={me}
               canManageAssets={canManageAssets}
@@ -371,7 +371,7 @@ export default function UsersPage() {
   const [reviewComment, setReviewComment]       = useState('');
   const [showDeleteModal, setShowDeleteModal]   = useState(null);
   const [deleting, setDeleting]                 = useState(false);
-  const [showNocPanel, setShowNocPanel]         = useState(false);
+  const [subPage, setSubPage]                   = useState('directory'); // 'directory' or 'noc'
   const [showEditEmpIdModal, setShowEditEmpIdModal] = useState(null); // user object or null
 
   const loadUsers = useCallback(() => {
@@ -644,211 +644,286 @@ export default function UsersPage() {
   return (
     <div style={{ padding: '0 0 40px' }}>
       <div style={{ marginBottom: 28 }}>
-        <p style={{ margin: 0, fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: '#64748B' }}>{isAdmin ? 'Admin Panel' : isManager ? 'Manager Panel' : 'HR Panel'}</p>
-        <h1 style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 800, color: '#0F172A', lineHeight: 1.15 }}>Team Directory</h1>
+        <p style={{ margin: 0, fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: '#64748B' }}>
+          {subPage === 'noc' 
+            ? 'Organisation' 
+            : (isAdmin ? 'Admin Panel' : isManager ? 'Manager Panel' : 'HR Panel')}
+        </p>
+        <h1 style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 800, color: '#0F172A', lineHeight: 1.15 }}>
+          {subPage === 'noc' ? 'NOC Requests' : 'Team Directory'}
+        </h1>
         <p style={{ margin: '6px 0 0', fontSize: 13, color: '#64748B' }}>
-          {visibleFiltered.length} member{visibleFiltered.length !== 1 ? 's' : ''} &nbsp;·&nbsp;
-          <span style={{ color: '#059669', fontWeight: 600 }}>{totalActive} active</span>
-          {totalInactive > 0 && <><span style={{ color: '#94A3B8' }}> · </span><span style={{ color: '#DC2626', fontWeight: 600 }}>{totalInactive} inactive</span></>}
-          {pendingUsers.length > 0 && <><span style={{ color: '#94A3B8' }}> · </span><span style={{ color: '#D97706', fontWeight: 700 }}>{pendingUsers.length} awaiting approval</span></>}
+          {subPage === 'noc' ? (
+            <>
+              {nocs.length} request{nocs.length !== 1 ? 's' : ''} &nbsp;·&nbsp;
+              <span style={{ color: '#059669', fontWeight: 600 }}>{nocs.filter(n => n.status === 'approved').length} approved</span> &nbsp;·&nbsp;
+              <span style={{ color: '#D97706', fontWeight: 600 }}>{nocs.filter(n => n.status === 'pending').length} pending</span>
+            </>
+          ) : (
+            <>
+              {visibleFiltered.length} member{visibleFiltered.length !== 1 ? 's' : ''} &nbsp;·&nbsp;
+              <span style={{ color: '#059669', fontWeight: 600 }}>{totalActive} active</span>
+              {totalInactive > 0 && <><span style={{ color: '#94A3B8' }}> · </span><span style={{ color: '#DC2626', fontWeight: 600 }}>{totalInactive} inactive</span></>}
+              {pendingUsers.length > 0 && <><span style={{ color: '#94A3B8' }}> · </span><span style={{ color: '#D97706', fontWeight: 700 }}>{pendingUsers.length} awaiting approval</span></>}
+            </>
+          )}
         </p>
       </div>
 
-      {/* ── PENDING APPROVALS BANNER ── */}
-      {pendingUsers.length > 0 && (
-        <div style={{ marginBottom: 28, background: '#FFFBEB', border: '1.5px solid #FDE68A', borderRadius: 16, overflow: 'hidden' }}>
-          <div style={{ padding: '14px 20px', borderBottom: '1px solid #FDE68A', background: '#FEF3C7', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 38, height: 38, borderRadius: 10, background: '#FDE68A', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Clock size={18} style={{ color: '#92400E' }} />
+      {/* Tab Switcher */}
+      {(isManager || isHR || isAdmin) && (
+        <div style={{ display: 'flex', gap: 6, borderBottom: '1px solid #E2E8F0', paddingBottom: 1, marginBottom: 24 }}>
+          <button
+            type="button"
+            onClick={() => setSubPage('directory')}
+            style={{
+              padding: '10px 16px',
+              border: 'none',
+              background: 'none',
+              borderBottom: subPage === 'directory' ? '3px solid #2563EB' : '3px solid transparent',
+              color: subPage === 'directory' ? '#2563EB' : '#64748B',
+              fontWeight: 700,
+              fontSize: 14,
+              cursor: 'pointer',
+              transition: 'all 0.15s'
+            }}
+          >
+            Team Directory
+          </button>
+          <button
+            type="button"
+            onClick={() => setSubPage('noc')}
+            style={{
+              padding: '10px 16px',
+              border: 'none',
+              background: 'none',
+              borderBottom: subPage === 'noc' ? '3px solid #2563EB' : '3px solid transparent',
+              color: subPage === 'noc' ? '#2563EB' : '#64748B',
+              fontWeight: 700,
+              fontSize: 14,
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8
+            }}
+          >
+            NOC Requests
+            {nocs.filter(n => n.status === 'pending').length > 0 && (
+              <span style={{ fontSize: 10, background: '#DC2626', color: '#fff', padding: '1px 6px', borderRadius: 999, fontWeight: 800 }}>
+                {nocs.filter(n => n.status === 'pending').length}
+              </span>
+            )}
+          </button>
+        </div>
+      )}
+
+      {subPage === 'directory' ? (
+        <>
+          {/* ── PENDING APPROVALS BANNER ── */}
+          {pendingUsers.length > 0 && (
+            <div style={{ marginBottom: 28, background: '#FFFBEB', border: '1.5px solid #FDE68A', borderRadius: 16, overflow: 'hidden' }}>
+              <div style={{ padding: '14px 20px', borderBottom: '1px solid #FDE68A', background: '#FEF3C7', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: '#FDE68A', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Clock size={18} style={{ color: '#92400E' }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#78350F' }}>Pending Approval Requests</p>
+                  <p style={{ margin: 0, fontSize: 11, color: '#92400E' }}>
+                    {pendingUsers.length} account{pendingUsers.length !== 1 ? 's' : ''} awaiting your approval before they can access the dashboard
+                  </p>
+                </div>
+                <span style={{ fontSize: 22, fontWeight: 800, color: '#B45309', background: '#FDE68A', borderRadius: 10, padding: '4px 14px' }}>
+                  {pendingUsers.length}
+                </span>
+              </div>
+              <div style={{ padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {pendingUsers.map(u => (
+                  <div key={u._id} style={{ background: '#fff', border: '1px solid #FDE68A', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg,#D97706,#B45309)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#fff', fontSize: 14, flexShrink: 0 }}>
+                      {(u.name || 'U').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 180 }}>
+                      <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0F172A' }}>{u.name}</p>
+                      <p style={{ margin: '2px 0 0', fontSize: 12, color: '#64748B', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Mail size={11} />{u.email}
+                        {u.department && <><span style={{ color: '#CBD5E1' }}>·</span><Building2 size={11} />{u.department}</>}
+                      </p>
+                      <p style={{ margin: '2px 0 0', fontSize: 11, color: '#94A3B8' }}>
+                        Registered {new Date(u.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                      <button
+                        disabled={approvingId === u._id}
+                        onClick={() => handleApprove(u._id, true)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, border: '1px solid #A7F3D0', background: '#ECFDF5', color: '#065F46', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        <UserCheck size={13} /> Approve
+                      </button>
+                      <button
+                        disabled={approvingId === u._id}
+                        onClick={() => handleApprove(u._id, false)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, border: '1px solid #FECACA', background: '#FEF2F2', color: '#991B1B', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        <UserMinus size={13} /> Reject
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div style={{ flex: 1 }}>
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#78350F' }}>Pending Approval Requests</p>
-              <p style={{ margin: 0, fontSize: 11, color: '#92400E' }}>
-                {pendingUsers.length} account{pendingUsers.length !== 1 ? 's' : ''} awaiting your approval before they can access the dashboard
-              </p>
-            </div>
-            <span style={{ fontSize: 22, fontWeight: 800, color: '#B45309', background: '#FDE68A', borderRadius: 10, padding: '4px 14px' }}>
-              {pendingUsers.length}
-            </span>
+          )}
+
+          {/* Summary pills — scoped by viewer role */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 24 }}>
+            {Object.entries(ROLE_CFG).filter(([role]) => {
+              // Admin sees all pills
+              if (isAdmin) return true;
+              // HR sees manager + team_lead + employee pills only
+              if (isHR) return ['manager', 'team_lead', 'employee'].includes(role);
+              // Manager sees team_lead + employee pills only
+              if (isManager) return ['team_lead', 'employee'].includes(role);
+              return false;
+            }).map(([role, cfg]) => {
+              const count = byRole[role]?.length || 0;
+              const Icon  = cfg.icon;
+              return (
+                <div key={role} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 12, background: cfg.accentBg, border: `1px solid ${cfg.accentBorder}` }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 8, background: cfg.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon size={14} style={{ color: '#fff' }} />
+                  </div>
+                  <div>
+                    <p style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>{count}</p>
+                    <p style={{ margin: 0, fontSize: 10, color: cfg.accent, fontWeight: 700, textTransform: 'capitalize' }}>{cfg.label}</p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <div style={{ padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {pendingUsers.map(u => (
-              <div key={u._id} style={{ background: '#fff', border: '1px solid #FDE68A', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-                <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg,#D97706,#B45309)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#fff', fontSize: 14, flexShrink: 0 }}>
-                  {(u.name || 'U').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase()}
+
+          {/* Filters */}
+          <div style={{ display: 'flex', gap: 10, marginBottom: 28, flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', flex: '1 1 220px', minWidth: 180 }}>
+              <Search size={14} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+              <input placeholder="Search by name, email or department…" value={search} onChange={e => setSearch(e.target.value)}
+                style={{ width: '100%', paddingLeft: 32, paddingRight: 12, paddingTop: 9, paddingBottom: 9, fontSize: 13, border: '1px solid #E2E8F0', borderRadius: 10, background: '#fff', color: '#0F172A', outline: 'none', boxSizing: 'border-box' }} />
+            </div>
+            <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)}
+              style={{ padding: '9px 12px', fontSize: 13, border: '1px solid #E2E8F0', borderRadius: 10, background: '#fff', color: '#334155', minWidth: 160 }}>
+              <option value="">All Departments</option>
+              {departments.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+            {(search || deptFilter) && (
+              <button onClick={() => { setSearch(''); setDeptFilter(''); }}
+                style={{ padding: '9px 14px', fontSize: 12, fontWeight: 700, border: '1px solid #FECACA', borderRadius: 10, background: '#FEF2F2', color: '#DC2626', cursor: 'pointer' }}>
+                Clear
+              </button>
+            )}
+          </div>
+
+          {/* Role sections */}
+          {visibleFiltered.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '60px 20px', border: '1px dashed #E2E8F0', borderRadius: 16 }}>
+              <Users size={36} style={{ color: '#CBD5E1', margin: '0 auto 10px' }} />
+              <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#64748B' }}>No users found</p>
+            </div>
+          ) : (
+            <>
+              <RoleSection role="admin"     users={byRole.admin}     {...roleProps} />
+              <RoleSection role="manager"   users={byRole.manager}   {...roleProps} />
+              <RoleSection role="hr"        users={byRole.hr}        {...roleProps} />
+              <RoleSection role="team_lead" users={byRole.team_lead} {...roleProps} />
+              <RoleSection role="employee"  users={byRole.employee}  {...roleProps} />
+            </>
+          )}
+        </>
+      ) : (
+        /* subPage === 'noc' */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* NOC Header Card with stats */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            {[
+              { label: 'Pending NOCs', count: nocs.filter(n => n.status === 'pending').length, color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+              { label: 'Approved NOCs', count: nocs.filter(n => n.status === 'approved').length, color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+              { label: 'Rejected NOCs', count: nocs.filter(n => n.status === 'rejected').length, color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+            ].map(card => (
+              <div key={card.label} style={{ flex: '1 1 200px', background: '#fff', border: '1px solid #E2E8F0', borderRadius: 16, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: card.bg, border: `1px solid ${card.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <FileWarning size={16} style={{ color: card.color }} />
                 </div>
-                <div style={{ flex: 1, minWidth: 180 }}>
-                  <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0F172A' }}>{u.name}</p>
-                  <p style={{ margin: '2px 0 0', fontSize: 12, color: '#64748B', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Mail size={11} />{u.email}
-                    {u.department && <><span style={{ color: '#CBD5E1' }}>·</span><Building2 size={11} />{u.department}</>}
-                  </p>
-                  <p style={{ margin: '2px 0 0', fontSize: 11, color: '#94A3B8' }}>
-                    Registered {new Date(u.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                  </p>
-                </div>
-                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                  <button
-                    disabled={approvingId === u._id}
-                    onClick={() => handleApprove(u._id, true)}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, border: '1px solid #A7F3D0', background: '#ECFDF5', color: '#065F46', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    <UserCheck size={13} /> Approve
-                  </button>
-                  <button
-                    disabled={approvingId === u._id}
-                    onClick={() => handleApprove(u._id, false)}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, border: '1px solid #FECACA', background: '#FEF2F2', color: '#991B1B', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    <UserMinus size={13} /> Reject
-                  </button>
+                <div>
+                  <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#0F172A' }}>{card.count}</p>
+                  <p style={{ margin: 0, fontSize: 11, color: '#64748B', fontWeight: 600 }}>{card.label}</p>
                 </div>
               </div>
             ))}
           </div>
-        </div>
-      )}
 
-      {/* Summary pills — scoped by viewer role */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 24 }}>
-        {Object.entries(ROLE_CFG).filter(([role]) => {
-          // Admin sees all pills
-          if (isAdmin) return true;
-          // HR sees manager + team_lead + employee pills only
-          if (isHR) return ['manager', 'team_lead', 'employee'].includes(role);
-          // Manager sees team_lead + employee pills only
-          if (isManager) return ['team_lead', 'employee'].includes(role);
-          return false;
-        }).map(([role, cfg]) => {
-          const count = byRole[role]?.length || 0;
-          const Icon  = cfg.icon;
-          return (
-            <div key={role} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 12, background: cfg.accentBg, border: `1px solid ${cfg.accentBorder}` }}>
-              <div style={{ width: 28, height: 28, borderRadius: 8, background: cfg.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon size={14} style={{ color: '#fff' }} />
-              </div>
+          {/* NOC Requests List */}
+          <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #E2E8F0', overflow: 'hidden', boxShadow: '0 3px 12px rgba(15,23,42,0.05)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid #F1F5F9', background: '#F8FAFC' }}>
               <div>
-                <p style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>{count}</p>
-                <p style={{ margin: 0, fontSize: 10, color: cfg.accent, fontWeight: 700, textTransform: 'capitalize' }}>{cfg.label}</p>
+                <h2 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#0F172A' }}>All NOC Requests</h2>
+                <p style={{ margin: '1px 0 0', fontSize: 11, color: '#64748B' }}>Non-Objection Certificates raised by managers</p>
               </div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#2563EB', background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '3px 10px', borderRadius: 999 }}>
+                {nocs.length} total
+              </span>
             </div>
-          );
-        })}
-      </div>
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 28, flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: '1 1 220px', minWidth: 180 }}>
-          <Search size={14} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
-          <input placeholder="Search by name, email or department…" value={search} onChange={e => setSearch(e.target.value)}
-            style={{ width: '100%', paddingLeft: 32, paddingRight: 12, paddingTop: 9, paddingBottom: 9, fontSize: 13, border: '1px solid #E2E8F0', borderRadius: 10, background: '#fff', color: '#0F172A', outline: 'none', boxSizing: 'border-box' }} />
-        </div>
-        <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)}
-          style={{ padding: '9px 12px', fontSize: 13, border: '1px solid #E2E8F0', borderRadius: 10, background: '#fff', color: '#334155', minWidth: 160 }}>
-          <option value="">All Departments</option>
-          {departments.map(d => <option key={d} value={d}>{d}</option>)}
-        </select>
-        {(search || deptFilter) && (
-          <button onClick={() => { setSearch(''); setDeptFilter(''); }}
-            style={{ padding: '9px 14px', fontSize: 12, fontWeight: 700, border: '1px solid #FECACA', borderRadius: 10, background: '#FEF2F2', color: '#DC2626', cursor: 'pointer' }}>
-            Clear
-          </button>
-        )}
-      </div>
-
-      {/* NOC Requests — dedicated dashboard section */}
-      {(isManager || isHR || isAdmin) && (
-        <div style={{ marginBottom: 32, background: '#fff', border: `1px solid ${showNocPanel ? '#FDE68A' : '#E2E8F0'}`, borderRadius: 16, overflow: 'hidden', boxShadow: '0 2px 8px rgba(15,23,42,.05)', transition: 'border-color 0.2s' }}>
-          <div style={{ padding: '14px 20px', borderBottom: showNocPanel ? '1px solid #FDE68A' : '1px solid #F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: '#FFFBF0', cursor: 'pointer' }} onClick={() => setShowNocPanel(v => !v)}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 34, height: 34, borderRadius: 10, background: '#FDE68A', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <FileWarning size={16} style={{ color: '#B45309' }} />
-              </div>
-              <div>
-                <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#0F172A' }}>NOC Requests</p>
-                <p style={{ margin: 0, fontSize: 11, color: '#92400E' }}>Non-Objection Certificates raised by managers</p>
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#059669', background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 999, padding: '3px 10px' }}>
-                {nocs.filter(n => n.status === 'approved').length} Approved
-              </span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#DC2626', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 999, padding: '3px 10px' }}>
-                {nocs.filter(n => n.status === 'rejected').length} Rejected
-              </span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#B45309', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 999, padding: '3px 10px' }}>
-                {nocs.filter(n => n.status === 'pending').length} Pending
-              </span>
-              <span style={{ fontSize: 13, color: '#94A3B8', marginLeft: 4 }}>{showNocPanel ? '▲' : '▼'}</span>
-            </div>
-          </div>
-          {showNocPanel && <div style={{ padding: '16px 20px' }}>
-            {nocs.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '28px 20px' }}>
-                <FileWarning size={32} style={{ color: '#CBD5E1', margin: '0 auto 8px' }} />
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#94A3B8' }}>No NOC requests yet</p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 320, overflowY: 'auto', paddingRight: 4 }}>
-                {nocs.map(n => (
-                  <div key={n._id} style={{ border: `1px solid ${n.status === 'approved' ? '#A7F3D0' : n.status === 'rejected' ? '#FECACA' : '#FDE68A'}`, borderRadius: 12, padding: '12px 14px', background: n.status === 'approved' ? '#F0FDF4' : n.status === 'rejected' ? '#FEF2F2' : '#FFFBEB' }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-                          <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0F172A' }}>{n.employee?.name}</p>
-                          <span style={{ fontSize: 10, fontWeight: 700, color: '#64748B', background: '#F1F5F9', border: '1px solid #E2E8F0', padding: '2px 7px', borderRadius: 999 }}>·</span>
-                          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#334155' }}>{n.accessoryName}</p>
+            <div style={{ padding: '20px' }}>
+              {nocs.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '32px 20px' }}>
+                  <FileWarning size={36} style={{ color: '#CBD5E1', margin: '0 auto 10px' }} />
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#94A3B8' }}>No NOC requests yet</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: '450px', overflowY: 'auto', paddingRight: 6 }}>
+                  {nocs.map(n => (
+                    <div key={n._id} style={{ border: `1px solid ${n.status === 'approved' ? '#A7F3D0' : n.status === 'rejected' ? '#FECACA' : '#FDE68A'}`, borderRadius: 12, padding: '12px 14px', background: n.status === 'approved' ? '#F0FDF4' : n.status === 'rejected' ? '#FEF2F2' : '#FFFBEB' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                            <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0F172A' }}>{n.employee?.name}</p>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: '#64748B', background: '#F1F5F9', border: '1px solid #E2E8F0', padding: '2px 7px', borderRadius: 999 }}>·</span>
+                            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#334155' }}>{n.accessoryName}</p>
+                          </div>
+                          <p style={{ margin: '0 0 4px', fontSize: 11, color: '#64748B' }}>
+                            <span style={{ textTransform: 'capitalize', fontWeight: 600 }}>{n.issueType}</span>
+                            {' · '}
+                            Raised by {n.raisedBy?.name || 'Manager'}
+                            {n.serialNumber && <> · Serial: <span style={{ fontFamily: 'monospace' }}>{n.serialNumber}</span></>}
+                          </p>
+                          <p style={{ margin: 0, fontSize: 12, color: '#334155' }}>{n.description}</p>
+                          {n.hrReviewComment && (
+                            <p style={{ margin: '6px 0 0', fontSize: 11, color: '#475569', fontStyle: 'italic' }}>Review note: {n.hrReviewComment}</p>
+                          )}
                         </div>
-                        <p style={{ margin: '0 0 4px', fontSize: 11, color: '#64748B' }}>
-                          <span style={{ textTransform: 'capitalize', fontWeight: 600 }}>{n.issueType}</span>
-                          {' · '}
-                          Raised by {n.raisedBy?.name || 'Manager'}
-                          {n.serialNumber && <> · Serial: <span style={{ fontFamily: 'monospace' }}>{n.serialNumber}</span></>}
-                        </p>
-                        <p style={{ margin: 0, fontSize: 12, color: '#334155' }}>{n.description}</p>
-                        {n.hrReviewComment && (
-                          <p style={{ margin: '6px 0 0', fontSize: 11, color: '#475569', fontStyle: 'italic' }}>Review note: {n.hrReviewComment}</p>
+                        <span style={{ fontSize: 11, fontWeight: 800, padding: '4px 10px', borderRadius: 999, textTransform: 'uppercase', flexShrink: 0, background: n.status === 'approved' ? '#ECFDF5' : n.status === 'rejected' ? '#FEF2F2' : '#FFFBEB', color: n.status === 'approved' ? '#059669' : n.status === 'rejected' ? '#DC2626' : '#B45309', border: `1px solid ${n.status === 'approved' ? '#A7F3D0' : n.status === 'rejected' ? '#FECACA' : '#FDE68A'}` }}>{n.status}</span>
+                        {(canReviewNoc || canRaiseNoc) && (
+                          <button onClick={() => deleteNoc(n._id)}
+                            title="Delete NOC"
+                            style={{ padding: '5px 7px', borderRadius: 8, border: '1px solid #FECACA', background: '#FEF2F2', color: '#DC2626', cursor: 'pointer', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                            <Trash2 size={13} />
+                          </button>
                         )}
                       </div>
-                      <span style={{ fontSize: 11, fontWeight: 800, padding: '4px 10px', borderRadius: 999, textTransform: 'uppercase', flexShrink: 0, background: n.status === 'approved' ? '#ECFDF5' : n.status === 'rejected' ? '#FEF2F2' : '#FFFBEB', color: n.status === 'approved' ? '#059669' : n.status === 'rejected' ? '#DC2626' : '#B45309', border: `1px solid ${n.status === 'approved' ? '#A7F3D0' : n.status === 'rejected' ? '#FECACA' : '#FDE68A'}` }}>{n.status}</span>
-                      {(canReviewNoc || canRaiseNoc) && (
-                        <button onClick={() => deleteNoc(n._id)}
-                          title="Delete NOC"
-                          style={{ padding: '5px 7px', borderRadius: 8, border: '1px solid #FECACA', background: '#FEF2F2', color: '#DC2626', cursor: 'pointer', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                          <Trash2 size={13} />
-                        </button>
+                      {canReviewNoc && n.status === 'pending' && (
+                        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #FDE68A', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <input value={reviewComment} onChange={e => setReviewComment(e.target.value)} placeholder="Review note (optional)"
+                            style={{ flex: '1 1 220px', minWidth: 160, padding: '7px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 12, outline: 'none' }} />
+                          <button onClick={() => reviewNoc(n._id, 'approved')} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #A7F3D0', background: '#ECFDF5', color: '#059669', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>✓ Approve</button>
+                          <button onClick={() => reviewNoc(n._id, 'rejected')} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #FECACA', background: '#FEF2F2', color: '#DC2626', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>✕ Reject</button>
+                        </div>
                       )}
                     </div>
-                    {canReviewNoc && n.status === 'pending' && (
-                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #FDE68A', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <input value={reviewComment} onChange={e => setReviewComment(e.target.value)} placeholder="Review note (optional)"
-                          style={{ flex: '1 1 220px', minWidth: 160, padding: '7px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 12, outline: 'none' }} />
-                        <button onClick={() => reviewNoc(n._id, 'approved')} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #A7F3D0', background: '#ECFDF5', color: '#059669', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>✓ Approve</button>
-                        <button onClick={() => reviewNoc(n._id, 'rejected')} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #FECACA', background: '#FEF2F2', color: '#DC2626', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>✕ Reject</button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>}
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-      )}
-
-      {/* Role sections */}
-      {visibleFiltered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px 20px', border: '1px dashed #E2E8F0', borderRadius: 16 }}>
-          <Users size={36} style={{ color: '#CBD5E1', margin: '0 auto 10px' }} />
-          <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#64748B' }}>No users found</p>
-        </div>
-      ) : (
-        <>
-          <RoleSection role="admin"     users={byRole.admin}     {...roleProps} />
-          <RoleSection role="manager"   users={byRole.manager}   {...roleProps} />
-          <RoleSection role="hr"        users={byRole.hr}        {...roleProps} />
-          <RoleSection role="team_lead" users={byRole.team_lead} {...roleProps} />
-          <RoleSection role="employee"  users={byRole.employee}  {...roleProps} />
-        </>
       )}
 
       {/* Role Change Modal */}

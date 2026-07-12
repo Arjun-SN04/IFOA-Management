@@ -155,17 +155,17 @@ export default function ProjectsPage() {
       {filtered.length === 0
         ? <Empty icon={FolderKanban} title="No projects found" description={search ? "Try a different search term" : "Create your first project to get started"} action={isManagerOrAdmin && <Button onClick={() => setShowCreate(true)}>Create Project</Button>} />
         : <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-            {filtered.map((p, idx) => (
-              <motion.div key={p._id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: idx * 0.05 }}>
-                <ProjectCard
-                  project={p}
-                  onClick={() => navigate(`/projects/${p._id}`)}
-                  canDelete={canDelete}
-                  onDelete={(e) => { e.stopPropagation(); setDeleteConfirm(p); }}
-                />
-              </motion.div>
-            ))}
-          </motion.div>
+          {filtered.map((p, idx) => (
+            <motion.div key={p._id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: idx * 0.05 }}>
+              <ProjectCard
+                project={p}
+                onClick={() => navigate(`/projects/${p._id}`)}
+                canDelete={canDelete}
+                onDelete={(e) => { e.stopPropagation(); setDeleteConfirm(p); }}
+              />
+            </motion.div>
+          ))}
+        </motion.div>
       }
 
       {/* ── Delete Confirm Modal ── */}
@@ -234,7 +234,6 @@ export default function ProjectsPage() {
                   return (
                     <div key={team._id} onClick={() => toggleTeam(team._id)}
                       style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, cursor: 'pointer', background: selected ? '#EFF6FF' : '#F8FAFC', border: `1.5px solid ${selected ? '#2563EB' : '#E2E8F0'}`, transition: 'all 0.15s' }}>
-                      <div style={{ width: 12, height: 12, borderRadius: 999, background: team.color || '#3B82F6', flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: selected ? '#1D4ED8' : '#0F172A' }}>{team.name}</p>
                         <p style={{ margin: '2px 0 0', fontSize: 11, color: '#64748B' }}>
@@ -296,17 +295,17 @@ export default function ProjectsPage() {
 
 // ── Project Card ──────────────────────────────────────────────────────────────
 const PROJECT_STATUS_CONFIG = {
-  'planning':    { color: '#8B5CF6', bg: '#F5F3FF', label: 'Planning',    border: '#DDD6FE' },
-  'active':      { color: '#2563EB', bg: '#EFF6FF', label: 'Active',       border: '#BFDBFE' },
-  'on-hold':     { color: '#D97706', bg: '#FFFBEB', label: 'On Hold',      border: '#FDE68A' },
-  'completed':   { color: '#059669', bg: '#ECFDF5', label: 'Completed',    border: '#A7F3D0' },
-  'cancelled':   { color: '#DC2626', bg: '#FEF2F2', label: 'Cancelled',    border: '#FECACA' },
+  'planning':  { color: '#8B5CF6', label: 'Planning'  },
+  'active':    { color: '#2563EB', label: 'Active'    },
+  'on-hold':   { color: '#D97706', label: 'On Hold'   },
+  'completed': { color: '#059669', label: 'Completed' },
+  'cancelled': { color: '#DC2626', label: 'Cancelled' },
 };
 const PROJECT_PRIORITY_CONFIG = {
-  low:      { color: '#16A34A', bg: '#F0FDF4', label: 'Low',      icon: '↓' },
-  medium:   { color: '#D97706', bg: '#FFFBEB', label: 'Medium',   icon: '−' },
-  high:     { color: '#EA580C', bg: '#FFF7ED', label: 'High',     icon: '↑' },
-  critical: { color: '#DC2626', bg: '#FEF2F2', label: 'Critical', icon: '↑↑' },
+  low:      { color: '#16A34A', label: 'Low'      },
+  medium:   { color: '#D97706', label: 'Medium'   },
+  high:     { color: '#EA580C', label: 'High'     },
+  critical: { color: '#DC2626', label: 'Critical' },
 };
 
 function ProjectCard({ project: p, onClick, canDelete, onDelete }) {
@@ -349,12 +348,13 @@ function ProjectCard({ project: p, onClick, canDelete, onDelete }) {
         </button>
       )}
 
-      {/* Status + priority badges */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', paddingRight: canDelete ? 36 : 0 }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 999, background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+      {/* Status · priority — plain text, no pill */}
+      <div style={{ display: 'flex', alignItems: 'center', paddingRight: canDelete ? 36 : 0 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: sc.color, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
           {sc.label}
         </span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 999, background: pc.bg, color: pc.color, fontSize: 10, fontWeight: 700 }}>
+        <span style={{ margin: '0 7px', fontSize: 11, color: '#CBD5E1' }}>·</span>
+        <span style={{ fontSize: 11, fontWeight: 700, color: pc.color, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
           {pc.label}
         </span>
       </div>

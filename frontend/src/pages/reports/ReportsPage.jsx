@@ -247,25 +247,27 @@ export default function ReportsPage() {
               <h3 className="text-sm font-semibold text-slate-900 mb-1">Tasks by Status</h3>
               <p className="text-xs text-slate-400 mb-4">Distribution of all tasks across workflow stages</p>
               {taskStatusData.length > 0 ? (
-                <div className="flex items-center gap-4">
-                  <ResponsiveContainer width="55%" height={220}>
-                    <PieChart>
-                      <Pie
-                        data={taskStatusData}
-                        cx="50%" cy="50%"
-                        innerRadius={55} outerRadius={85}
-                        paddingAngle={3}
-                        dataKey="count"
-                      >
-                        {taskStatusData.map((entry, i) => (
-                          <Cell key={i} fill={entry.fill} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<CustomTooltip />} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  <div className="w-full sm:w-[55%] h-[220px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={taskStatusData}
+                          cx="50%" cy="50%"
+                          innerRadius={55} outerRadius={85}
+                          paddingAngle={3}
+                          dataKey="count"
+                        >
+                          {taskStatusData.map((entry, i) => (
+                            <Cell key={i} fill={entry.fill} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<CustomTooltip />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
                   {/* Custom legend */}
-                  <div className="flex-1 space-y-2.5">
+                  <div className="flex-1 w-full space-y-2.5">
                     {taskStatusData.map((d, i) => (
                       <div key={i} className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -336,7 +338,6 @@ export default function ReportsPage() {
                   const sc = STATUS_COLORS[task.status] || { fill: '#94a3b8', label: task.status };
                   return (
                     <div key={task._id || i} className="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ background: sc.fill, flexShrink: 0 }} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-slate-800 truncate">{task.title}</p>
                         <p className="text-xs text-slate-400">{task.project?.name || '—'}</p>

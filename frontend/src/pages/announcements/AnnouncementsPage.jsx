@@ -148,19 +148,28 @@ export default function AnnouncementsPage() {
       </section>
 
       {/* ── Count row ── */}
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         {[
-          { label: 'Total',     value: published.length,                                      color: B.blue,    bg: B.blueBg   },
-          { label: 'Pinned',    value: pinned.length,                                         color: '#D97706', bg: '#FFFBEB'  },
-          { label: 'Urgent',    value: published.filter(a => a.priority === 'urgent').length,  color: '#DC2626', bg: '#FEF2F2'  },
+          { label: 'Total',     value: published.length,                                      color: B.blue },
+          { label: 'Pinned',    value: pinned.length,                                         color: '#D97706' },
+          { label: 'Urgent',    value: published.filter(a => a.priority === 'urgent').length,  color: '#DC2626' },
           ...(isHROrAbove && scheduled.length > 0
-            ? [{ label: 'Scheduled', value: scheduled.length, color: '#7C3AED', bg: '#F5F3FF' }]
+            ? [{ label: 'Scheduled', value: scheduled.length, color: '#7C3AED' }]
             : []),
         ].map((s, i) => (
           <motion.div key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
-            style={{ background: s.bg, borderRadius: 12, padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.value}</span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: s.color }}>{s.label}</span>
+            style={{
+              border: '1px solid #E2E8F0',
+              background: '#fff',
+              borderRadius: 10,
+              padding: '6px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              boxShadow: '0 1px 2px rgba(15,23,42,0.02)'
+            }}>
+            <span style={{ fontSize: 18, fontWeight: 800, color: s.color }}>{s.value}</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: B.slate }}>{s.label}</span>
           </motion.div>
         ))}
       </div>

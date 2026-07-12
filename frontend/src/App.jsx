@@ -6,7 +6,6 @@ import Layout from './components/layout/Layout'
 
 import LandingPage from './pages/landing/LandingPage'
 import Login from './pages/auth/Login'
-import Register from './pages/auth/Register'
 import DashboardPage from './pages/dashboard/DashboardPage'
 import ProjectsPage from './pages/projects/ProjectsPage'
 import ProjectDetailPage from './pages/projects/ProjectDetailPage'
@@ -87,7 +86,7 @@ export default function App() {
       <Routes>
         <Route index element={<LandingPage />} />
         <Route path="login"    element={<GuestRoute><Login /></GuestRoute>} />
-        <Route path="register" element={<GuestRoute><Register /></GuestRoute>} />
+        <Route path="register" element={<Navigate to="/login" replace />} />
 
         <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route path="dashboard"     element={<DashboardPage />} />

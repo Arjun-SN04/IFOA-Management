@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const {
-  getMyNotifications, markAsRead, markAllRead, deleteNotification, getUnreadCount
+  getMyNotifications, markAsRead, markAllRead, deleteNotification, deleteAllNotifications, getUnreadCount
 } = require('../controllers/notificationController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -9,6 +9,7 @@ const { protect } = require('../middleware/authMiddleware');
 router.get('/', protect, getMyNotifications);
 router.get('/unread-count', protect, getUnreadCount);
 router.patch('/mark-all-read', protect, markAllRead);
+router.delete('/clear-all', protect, deleteAllNotifications);
 
 // Wildcard /:id routes last
 router.patch('/:id/read', protect, markAsRead);

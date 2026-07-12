@@ -182,6 +182,8 @@ export default function Login() {
           alignItems: 'center',
           justifyContent: 'center',
           padding: '32px 20px',
+          background: '#FFFFFF',
+          overflowY: 'auto',
         }}>
           <div className="login-card" style={{ width: '100%', maxWidth: 440 }}>
 
@@ -286,12 +288,6 @@ export default function Login() {
               </form>
             </div>
 
-            <p style={{ textAlign: 'center', fontSize: 14, color: '#6B7280', marginTop: 24, fontWeight: 400 }}>
-              Don't have an account?{' '}
-              <Link to="/register" style={{ fontWeight: 700, color: '#1D4ED8', textDecoration: 'none' }}>
-                Create one
-              </Link>
-            </p>
           </div>
         </div>
       </div>
